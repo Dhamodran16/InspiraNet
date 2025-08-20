@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: inspiranet-frontend
+    env: static
+    buildCommand: npm install && npm run build
+    staticPublishPath: ./dist
+    envVars:
+      - key: VITE_BACKEND_URL
+        value: https://your-backend-api.com
+      - key: VITE_FRONTEND_URL
+        value: https://your-app-name.onrender.com
+      - key: VITE_SOCKET_URL
+        value: https://your-backend-api.com
+      - key: VITE_CLOUDINARY_CLOUD_NAME
+        value: your_cloudinary_cloud_name
+      - key: VITE_CLOUDINARY_UPLOAD_PRESET
+        value: your_cloudinary_upload_preset
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
