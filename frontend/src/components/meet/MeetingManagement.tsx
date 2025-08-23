@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -22,6 +23,7 @@ interface Meeting {
 }
 
 const MeetingManagement: React.FC = () => {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
   const [meetings, setMeetings] = useState<Meeting[]>([]);
@@ -78,7 +80,7 @@ const MeetingManagement: React.FC = () => {
         loadMeetings();
         
         // Automatically join the created meeting
-        window.open(`/meeting/${response.data.roomId}`, '_blank');
+        navigate(`/meeting/${response.data.roomId}`);
       }
     } catch (error) {
       console.error('Error creating meeting:', error);
@@ -103,7 +105,7 @@ const MeetingManagement: React.FC = () => {
       return;
     }
 
-    window.open(`/meeting/${joinRoomId.trim()}`, '_blank');
+    navigate(`/meeting/${joinRoomId.trim()}`);
     setIsJoinDialogOpen(false);
     setJoinRoomId('');
   };
@@ -307,7 +309,7 @@ const MeetingManagement: React.FC = () => {
                       </Button>
                       <Button
                         size="sm"
-                        onClick={() => window.open(`/meeting/${meeting.roomId}`, '_blank')}
+                        onClick={() => navigate(`/meeting/${meeting.roomId}`)}
                         title="Join Meeting"
                       >
                         <ExternalLink className="h-4 w-4 mr-1" />

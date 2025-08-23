@@ -460,7 +460,7 @@ const SignUpPage = () => {
                   By creating an account, you agree to our{' '}
                   <button 
                     type="button"
-                    onClick={() => window.open('/terms', '_blank')} 
+                    onClick={() => navigate('/terms')} 
                     className="text-cyan-300 hover:text-cyan-200 underline"
                   >
                     Terms of Service
@@ -468,7 +468,7 @@ const SignUpPage = () => {
                   {' '}and{' '}
                   <button 
                     type="button"
-                    onClick={() => window.open('/privacy-policy', '_blank')} 
+                    onClick={() => navigate('/privacy-policy')} 
                     className="text-cyan-300 hover:text-cyan-200 underline"
                   >
                     Privacy Policy
@@ -478,7 +478,7 @@ const SignUpPage = () => {
                   We use cookies to enhance your experience. See our{' '}
                   <button 
                     type="button"
-                    onClick={() => window.open('/cookie-policy', '_blank')} 
+                    onClick={() => navigate('/cookie-policy')} 
                     className="text-cyan-300 hover:text-cyan-200 underline"
                   >
                     Cookie Policy

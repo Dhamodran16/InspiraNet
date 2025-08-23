@@ -27,7 +27,7 @@ const CookieConsent = () => {
   };
 
   const handleSettings = () => {
-    window.open('/cookie-policy', '_blank');
+    navigate('/cookie-policy');
   };
 
   if (!showBanner) return null;
