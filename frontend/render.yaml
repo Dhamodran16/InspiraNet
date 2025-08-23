@@ -36,4 +36,5 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
-    # Render will automatically use static.json for routing
+    # Multiple routing configurations for maximum compatibility
+    # Render will use the first one it recognizes

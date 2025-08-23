@@ -1,16 +1,34 @@
-# SPA Routing for Render
+# SPA Routing for Render - More Explicit Rules
+# Catch all routes and serve index.html
 /*    /index.html   200
 
-# Handle specific routes that might cause issues
+# Explicit route handling for common paths
 /signin    /index.html   200
 /signup    /index.html   200
 /privacy-policy    /index.html   200
 /terms    /index.html   200
 /cookie-policy    /index.html   200
 /team    /index.html   200
+/meeting    /index.html   200
 /meeting/*    /index.html   200
 /dashboard    /index.html   200
 /profile    /index.html   200
 /messages    /index.html   200
 /notifications    /index.html   200
 /create-post    /index.html   200
+/profile-completion    /index.html   200
+/meeting-room    /index.html   200
+
+# Handle nested routes
+/meeting/:roomId    /index.html   200
+/profile/:userId    /index.html   200
+/messages/:conversationId    /index.html   200
+
+# Ensure static assets are served correctly
+/assets/*    /assets/*   200
+/icons/*    /icons/*   200
+*.ico    /favicon.ico   200
+*.png    /logo.png   200
+*.jpg    /kongu_main-entrance.jpg   200
+*.jpeg    /IT_part.jpeg   200
+*.css    /meeting-app.css   200
