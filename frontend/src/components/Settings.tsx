@@ -169,7 +169,7 @@ export default function Settings() {
     };
 
     // Connect socket events - using available methods
-    if (socketService.isConnected()) {
+            if (socketService.getConnectionStatus()) {
       handleSocketConnect();
     } else {
       socketService.connect();

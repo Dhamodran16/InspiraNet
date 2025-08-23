@@ -74,7 +74,7 @@ const EnhancedNotificationSettings: React.FC = () => {
     
     // Monitor connection status
     const checkConnection = () => {
-      setIsOnline(socketService.isConnected());
+              setIsOnline(socketService.getConnectionStatus());
     };
     
     // Check connection periodically

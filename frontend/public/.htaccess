@@ -18,3 +18,6 @@ Header always set Referrer-Policy strict-origin-when-cross-origin
 <FilesMatch "\.(html|json)$">
     Header set Cache-Control "public, max-age=0, must-revalidate"
 </FilesMatch>
+
+# Error handling for 404s
+ErrorDocument 404 /index.html
