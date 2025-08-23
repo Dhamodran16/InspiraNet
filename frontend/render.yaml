@@ -6,6 +6,39 @@ services:
     staticPublishPath: ./dist
     routes:
       - type: rewrite
+        source: /
+        destination: /index.html
+      - type: rewrite
+        source: /signin
+        destination: /index.html
+      - type: rewrite
+        source: /signup
+        destination: /index.html
+      - type: rewrite
+        source: /dashboard
+        destination: /index.html
+      - type: rewrite
+        source: /meeting
+        destination: /index.html
+      - type: rewrite
+        source: /meeting/(.*)
+        destination: /index.html
+      - type: rewrite
+        source: /privacy-policy
+        destination: /index.html
+      - type: rewrite
+        source: /terms
+        destination: /index.html
+      - type: rewrite
+        source: /cookie-policy
+        destination: /index.html
+      - type: rewrite
+        source: /profile/(.*)
+        destination: /index.html
+      - type: rewrite
+        source: /messages/(.*)
+        destination: /index.html
+      - type: rewrite
         source: /(.*)
         destination: /index.html
     headers:
