@@ -12,6 +12,7 @@ import { GraduationCap, Users, BookOpen, Eye, EyeOff } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { authService, LoginCredentials, RegisterData } from "@/services/auth";
+import { getBackendUrl } from "@/utils/urlConfig";
 
 interface AuthModalProps {
   children: React.ReactNode;
@@ -40,7 +41,7 @@ export default function AuthModal({ children, onAuthSuccess, defaultOpen, defaul
   useEffect(() => {
     const fetchDepartments = async () => {
       try {
-        const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/auth/departments`);
+        const response = await fetch(`${getBackendUrl()}/api/auth/departments`);
         if (response.ok) {
           const data = await response.json();
           setDepartments(data.departments);

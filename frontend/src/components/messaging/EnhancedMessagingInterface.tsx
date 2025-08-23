@@ -11,6 +11,7 @@ import { socketService } from '../../services/socketService';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../ui/dropdown-menu';
 import { Textarea } from '../ui/textarea';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
+import { getBackendUrl } from '../../utils/urlConfig';
 
 interface Message {
   _id: string;
