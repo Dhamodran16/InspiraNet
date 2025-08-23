@@ -12,8 +12,6 @@ import {
   MapPin, 
   Calendar, 
   Building, 
-  GraduationCap, 
-  Briefcase, 
   Globe, 
   Linkedin, 
   Github, 
@@ -405,55 +403,9 @@ const ProfileDisplay = ({ isOwnProfile = true, onEdit }: ProfileDisplayProps) =>
         </Card>
         )}
 
-        {/* Work Experience - Only show if data exists */}
-        {(user as any).workExperience && (user as any).workExperience.length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Briefcase className="h-5 w-5" />
-                Work Experience
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {(user as any).workExperience.map((exp: any, index: number) => (
-                <div key={index} className="border-l-4 border-blue-500 pl-4">
-                  <h4 className="font-medium">{exp.position}</h4>
-                  <p className="text-sm text-gray-600">{exp.company}</p>
-                  <p className="text-xs text-gray-500">
-                    {new Date(exp.startDate).toLocaleDateString()} - {exp.current ? 'Present' : new Date(exp.endDate).toLocaleDateString()}
-                  </p>
-                  {exp.description && (
-                    <p className="text-sm text-gray-700 mt-2">{exp.description}</p>
-                  )}
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-        )}
 
-        {/* Education - Only show if data exists */}
-        {(user as any).education && (user as any).education.length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <GraduationCap className="h-5 w-5" />
-                Education
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {(user as any).education.map((edu: any, index: number) => (
-                <div key={index} className="border-l-4 border-green-500 pl-4">
-                  <h4 className="font-medium">{edu.degree}</h4>
-                  <p className="text-sm text-gray-600">{edu.institution}</p>
-                  <p className="text-xs text-gray-500">{edu.year}</p>
-                  {edu.gpa && (
-                    <p className="text-sm text-gray-700">GPA: {edu.gpa}</p>
-                  )}
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-        )}
+
+
 
         {/* Profile Status */}
         <Card>

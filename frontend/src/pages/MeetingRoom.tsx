@@ -1,5 +1,5 @@
 ﻿import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -53,11 +53,12 @@ interface Message {
 
 export default function MeetingRoom() {
   const navigate = useNavigate();
+  const { roomId: urlRoomId } = useParams<{ roomId: string }>();
   const { user } = useAuth();
   const { toast } = useToast();
   
   // State variables
-  const [roomId, setRoomId] = useState('');
+  const [roomId, setRoomId] = useState(urlRoomId || '');
   const [username, setUsername] = useState(user?.name || '');
   const [isInMeeting, setIsInMeeting] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
@@ -184,6 +185,14 @@ export default function MeetingRoom() {
   useEffect(() => {
     loadRTCConfig();
   }, []);
+  
+  // Update roomId when URL parameter changes
+  useEffect(() => {
+    if (urlRoomId && urlRoomId !== roomId) {
+      setRoomId(urlRoomId);
+      console.log('✅ Room ID updated from URL:', urlRoomId);
+    }
+  }, [urlRoomId, roomId]);
 
   // Ensure video element is properly initialized
   useEffect(() => {
@@ -193,8 +202,10 @@ export default function MeetingRoom() {
       localVideoRef.current.play().catch(e => {
         console.error('Error playing local video:', e);
       });
+    } else if (localStream && !localVideoRef.current) {
+      console.log('Waiting for video ref to be available...');
     }
-  }, [localStream]);
+  }, [localStream, localVideoRef.current]);
 
   const setupSocketListeners = () => {
     if (meetingSocket) {
@@ -251,6 +262,28 @@ export default function MeetingRoom() {
       
       // Listen for media state updates
       meetingSocket.on('media-state-update', handleParticipantUpdate);
+      
+      // Listen for room joining confirmation
+      meetingSocket.on('meeting_joined', (data: any) => {
+        console.log('✅ Successfully joined meeting:', data);
+        setIsInMeeting(true);
+        setRoomId(data.roomId);
+        toast({
+          title: "Success",
+          description: `Joined room: ${data.roomId}`,
+        });
+      });
+      
+      // Listen for room joining errors
+      meetingSocket.on('meeting_join_error', (error: any) => {
+        console.error('❌ Failed to join meeting:', error);
+        toast({
+          title: "Join Failed",
+          description: error.message || "Failed to join the meeting room",
+          variant: "destructive"
+        });
+        setIsJoining(false);
+      });
     }
   };
 
@@ -271,6 +304,8 @@ export default function MeetingRoom() {
       meetingSocket.off('emoji-reaction');
       meetingSocket.off('participant-update');
       meetingSocket.off('media-state-update');
+      meetingSocket.off('meeting_joined');
+      meetingSocket.off('meeting_join_error');
     }
   };
 
@@ -414,12 +449,15 @@ export default function MeetingRoom() {
       return;
     }
 
-    const newRoomId = generateRoomId();
-    setRoomId(newRoomId);
+    // Use existing roomId from URL or generate new one if creating
+    const targetRoomId = roomId || generateRoomId();
+    if (!roomId) {
+      setRoomId(targetRoomId);
+    }
     
     try {
       await initializeLocalStream();
-      meetingSocket?.emit('join_meeting', { roomId: newRoomId, username });
+      meetingSocket?.emit('join_meeting', { roomId: targetRoomId, username });
       
       // Add current user to participants as host
       const currentParticipant: Participant = {
@@ -436,7 +474,7 @@ export default function MeetingRoom() {
       setIsHost(true);
       toast({
         title: "Meeting Created!",
-        description: `Welcome to room: ${newRoomId}`,
+        description: `Welcome to room: ${targetRoomId}`,
       });
       } catch (error) {
       console.error('Error creating meeting:', error);
@@ -484,7 +522,7 @@ export default function MeetingRoom() {
           console.error('Error playing local video:', e);
         });
       } else {
-        console.error('Local video ref is null!');
+        console.warn('Local video ref is null, will be set up in useEffect');
       }
       
       // Reset video/audio states
@@ -947,7 +985,7 @@ export default function MeetingRoom() {
         // Update media state
         meetingSocket?.emit('participant_media_update', {
           roomId,
-          isMuted: !isMuted,
+          isMuted: isMuted,
           isVideoOff: newVideoOffState
         });
         

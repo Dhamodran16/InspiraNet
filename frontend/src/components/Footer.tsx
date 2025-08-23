@@ -38,7 +38,7 @@ const Footer: React.FC<FooterProps> = ({ transparent = true }) => {
     <footer className={rootClasses}>
       <div className="container mx-auto px-4 py-12">
         {/* Main Footer Content */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {/* Company Info */}
           <div className="space-y-4">
             <h3 className="text-xl font-bold text-yellow-300">KEC Alumni Network</h3>
@@ -122,24 +122,6 @@ const Footer: React.FC<FooterProps> = ({ transparent = true }) => {
                   alumni@kec.edu
                 </button>
               </div>
-            </div>
-          </div>
-
-          {/* Newsletter */}
-          <div className="space-y-4">
-            <h4 className="text-lg font-semibold text-yellow-300">Stay Connected</h4>
-            <p className="text-white/80 text-sm">
-              Get updates about alumni events, job opportunities, and networking events.
-            </p>
-            <div className="flex">
-              <input
-                type="email"
-                placeholder="Enter your email"
-                className="flex-1 px-3 py-2 text-sm text-gray-900 bg-white rounded-l-md focus:outline-none focus:ring-2 focus:ring-yellow-300"
-              />
-              <button className="px-4 py-2 bg-yellow-300 text-black text-sm font-medium rounded-r-md hover:bg-yellow-400 transition-colors">
-                Subscribe
-              </button>
             </div>
           </div>
         </div>
