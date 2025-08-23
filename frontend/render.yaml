@@ -5,6 +5,7 @@ services:
     buildCommand: npm run build
     staticPublishPath: ./dist
     routes:
+      # Main routes
       - type: rewrite
         source: /
         destination: /index.html
@@ -18,11 +19,25 @@ services:
         source: /dashboard
         destination: /index.html
       - type: rewrite
-        source: /meeting
+        source: /profile
         destination: /index.html
       - type: rewrite
-        source: /meeting/(.*)
+        source: /profile/(.*)
         destination: /index.html
+      - type: rewrite
+        source: /messages
+        destination: /index.html
+      - type: rewrite
+        source: /notifications
+        destination: /index.html
+      - type: rewrite
+        source: /create-post
+        destination: /index.html
+      - type: rewrite
+        source: /profile-completion
+        destination: /index.html
+      
+      # Legal and policy pages - CRITICAL FOR YOUR ISSUE
       - type: rewrite
         source: /privacy-policy
         destination: /index.html
@@ -33,11 +48,18 @@ services:
         source: /cookie-policy
         destination: /index.html
       - type: rewrite
-        source: /profile/(.*)
+        source: /team
+        destination: /index.html
+      
+      # Meeting routes
+      - type: rewrite
+        source: /meeting
         destination: /index.html
       - type: rewrite
-        source: /messages/(.*)
+        source: /meeting/(.*)
         destination: /index.html
+      
+      # Catch-all for any other routes - MUST BE LAST
       - type: rewrite
         source: /(.*)
         destination: /index.html
