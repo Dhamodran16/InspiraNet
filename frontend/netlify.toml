@@ -1,0 +1,79 @@
+[build]
+  publish = "dist"
+  command = "npm run build"
+
+[[redirects]]
+  from = "/privacy-policy"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/terms"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/cookie-policy"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/cookies"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/team"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/meeting"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/signin"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/signup"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/dashboard"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/profile/*"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/messages"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/notifications"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/create-post"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/profile-completion"
+  to = "/index.html"
+  status = 200
+
+# Catch-all redirect
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

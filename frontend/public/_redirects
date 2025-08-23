@@ -1,5 +1,5 @@
-# SPA Routing for Render - Comprehensive Redirect Strategy
-# This ensures all routes work properly on Render.com
+# SPA Routing for Render.com - Aggressive Redirect Strategy
+# This ensures ALL routes work properly on Render.com
 
 # Root route
 /    /index.html   200
@@ -25,6 +25,11 @@
 # Meeting routes
 /meeting    /index.html   200
 /meeting/*    /index.html   200
+
+# Additional fallback routes
+/index.html    /index.html   200
+/404    /index.html   200
+/error    /index.html   200
 
 # Catch-all for any other routes - MUST BE LAST
 /*    /index.html   200

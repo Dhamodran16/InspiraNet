@@ -2,6 +2,29 @@
   X-Frame-Options: DENY
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=()
 
-/*
-  Cache-Control: public, max-age=0, must-revalidate
+# SPA Routing Headers
+/privacy-policy
+  X-Robots-Tag: noindex
+  Cache-Control: no-cache
+
+/terms
+  X-Robots-Tag: noindex
+  Cache-Control: no-cache
+
+/cookie-policy
+  X-Robots-Tag: noindex
+  Cache-Control: no-cache
+
+/cookies
+  X-Robots-Tag: noindex
+  Cache-Control: no-cache
+
+/team
+  X-Robots-Tag: noindex
+  Cache-Control: no-cache
+
+/meeting
+  X-Robots-Tag: noindex
+  Cache-Control: no-cache

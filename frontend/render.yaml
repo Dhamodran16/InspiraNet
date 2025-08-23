@@ -5,10 +5,12 @@ services:
     buildCommand: npm run build
     staticPublishPath: ./dist
     routes:
-      # Main routes
+      # Root route
       - type: rewrite
         source: /
         destination: /index.html
+      
+      # Main application routes
       - type: rewrite
         source: /signin
         destination: /index.html
@@ -60,6 +62,17 @@ services:
         destination: /index.html
       - type: rewrite
         source: /meeting/(.*)
+        destination: /index.html
+      
+      # Additional fallback routes
+      - type: rewrite
+        source: /index.html
+        destination: /index.html
+      - type: rewrite
+        source: /404
+        destination: /index.html
+      - type: rewrite
+        source: /error
         destination: /index.html
       
       # Catch-all for any other routes - MUST BE LAST

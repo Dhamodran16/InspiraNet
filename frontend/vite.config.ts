@@ -13,9 +13,11 @@ export default defineConfig({
         // Copy critical configuration files to dist folder
         const filesToCopy = [
           '_redirects',
+          '_headers',
           '404.html',
           'vercel.json',
-          'render.yaml'
+          'render.yaml',
+          'netlify.toml'
         ]
         
         for (const file of filesToCopy) {
