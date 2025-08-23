@@ -48,6 +48,9 @@ services:
         source: /cookie-policy
         destination: /index.html
       - type: rewrite
+        source: /cookies
+        destination: /index.html
+      - type: rewrite
         source: /team
         destination: /index.html
       

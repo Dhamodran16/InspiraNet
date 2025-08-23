@@ -1,8 +1,10 @@
 # SPA Routing for Render - Comprehensive Redirect Strategy
 # This ensures all routes work properly on Render.com
 
-# Main routes
+# Root route
 /    /index.html   200
+
+# Main application routes
 /signin    /index.html   200
 /signup    /index.html   200
 /dashboard    /index.html   200
@@ -13,10 +15,11 @@
 /create-post    /index.html   200
 /profile-completion    /index.html   200
 
-# Legal and policy pages
+# Legal and policy pages - CRITICAL FOR YOUR ISSUE
 /privacy-policy    /index.html   200
 /terms    /index.html   200
 /cookie-policy    /index.html   200
+/cookies    /index.html   200
 /team    /index.html   200
 
 # Meeting routes

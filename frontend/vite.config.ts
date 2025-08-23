@@ -1,50 +1,58 @@
-import { defineConfig } from "vite";
-import react from "@vitejs/plugin-react-swc";
-import path from "path";
-import { componentTagger } from "lovable-tagger";
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react-swc'
+import path from 'path'
+import { copy } from 'fs-extra'
 
 // https://vitejs.dev/config/
-export default defineConfig(({ mode }) => ({
-  server: {
-    host: "::",
-    port: 8083,
-  },
+export default defineConfig({
   plugins: [
     react(),
-    mode === 'development' &&
-    componentTagger(),
-  ].filter(Boolean),
+    {
+      name: 'copy-config-files',
+      closeBundle: async () => {
+        // Copy critical configuration files to dist folder
+        const filesToCopy = [
+          '_redirects',
+          '404.html',
+          'vercel.json',
+          'render.yaml'
+        ]
+        
+        for (const file of filesToCopy) {
+          try {
+            await copy(`public/${file}`, `dist/${file}`)
+            console.log(`✅ Copied ${file} to dist folder`)
+          } catch (error) {
+            try {
+              // Fallback: try copying from root directory
+              await copy(file, `dist/${file}`)
+              console.log(`✅ Copied ${file} to dist folder (fallback)`)
+            } catch (fallbackError: any) {
+              console.warn(`⚠️ Could not copy ${file}:`, fallbackError.message)
+            }
+          }
+        }
+      }
+    }
+  ],
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
     },
   },
-  define: {
-    // Set production environment variables
-    'import.meta.env.VITE_BACKEND_URL': mode === 'production' 
-      ? '"https://inspiranet-backend.onrender.com"' 
-      : '"http://localhost:5000"',
-    'import.meta.env.VITE_FRONTEND_URL': mode === 'production' 
-      ? '"https://inspiranet.onrender.com"' 
-      : '"http://localhost:8083"',
-    'import.meta.env.VITE_SOCKET_URL': mode === 'production' 
-      ? '"https://inspiranet-backend.onrender.com"' 
-      : '"http://localhost:5000"',
-    'import.meta.env.VITE_MEETING_URL': mode === 'production' 
-      ? '"https://inspiranet-backend.onrender.com"' 
-      : '"http://localhost:5000"',
-  },
   build: {
     outDir: 'dist',
-    sourcemap: false,
     rollupOptions: {
       output: {
         manualChunks: {
           vendor: ['react', 'react-dom'],
           router: ['react-router-dom'],
-          ui: ['@radix-ui/react-dialog', '@radix-ui/react-dropdown-menu', '@radix-ui/react-toast'],
-        },
-      },
-    },
+        }
+      }
+    }
   },
-}));
+  server: {
+    port: 8083,
+    host: "::"
+  }
+})
