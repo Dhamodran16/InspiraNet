@@ -4,6 +4,7 @@ const helmet = require('helmet');
 const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
 const mongoose = require('mongoose');
+const jwt = require('jsonwebtoken');
 // Multer moved to individual route files
 const { createServer } = require('http');
 const { Server } = require('socket.io');
@@ -25,6 +26,8 @@ const statsRoutes = require('./routes/stats');
 const configRoutes = require('./routes/config');
 const followRoutes = require('./routes/follows');
 const placementRoutes = require('./routes/placements');
+const { router: meetingRoutes, rooms, roomMessages, roomMeta } = require('./routes/meetings');
+const CronService = require('./services/cronService');
 
 // Import middleware
 const { authenticateToken } = require('./middleware/auth');
@@ -45,15 +48,77 @@ const PORT = process.env.PORT || 5000;
 // Parse frontend URLs from environment variable
 const frontendUrls = process.env.FRONTEND_URL 
   ? process.env.FRONTEND_URL.split(',').map(url => url.trim())
-  : ['http://localhost:8084', 'http://localhost:8085', 'http://localhost:3000'];
+  : ['https://inspiranet.onrender.com'];
+
+// Add development URLs for local development
+if (process.env.NODE_ENV === 'development') {
+  frontendUrls.push('http://localhost:8083', 'http://localhost:8084', 'http://localhost:8085', 'http://localhost:3000', 'http://localhost:5173');
+}
+
+
+
+// CORS configuration
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    // Check if origin is in allowed list
+    if (frontendUrls.indexOf(origin) !== -1) {
+      return callback(null, true);
+    }
+    
+    // For development, allow all localhost origins
+    if (process.env.NODE_ENV === 'development' && origin.includes('localhost')) {
+      return callback(null, true);
+    }
+    
+    // Allow the production frontend URL
+    if (origin === 'https://inspiranet.onrender.com') {
+      return callback(null, true);
+    }
+    
+    return callback(new Error('Not allowed by CORS'));
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+};
+
+// Apply CORS middleware
+app.use(cors(corsOptions));
 
 // Initialize Socket.io
 const io = new Server(server, {
   cors: {
-    origin: frontendUrls,
-    methods: ['GET', 'POST'],
-    credentials: true
-  }
+    origin: function (origin, callback) {
+      // Allow requests with no origin (like mobile apps or curl requests)
+      if (!origin) return callback(null, true);
+      
+      // Check if origin is in allowed list
+      if (frontendUrls.indexOf(origin) !== -1) {
+        return callback(null, true);
+      }
+      
+      // For development, allow all localhost origins
+      if (process.env.NODE_ENV === 'development' && origin.includes('localhost')) {
+        return callback(null, true);
+      }
+      
+      // Allow the production frontend URL
+      if (origin === 'https://inspiranet.onrender.com') {
+        return callback(null, true);
+      }
+      
+      return callback(new Error('Not allowed by CORS'));
+    },
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+  },
+  transports: ["websocket", "polling"],
+  pingTimeout: 60000,
+  pingInterval: 25000,
 });
 
 // Initialize Socket Service
@@ -63,11 +128,232 @@ startRealtimeWatchers(io);
 // Make io available to routes
 app.set('io', io);
 
+// Socket.IO connection handling
+io.on('connection', (socket) => {
+  console.log('🔌 New socket connection:', socket.id);
+  
+  // Handle user authentication
+  socket.on('authenticate', async (data) => {
+    try {
+      const token = data.token;
+      if (!token) {
+        socket.emit('auth_error', { message: 'No token provided' });
+        return;
+      }
+      
+      // Verify token and get user
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      const user = await User.findById(decoded.userId).select('name email type department batch');
+      
+      if (!user) {
+        socket.emit('auth_error', { message: 'User not found' });
+        return;
+      }
+      
+      // Store user info in socket
+      socket.userId = user._id.toString();
+      socket.user = user;
+      
+      // Join user to personal room
+      socket.join(`user_${user._id}`);
+      console.log(`✅ User ${user.name} authenticated and joined room user_${user._id}`);
+      
+      // Emit successful authentication
+      socket.emit('authenticated', { 
+        userId: user._id, 
+        userName: user.name,
+        userType: user.type 
+      });
+      
+    } catch (error) {
+      console.error('Socket authentication error:', error);
+      socket.emit('auth_error', { message: 'Authentication failed' });
+    }
+  });
+  
+  // Handle disconnection
+  socket.on('disconnect', () => {
+    console.log('🔌 Socket disconnected:', socket.id);
+  });
+
+  // Meeting room functionality
+  socket.on('join-room', (roomId, username) => {
+    console.log(`User ${username} (${socket.id}) joining room: ${roomId}`);
+    
+    // Join the room
+    socket.join(roomId);
+    socket.roomId = roomId;
+    socket.username = username;
+    
+    // Notify others in the room
+    socket.to(roomId).emit('user-connected', socket.id, username);
+    
+    // Send existing users to the new user
+    const room = io.sockets.adapter.rooms.get(roomId);
+    if (room) {
+      const users = Array.from(room).filter(id => id !== socket.id);
+      socket.emit('room-users', users.map(id => ({
+        id,
+        username: io.sockets.sockets.get(id)?.username || 'Unknown'
+      })));
+    }
+  });
+
+  // Handle room leaving
+  socket.on('leave-room', (roomId) => {
+    console.log(`User ${socket.username} (${socket.id}) leaving room: ${roomId}`);
+    
+    // Notify others in the room
+    socket.to(roomId).emit('user-disconnected', socket.id, socket.username);
+    
+    // Leave the room
+    socket.leave(roomId);
+    socket.roomId = null;
+    socket.username = null;
+  });
+
+  // WebRTC signaling
+  socket.on('offer', (offer, targetId) => {
+    console.log(`Offer from ${socket.id} to ${targetId}`);
+    socket.to(targetId).emit('offer', offer, socket.id);
+  });
+
+  socket.on('answer', (answer, targetId) => {
+    console.log(`Answer from ${socket.id} to ${targetId}`);
+    socket.to(targetId).emit('answer', answer, socket.id);
+  });
+
+  socket.on('ice-candidate', (candidate, targetId) => {
+    console.log(`ICE candidate from ${socket.id} to ${targetId}`);
+    socket.to(targetId).emit('ice-candidate', candidate, socket.id);
+  });
+
+  // Chat functionality
+  socket.on('send-message', (messageData) => {
+    const roomId = socket.roomId;
+    if (roomId) {
+      const message = {
+        id: Date.now().toString(),
+        user: socket.username,
+        text: messageData.text,
+        senderId: socket.id,
+        timestamp: Date.now(),
+        replyTo: messageData.replyTo || null
+      };
+      
+      console.log(`Message in room ${roomId} from ${socket.username}: ${messageData.text}`);
+      
+      // Broadcast to all users in the room (including sender for consistency)
+      io.to(roomId).emit('receive-message', message);
+    }
+  });
+
+  // Typing indicators
+  socket.on('typing', (isTyping) => {
+    const roomId = socket.roomId;
+    if (roomId) {
+      // Broadcast to all users in the room (including sender for consistency)
+      io.to(roomId).emit('user-typing', socket.id, isTyping, socket.username);
+    }
+  });
+
+  // Hand raise functionality
+  socket.on('raise-hand', (raised) => {
+    const roomId = socket.roomId;
+    if (roomId) {
+      console.log(`Hand raise from ${socket.username} (${socket.id}): ${raised ? 'raised' : 'lowered'}`);
+      // Broadcast to all users in the room (including sender for consistency)
+      io.to(roomId).emit('user-raised-hand', socket.id, raised, socket.username);
+    }
+  });
+
+  // Media state updates
+  socket.on('update-media-state', (state) => {
+    const roomId = socket.roomId;
+    if (roomId) {
+      console.log(`Media state update from ${socket.username} (${socket.id}):`, state);
+      // Broadcast to all users in the room (including sender for consistency)
+      io.to(roomId).emit('media-state-update', socket.id, state);
+    }
+  });
+
+  // Host controls
+  socket.on('host-mute-all', () => {
+    const roomId = socket.roomId;
+    if (roomId) {
+      console.log(`Host ${socket.username} (${socket.id}) muted all in room ${roomId}`);
+      // Broadcast to all users in the room (including sender for consistency)
+      io.to(roomId).emit('host-mute-all');
+    }
+  });
+
+  // Host ends meeting - disconnect all participants
+  socket.on('host-end-meeting', () => {
+    const roomId = socket.roomId;
+    if (roomId) {
+      console.log(`Host ${socket.username} (${socket.id}) ended meeting in room ${roomId}`);
+      
+      // Get all users in the room
+      const room = io.sockets.adapter.rooms.get(roomId);
+      if (room) {
+        const userIds = Array.from(room);
+        
+        // Disconnect all participants
+        userIds.forEach(userId => {
+          const userSocket = io.sockets.sockets.get(userId);
+          if (userSocket) {
+            userSocket.emit('meeting-ended-by-host');
+            userSocket.leave(roomId);
+            userSocket.roomId = null;
+            userSocket.username = null;
+          }
+        });
+        
+        // Delete the room
+        io.sockets.adapter.rooms.delete(roomId);
+        console.log(`Room ${roomId} deleted and all participants disconnected`);
+      }
+    }
+  });
+
+  // Emoji reactions
+  socket.on('emoji-reaction', (data) => {
+    const roomId = socket.roomId;
+    if (roomId) {
+      // Broadcast to all users in the room (including sender for consistency)
+      io.to(roomId).emit('emoji-reaction', data.messageId, data.emoji, socket.id);
+    }
+  });
+});
+
 // Middleware
 app.use(helmet());
 app.use(cors({
-  origin: frontendUrls,
-  credentials: true
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    // Check if origin is in allowed list
+    if (frontendUrls.indexOf(origin) !== -1) {
+      return callback(null, true);
+    }
+    
+    // For development, allow all localhost origins
+    if (process.env.NODE_ENV === 'development' && origin.includes('localhost')) {
+      return callback(null, true);
+    }
+    
+    // Allow the production frontend URL
+    if (origin === 'https://inspiranet.onrender.com') {
+      return callback(null, true);
+    }
+    
+    console.log('CORS blocked origin:', origin);
+    return callback(new Error('Not allowed by CORS'));
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept']
 }));
 app.use(morgan('combined'));
 app.use(express.json({ limit: '10mb' }));
@@ -289,27 +575,29 @@ const gracefulShutdown = async (signal) => {
   console.log(`🔄 ${signal} received, shutting down gracefully...`);
   
   // Stop accepting new requests
-  server.close(() => {
+  server.close(async () => {
     console.log('✅ HTTP server closed gracefully');
     
     // Close MongoDB connection
     if (mongoose.connection.readyState === 1) {
-      mongoose.connection.close(() => {
+      try {
+        await mongoose.connection.close();
         console.log('✅ MongoDB connection closed gracefully');
-        
-        // Stop health monitoring
-        if (connectionHealthCheck) {
-          clearInterval(connectionHealthCheck);
-          console.log('✅ Health monitoring stopped');
-        }
-        
-        console.log('✅ Graceful shutdown completed');
-        process.exit(0);
-      });
+      } catch (error) {
+        console.log('⚠️ Error closing MongoDB connection:', error.message);
+      }
     } else {
       console.log('✅ MongoDB connection already closed');
-      process.exit(0);
     }
+    
+    // Stop health monitoring
+    if (connectionHealthCheck) {
+      clearInterval(connectionHealthCheck);
+      console.log('✅ Health monitoring stopped');
+    }
+    
+    console.log('✅ Graceful shutdown completed');
+    process.exit(0);
   });
   
   // Force exit after 30 seconds if graceful shutdown fails
@@ -354,6 +642,27 @@ app.use('/api/', limiter);
 
 // Routes
 
+// WebRTC configuration for meetings
+app.get('/api/config', (req, res) => {
+  const rtcConfig = {
+    iceServers: [
+      { urls: "stun:stun.l.google.com:19302" },
+      { urls: "stun:stun1.l.google.com:19302" }
+    ]
+  };
+  
+  // Add TURN servers if configured
+  if (process.env.TURN_URL && process.env.TURN_USERNAME && process.env.TURN_PASSWORD) {
+    rtcConfig.iceServers.push({
+      urls: process.env.TURN_URL,
+      username: process.env.TURN_USERNAME,
+      credential: process.env.TURN_PASSWORD
+    });
+  }
+  
+  res.json({ rtcConfig });
+});
+
 // Health check with detailed database status
 app.get('/api/health', (req, res) => {
   const dbStatus = {
@@ -383,6 +692,17 @@ app.get('/api/health', (req, res) => {
   };
 
   res.status(dbStatus.readyState === 1 ? 200 : 503).json(healthStatus);
+});
+
+// Simple health check for Render
+app.get('/health', (req, res) => {
+  res.status(200).json({ 
+    status: 'OK', 
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    environment: process.env.NODE_ENV || 'development',
+    version: '1.0.0'
+  });
 });
 
 // Database-specific health check
@@ -472,6 +792,80 @@ app.use('/api/follows', followRoutes);
 // Group routes (protected)
 app.use('/api/groups', require('./routes/groups'));
 
+// Meetings routes (protected)
+app.use('/api/meetings', meetingRoutes);
+
+// Meeting configuration endpoint (public for RTC config)
+app.get('/config', (req, res) => {
+  // Build ICE server config
+  const iceServers = [
+    { urls: "stun:stun.l.google.com:19302" },
+    { urls: "stun:stun1.l.google.com:19302" }
+  ];
+  
+  // Add TURN servers if configured
+  if (process.env.TURN_URL && process.env.TURN_USERNAME && process.env.TURN_PASSWORD) {
+    iceServers.push({
+      urls: process.env.TURN_URL,
+      username: process.env.TURN_USERNAME,
+      credential: process.env.TURN_PASSWORD,
+    });
+  }
+  
+  res.json({
+    rtcConfig: {
+      iceServers: iceServers
+    }
+  });
+});
+
+// 🚨 ADMIN ENDPOINT: System Capacity Monitoring
+app.get('/admin/system-stats', (req, res) => {
+  try {
+    // Get system stats from socket service
+    const socketService = require('./services/socketService');
+    const stats = socketService.getSystemStats ? socketService.getSystemStats() : null;
+    
+    if (!stats) {
+      return res.json({
+        status: 'Service not available',
+        message: 'Socket service not initialized'
+      });
+    }
+    
+    res.json({
+      status: 'success',
+      timestamp: new Date().toISOString(),
+      system: {
+        totalUsers: stats.totalUsers,
+        totalRooms: stats.totalRooms,
+        maxUsers: stats.maxUsers,
+        maxRooms: stats.maxRooms,
+        maxParticipantsPerRoom: stats.maxParticipantsPerRoom,
+        systemLoad: stats.systemLoad
+      },
+      limits: {
+        participantsPerRoom: '50 users max',
+        concurrentRooms: '100 rooms max',
+        totalUsers: '5,000 users max',
+        videoStreams: '25 HD streams max',
+        audioStreams: '50 audio streams max'
+      },
+      recommendations: {
+        optimalRoomSize: '20-30 participants',
+        optimalTotalRooms: '50-80 rooms',
+        optimalTotalUsers: '2,000-4,000 users'
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to get system stats',
+      error: error.message
+    });
+  }
+});
+
 // Posts API routes are now handled in /routes/posts.js
 
 // Events API routes are now handled in /routes/events.js
@@ -489,6 +883,9 @@ app.use('*', (req, res) => {
   res.status(404).json({ error: 'Route not found' });
 });
 
+// Initialize cron jobs
+CronService.init();
+
 // Start server
 server.listen(PORT, () => {
   const backendUrl = process.env.BACKEND_URL || `http://localhost:${PORT}`;
@@ -496,6 +893,7 @@ server.listen(PORT, () => {
   console.log(`📊 Health check: ${backendUrl}/api/health`);
   console.log(`🌐 Frontend URL: ${process.env.FRONTEND_URL || 'http://localhost:8083'}`);
   console.log(`🔌 WebSocket server ready for real-time messaging`);
+  console.log(`🕐 Cron jobs: Initialized for email expiry processing`);
   
   // Email service status
   if (process.env.SMTP_USER && process.env.SMTP_PASS) {

@@ -1,6 +1,19 @@
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse, AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { getAuthToken, removeAuthToken } from '@/contexts/AuthContext';
 import { toast } from '@/hooks/use-toast';
+import { getBackendUrl } from '../utils/urlConfig';
+
+// 🚀 Dynamic API base URL based on environment
+const API_BASE_URL = getBackendUrl();
+
+// API service configuration
+export const apiConfig = {
+  baseURL: API_BASE_URL,
+  timeout: 30000,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+};
 
 // Create axios instance with base configuration
 const api: AxiosInstance = axios.create({

@@ -3,6 +3,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const { authenticateToken } = require('../middleware/auth');
+const EmailExpiryService = require('../services/emailExpiryService');
 const studentConversionService = require('../services/studentConversionService');
 
 const router = express.Router();
@@ -27,7 +28,6 @@ router.post('/register', async (req, res) => {
     let personalEmail = null;
 
 		if (userType === 'student') {
-			if (!department) return res.status(400).json({ error: 'Department is required for students' });
 			if (!email || !email.toLowerCase().endsWith('@kongu.edu')) return res.status(400).json({ error: 'Use your Kongu email (@kongu.edu)' });
 
 			// name.yydept@kongu.edu -> capture year and dept code
@@ -35,10 +35,14 @@ router.post('/register', async (req, res) => {
 			if (!m) return res.status(400).json({ error: 'Student email must be like name.yydept@kongu.edu (e.g., john.23aim@kongu.edu)' });
 			const emailYear = parseInt(m[1], 10);
 			const emailDept = m[2];
-			// Department short forms per latest requirement (Civil removed)
-			const deptMapping = { MCH: 'mch', AID: 'aid', AIM: 'aim', MTR: 'mtr', AUT: 'aut', EEE: 'eee', ECE: 'ece', CSE: 'cse', IT: 'it', EIE: 'eie' };
-			const expectedDept = deptMapping[department] || String(department).toLowerCase();
-			if (emailDept !== expectedDept) return res.status(400).json({ error: `Email department (${emailDept}) doesn't match selected department (${department})` });
+			
+			// If department is provided, validate it matches email
+			if (department) {
+				// Department short forms per latest requirement (Civil removed)
+				const deptMapping = { MCH: 'mch', AID: 'aid', AIM: 'aim', MTR: 'mtr', AUT: 'aut', EEE: 'eee', ECE: 'ece', CSE: 'cse', IT: 'it', EIE: 'eie' };
+				const expectedDept = deptMapping[department] || String(department).toLowerCase();
+				if (emailDept !== expectedDept) return res.status(400).json({ error: `Email department (${emailDept}) doesn't match selected department (${department})` });
+			}
 
 			// Derive join year from currentYear (I/II/III/IV) or batch
 			const romanToNum = { I: 1, II: 2, III: 3, IV: 4, '1': 1, '2': 2, '3': 3, '4': 4 };
@@ -59,20 +63,37 @@ router.post('/register', async (req, res) => {
       }
 
       collegeEmail = email.toLowerCase();
-			const exists = await User.findOne({ 'email.college': collegeEmail });
-			if (exists) return res.status(400).json({ error: 'User with this college email already exists' });
+			
+			// Check if email exists in ANY user type (college or personal)
+			const existingUser = await User.findOne({
+				$or: [
+					{ 'email.college': collegeEmail },
+					{ 'email.personal': collegeEmail }
+				]
+			});
+			if (existingUser) {
+				return res.status(400).json({ 
+					error: `Email ${collegeEmail} is already registered as ${existingUser.type}. One email can only be used for one account type.` 
+				});
+			}
 
 			const hashed = await bcrypt.hash(password, 12);
-			const user = new User({
+			const userData = {
 				name,
 				password: hashed,
 				type: userType,
 				phone: phone || undefined,
 				email: { college: collegeEmail },
-				department,
 				batch: String(joinYear),
 				studentInfo: { joinYear, currentYear: Math.min(4, new Date().getFullYear() - joinYear + 1) }
-			});
+			};
+			
+			// Only include department if provided
+			if (department) {
+				userData.department = department;
+			}
+			
+			const user = new User(userData);
 			await user.save();
 			const token = generateToken(user._id);
 			const refreshToken = generateRefreshToken(user._id);
@@ -80,19 +101,46 @@ router.post('/register', async (req, res) => {
 		}
 
 		if (userType === 'faculty') {
-			if (!department) return res.status(400).json({ error: 'Department is required for faculty' });
 			if (!email || !email.toLowerCase().endsWith('@kongu.edu')) return res.status(400).json({ error: 'Use your Kongu email (@kongu.edu)' });
-			const match = email.match(/^[a-zA-Z]+\.([a-z]+)@kongu\.edu$/);
-			if (!match) return res.status(400).json({ error: `Faculty email must be name.${String(department).toLowerCase()}@kongu.edu` });
-			const emailDept = match[1];
-			if (emailDept !== String(department).toLowerCase()) return res.status(400).json({ error: `Email department (${emailDept}) doesn't match selected department (${department})` });
+			
+			// If department is provided, validate it matches email
+			if (department) {
+				const match = email.match(/^[a-zA-Z]+\.([a-z]+)@kongu\.edu$/);
+				if (!match) return res.status(400).json({ error: `Faculty email must be name.${String(department).toLowerCase()}@kongu.edu` });
+				const emailDept = match[1];
+				if (emailDept !== String(department).toLowerCase()) return res.status(400).json({ error: `Email department (${emailDept}) doesn't match selected department (${department})` });
+			}
 
 			collegeEmail = email.toLowerCase();
-			const exists = await User.findOne({ 'email.college': collegeEmail });
-			if (exists) return res.status(400).json({ error: 'User with this college email already exists' });
+			
+			// Check if email exists in ANY user type (college or personal)
+			const existingUser = await User.findOne({
+				$or: [
+					{ 'email.college': collegeEmail },
+					{ 'email.personal': collegeEmail }
+				]
+			});
+			if (existingUser) {
+				return res.status(400).json({ 
+					error: `Email ${collegeEmail} is already registered as ${existingUser.type}. One email can only be used for one account type.` 
+				});
+			}
 
 			const hashed = await bcrypt.hash(password, 12);
-			const user = new User({ name, password: hashed, type: userType, phone: phone || undefined, email: { college: collegeEmail }, department });
+			const userData = {
+				name,
+				password: hashed,
+				type: userType,
+				phone: phone || undefined,
+				email: { college: collegeEmail }
+			};
+			
+			// Only include department if provided
+			if (department) {
+				userData.department = department;
+			}
+			
+			const user = new User(userData);
 			await user.save();
 			const token = generateToken(user._id);
 			const refreshToken = generateRefreshToken(user._id);
@@ -104,8 +152,19 @@ router.post('/register', async (req, res) => {
 			const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 			if (!re.test(email)) return res.status(400).json({ error: 'Please provide a valid email address' });
       personalEmail = email.toLowerCase();
-			const exists = await User.findOne({ 'email.personal': personalEmail });
-			if (exists) return res.status(400).json({ error: 'User with this email already exists' });
+			
+			// Check if email exists in ANY user type (college or personal)
+			const existingUser = await User.findOne({
+				$or: [
+					{ 'email.college': personalEmail },
+					{ 'email.personal': personalEmail }
+				]
+			});
+			if (existingUser) {
+				return res.status(400).json({ 
+					error: `Email ${personalEmail} is already registered as ${existingUser.type}. One email can only be used for one account type.` 
+				});
+			}
 
 			const hashed = await bcrypt.hash(password, 12);
 			const user = new User({ name, password: hashed, type: userType, phone: phone || undefined, email: { personal: personalEmail }, currentCompany: company || undefined, designation: designation || undefined });
@@ -240,15 +299,58 @@ router.post('/convert-student/:studentId', authenticateToken, async (req, res) =
 router.get('/email-expiry-status', authenticateToken, async (req, res) => {
   try {
     const user = req.user;
-		if (user.type !== 'student') return res.json({ hasExpiryWarning: false, message: 'Not applicable for non-students' });
-    const currentYear = new Date().getFullYear();
-    const joinYear = user.studentInfo?.joinYear;
-		if (!joinYear) return res.json({ hasExpiryWarning: false, message: 'Join year not set' });
-    const yearsUntilExpiry = 4 - (currentYear - joinYear);
-		const expiryDate = new Date(joinYear + 4, 11, 31);
-    const daysUntilExpiry = Math.ceil((expiryDate - new Date()) / (1000 * 60 * 60 * 24));
-		res.json({ hasExpiryWarning: yearsUntilExpiry <= 1, joinYear, expiryYear: joinYear + 4, expiryDate: expiryDate.toISOString(), daysUntilExpiry, yearsUntilExpiry, hasPersonalEmail: !!user.email?.personal, warningLevel: yearsUntilExpiry <= 0.5 ? 'critical' : yearsUntilExpiry <= 1 ? 'warning' : 'normal' });
-	} catch { res.status(500).json({ error: 'Failed to check email expiry status' }); }
+    const expiryInfo = EmailExpiryService.checkEmailExpiry(user);
+    
+    res.json({
+      hasExpiryWarning: expiryInfo.shouldMigrate || expiryInfo.isExpired,
+      expiryInfo,
+      message: expiryInfo.isExpired 
+        ? 'Your Kongu email has expired. Please update your profile with a personal email.'
+        : expiryInfo.shouldMigrate 
+        ? `Your Kongu email will expire in ${expiryInfo.daysUntilExpiry} days. Please add a personal email to your profile.`
+        : 'Your email is active.',
+      hasPersonalEmail: !!user.email?.personal,
+      warningLevel: expiryInfo.isExpired ? 'critical' : expiryInfo.shouldMigrate ? 'warning' : 'normal'
+    });
+  } catch (error) {
+    console.error('Email expiry check error:', error);
+    res.status(500).json({ error: 'Failed to check email expiry status' });
+  }
+});
+
+// Migrate student data to personal email
+router.post('/migrate-email', authenticateToken, async (req, res) => {
+  try {
+    const user = req.user;
+    
+    if (user.type !== 'student') {
+      return res.status(400).json({ error: 'Email migration is only available for students' });
+    }
+
+    const result = await EmailExpiryService.migrateStudentData(user._id);
+    res.json(result);
+  } catch (error) {
+    console.error('Email migration error:', error);
+    res.status(500).json({ error: error.message || 'Failed to migrate email data' });
+  }
+});
+
+// Admin endpoint to process all expiring emails
+router.post('/admin/process-expiring-emails', authenticateToken, async (req, res) => {
+  try {
+    const user = req.user;
+    
+    // Check if user is admin (you can add admin role to user model)
+    if (user.type !== 'faculty') {
+      return res.status(403).json({ error: 'Access denied. Only faculty can process expiring emails.' });
+    }
+
+    const results = await EmailExpiryService.processExpiringEmails();
+    res.json(results);
+  } catch (error) {
+    console.error('Process expiring emails error:', error);
+    res.status(500).json({ error: 'Failed to process expiring emails' });
+  }
 });
 
 module.exports = router;

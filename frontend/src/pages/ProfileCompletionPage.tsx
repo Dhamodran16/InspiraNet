@@ -51,7 +51,7 @@ interface UserInfoData {
     batch?: string;
     section?: string;
     currentSemester?: string;
-    cgpa?: string;
+
     specialization?: string;
     subjects?: string[];
     placementStatus?: string;
@@ -106,6 +106,130 @@ const ProfileCompletionPage: React.FC = () => {
   const [designations, setDesignations] = useState<string[]>([]);
   const [placementStatuses, setPlacementStatuses] = useState<string[]>([]);
 
+  // Validation function for mandatory fields based on user type and year
+  const validateMandatoryFields = () => {
+    const errors: string[] = [];
+    
+    // Email validation function
+    const isValidEmail = (email: string) => {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      return emailRegex.test(email);
+    };
+
+    // URL validation function
+    const isValidUrl = (url: string) => {
+      try {
+        new URL(url);
+        return true;
+      } catch {
+        return false;
+      }
+    };
+
+    if (user?.type === 'faculty') {
+      // Faculty mandatory fields
+      if (!formData.personalEmail?.trim()) {
+        errors.push('Personal Email is required for faculty');
+      } else if (!isValidEmail(formData.personalEmail.trim())) {
+        errors.push('Please enter a valid personal email address');
+      }
+      
+      if (!formData.bio?.trim()) errors.push('Bio is required for faculty');
+      if (!formData.facultyInfo?.department) errors.push('Department is required for faculty');
+      if (!formData.facultyInfo?.designation) errors.push('Designation is required for faculty');
+      if (!formData.skills || formData.skills.length === 0) errors.push('Skills are required for faculty');
+      
+      if (!formData.socialLinks?.linkedin) {
+        errors.push('LinkedIn Profile is required for faculty');
+      } else if (!isValidUrl(formData.socialLinks.linkedin)) {
+        errors.push('Please enter a valid LinkedIn URL');
+      }
+      
+    } else if (user?.type === 'alumni') {
+      // Alumni mandatory fields - More reasonable requirements
+      if (!formData.personalEmail?.trim()) {
+        errors.push('Personal Email is required for alumni');
+      } else if (!isValidEmail(formData.personalEmail.trim())) {
+        errors.push('Please enter a valid personal email address');
+      }
+      
+      if (!formData.bio?.trim()) errors.push('Bio is required for alumni');
+      if (!formData.interests || formData.interests.length === 0) errors.push('Interests are required for alumni');
+      if (!formData.studentInfo?.graduationYear) errors.push('Graduation Year is required for alumni');
+      if (!formData.studentInfo?.department) errors.push('Department is required for alumni');
+      if (!formData.alumniInfo?.jobTitle) errors.push('Job Title is required for alumni');
+      if (!formData.skills || formData.skills.length === 0) errors.push('Skills are required for alumni');
+      
+      // LinkedIn is required but GitHub is optional for alumni
+      if (!formData.socialLinks?.linkedin) {
+        errors.push('LinkedIn Profile is required for alumni');
+      } else if (!isValidUrl(formData.socialLinks.linkedin)) {
+        errors.push('Please enter a valid LinkedIn URL');
+      }
+      
+      // Optional fields with validation if provided
+      if (formData.socialLinks?.github && !isValidUrl(formData.socialLinks.github)) {
+        errors.push('Please enter a valid GitHub URL');
+      }
+      
+      if (formData.portfolio && !isValidUrl(formData.portfolio)) {
+        errors.push('Please enter a valid Portfolio URL');
+      }
+      
+
+      
+    } else if (user?.type === 'student') {
+      // Student mandatory fields based on year
+      const currentYear = user.studentInfo?.currentYear;
+      
+      // Common mandatory fields for all students
+      if (!formData.personalEmail?.trim()) {
+        errors.push('Personal Email is required for students');
+      } else if (!isValidEmail(formData.personalEmail.trim())) {
+        errors.push('Please enter a valid personal email address');
+      }
+      
+      if (!formData.bio?.trim()) errors.push('Bio is required for students');
+      if (!formData.interests || formData.interests.length === 0) errors.push('Interests are required for students');
+      if (!formData.studentInfo?.graduationYear) errors.push('Graduation Year is required for students');
+      if (!formData.studentInfo?.department) errors.push('Department is required for students');
+      if (!formData.skills || formData.skills.length === 0) errors.push('Skills are required for students');
+      
+      // LinkedIn is required for all students
+      if (!formData.socialLinks?.linkedin) {
+        errors.push('LinkedIn Profile is required for students');
+      } else if (!isValidUrl(formData.socialLinks.linkedin)) {
+        errors.push('Please enter a valid LinkedIn URL');
+      }
+      
+
+      
+      // Additional fields for 2nd, 3rd, and 4th year students
+      if (currentYear === '2' || currentYear === '3' || currentYear === '4') {
+        if (!formData.socialLinks?.github) {
+          errors.push('GitHub Profile is required for 2nd, 3rd, and 4th year students');
+        } else if (!isValidUrl(formData.socialLinks.github)) {
+          errors.push('Please enter a valid GitHub URL');
+        }
+        
+        if (!formData.resume) errors.push('Resume is required for 2nd, 3rd, and 4th year students');
+        
+        if (!formData.portfolio) {
+          errors.push('Portfolio is required for 2nd, 3rd, and 4th year students');
+        } else if (!isValidUrl(formData.portfolio)) {
+          errors.push('Please enter a valid Portfolio URL');
+        }
+      }
+      
+      // Specialization is required for 3rd and 4th year students
+      if ((currentYear === '3' || currentYear === '4') && !formData.studentInfo?.specialization) {
+        errors.push('Specialization is required for 3rd and 4th year students');
+      }
+    }
+    
+    return errors;
+  };
+
   useEffect(() => {
     if (!user) {
       navigate('/');
@@ -142,17 +266,17 @@ const ProfileCompletionPage: React.FC = () => {
         console.error('Error fetching configuration data:', error);
         // Use fallback data if configuration fails
         setDepartments([
-          'Civil Engineering',
           'Mechanical Engineering',
+          'Artificial Intelligence and Data Science',
+          'Artificial Intelligence and Machine Learning',
           'Mechatronics Engineering',
           'Automobile Engineering',
-          'Electrical and Electronics Engineering (EEE)',
-          'Electronics and Communication Engineering (ECE)',
-          'Electronics and Instrumentation Engineering (EIE)',
-          'Computer Science and Engineering (CSE)',
-          'Information Technology (IT)',
-          'Artificial Intelligence and Machine Learning (AIML)',
-          'Food Technology'
+          'Electrical and Electronics Engineering',
+          'Electronics and Communication Engineering',
+          'Electronics and Instrumentation Engineering',
+          'Computer Science and Engineering',
+          'Information Technology',
+          'Computer Science and Design'
         ]);
         setDesignations([
           'Professor',
@@ -298,6 +422,17 @@ const ProfileCompletionPage: React.FC = () => {
       toast({
         title: "Authentication Error",
         description: "No user data found. Please log in again.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validate mandatory fields based on user type and year
+    const validationErrors = validateMandatoryFields();
+    if (validationErrors.length > 0) {
+      toast({
+        title: "Missing Required Fields",
+        description: validationErrors.join(', '),
         variant: "destructive",
       });
       return;
@@ -658,6 +793,17 @@ const ProfileCompletionPage: React.FC = () => {
                         className="bg-gray-700/50 border-gray-600 text-white placeholder-gray-400 focus:border-purple-500"
                       />
                     </div>
+
+                    <div>
+                      <Label htmlFor="specialization" className="text-gray-300">Specialization</Label>
+                      <Input
+                        id="specialization"
+                        placeholder="e.g., AI/ML, Web Development, Data Science"
+                        value={formData.studentInfo?.specialization || ''}
+                        onChange={(e) => handleInputChange('specialization', e.target.value, 'studentInfo')}
+                        className="bg-gray-700/50 border-gray-600 text-white placeholder-gray-400 focus:border-purple-500"
+                      />
+                    </div>
                     <div>
                       <Label htmlFor="placementStatus" className="text-gray-300">Placement Status</Label>
                       <Select value={formData.studentInfo?.placementStatus || ''} onValueChange={(value) => handleInputChange('placementStatus', value, 'studentInfo')}>
@@ -710,9 +856,66 @@ const ProfileCompletionPage: React.FC = () => {
                   </div>
                 )}
                 {user.type === 'alumni' && (
-                  <p className="text-gray-400">
-                    Academic information is not required for alumni. Please proceed to the Professional tab.
-                  </p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="alumniDepartment" className="text-gray-300">Department (Graduated)</Label>
+                      <Select value={formData.studentInfo?.department || ''} onValueChange={(value) => handleInputChange('department', value, 'studentInfo')}>
+                        <SelectTrigger className="bg-gray-700/50 border-gray-600 text-white focus:border-purple-500">
+                          <SelectValue placeholder="Select your department" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-gray-800 border-gray-600">
+                          {departments.map((dept) => (
+                            <SelectItem key={dept} value={dept} className="hover:bg-purple-500 text-white focus:bg-purple-600 focus:text-white">
+                              {dept}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label htmlFor="alumniGraduationYear" className="text-gray-300">Graduation Year</Label>
+                      <Input
+                        id="alumniGraduationYear"
+                        placeholder="2024"
+                        value={formData.studentInfo?.graduationYear || ''}
+                        onChange={(e) => handleInputChange('graduationYear', e.target.value, 'studentInfo')}
+                        className="bg-gray-700/50 border-gray-600 text-white placeholder-gray-400 focus:border-purple-500"
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="alumniJobTitle" className="text-gray-300">Current Job Title</Label>
+                      <Input
+                        id="alumniJobTitle"
+                        placeholder="e.g., Software Engineer, Data Scientist"
+                        value={formData.alumniInfo?.jobTitle || ''}
+                        onChange={(e) => handleInputChange('jobTitle', e.target.value, 'alumniInfo')}
+                        className="bg-gray-700/50 border-gray-600 text-white placeholder-gray-400 focus:border-purple-500"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="alumniCompany" className="text-gray-300">Current Company</Label>
+                      <Input
+                        id="alumniCompany"
+                        placeholder="e.g., Google, Microsoft"
+                        value={formData.alumniInfo?.currentCompany || ''}
+                        onChange={(e) => handleInputChange('currentCompany', e.target.value, 'alumniInfo')}
+                        className="bg-gray-700/50 border-gray-600 text-white placeholder-gray-400 focus:border-purple-500"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="alumniExperience" className="text-gray-300">Years of Experience</Label>
+                      <Input
+                        id="alumniExperience"
+                        type="number"
+                        min="0"
+                        placeholder="2"
+                        value={formData.alumniInfo?.experience || ''}
+                        onChange={(e) => handleInputChange('experience', e.target.value, 'alumniInfo')}
+                        className="bg-gray-700/50 border-gray-600 text-white placeholder-gray-400 focus:border-purple-500"
+                      />
+                    </div>
+                  </div>
                 )}
               </CardContent>
             </Card>
@@ -917,6 +1120,22 @@ const ProfileCompletionPage: React.FC = () => {
           </Button>
 
           <div className="flex gap-2">
+            {user.type === 'student' && (user.studentInfo?.currentYear === '1' || user.studentInfo?.currentYear === '2') && (
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  toast({
+                    title: "Profile Completion Skipped",
+                    description: "You can complete your profile later from the dashboard",
+                  });
+                  navigate('/dashboard', { replace: true });
+                }}
+                className="text-gray-400 hover:text-white"
+              >
+                Skip for Now
+              </Button>
+            )}
+            
             {activeTab !== 'resume' && (
               <Button
                 onClick={() => {

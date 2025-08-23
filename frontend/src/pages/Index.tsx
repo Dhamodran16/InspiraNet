@@ -1,11 +1,6 @@
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import LogoHeader from "@/components/LogoHeader";
-import ImageCarousel from "@/components/ImageCarousel";
-import LandingHero from "@/components/LandingHero";
-import EnhancedFeatureShowcase from "@/components/EnhancedFeatureShowcase";
-import Footer from "@/components/Footer";
 
 export default function Index() {
   const navigate = useNavigate();
@@ -45,16 +40,12 @@ export default function Index() {
   }
 
   return (
-    <div className="min-h-screen bg-transparent flex flex-col">
-      <ImageCarousel />
-      <LogoHeader />
-
-      <main className="flex-1">
-        <LandingHero />
-        <EnhancedFeatureShowcase />
-      </main>
-
-      <Footer transparent />
+    <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="text-center">
+        <h1 className="text-4xl font-bold mb-4">Welcome to Innovation Platform</h1>
+        <p className="text-lg text-muted-foreground mb-8">Redirecting to landing page...</p>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+      </div>
     </div>
   );
 }

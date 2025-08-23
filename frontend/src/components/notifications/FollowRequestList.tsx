@@ -13,7 +13,8 @@ import {
   CheckCircle, 
   XCircle,
   MessageSquare,
-  Eye
+  Eye,
+  UserMinus
 } from 'lucide-react';
 import api, { 
   getPendingFollowRequests, 
@@ -21,7 +22,8 @@ import api, {
   getAcceptedConnections,
   acceptFollowRequest, 
   rejectFollowRequest, 
-  cancelFollowRequest 
+  cancelFollowRequest,
+  unfollowUser
 } from '@/services/api';
 import { socketService } from '@/services/socketService';
 import { useAuth } from '@/contexts/AuthContext';
@@ -270,6 +272,33 @@ export default function FollowRequestList({ onRequestProcessed }: { onRequestPro
 
   const handleViewProfile = (userId: string) => {
     window.location.href = `/profile/${userId}`;
+  };
+
+  const handleUnfollow = async (userId: string) => {
+    try {
+      setLoading(true);
+      await unfollowUser(userId);
+      
+      // Remove from accepted connections
+      setAcceptedConnections(prev => prev.filter(conn => conn.requester._id !== userId));
+      
+      toast({
+        title: "Unfollowed",
+        description: "You are no longer following this user",
+      });
+      
+      // Refresh all data
+      loadFollowRequests();
+    } catch (error: any) {
+      console.error('Error unfollowing user:', error);
+      toast({
+        title: "Error",
+        description: error.response?.data?.error || "Failed to unfollow user",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const receivedRequests = pendingRequests;
@@ -587,6 +616,14 @@ export default function FollowRequestList({ onRequestProcessed }: { onRequestPro
                         >
                           <Eye className="h-4 w-4 mr-2" />
                           Profile
+                        </Button>
+                        <Button
+                          variant="outline"
+                          onClick={() => handleUnfollow(request.requester._id)}
+                          className="w-full sm:w-auto text-red-600 hover:text-red-700 hover:bg-red-50"
+                        >
+                          <UserMinus className="h-4 w-4 mr-2" />
+                          Unfollow
                         </Button>
                       </div>
                     </div>

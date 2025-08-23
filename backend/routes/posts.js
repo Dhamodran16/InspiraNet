@@ -242,7 +242,7 @@ router.post('/', authenticateToken, upload.array('media', 5), async (req, res) =
       author: userId,
       userType: user.type,
       batch: user.batch,
-      department: user.department,
+      department: user.type === 'alumni' ? user.alumniInfo?.currentCompany : user.department,
       postType,
       title: title?.trim(),
       content: content.trim(),

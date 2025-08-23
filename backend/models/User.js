@@ -43,7 +43,7 @@ const userSchema = new mongoose.Schema({
   },
   department: {
     type: String,
-    required: function() { return this.type === 'student' || this.type === 'faculty'; },
+    required: false, // Department is optional during registration, will be collected during profile completion
     trim: true,
     lowercase: true
   },

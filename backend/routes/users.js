@@ -677,45 +677,50 @@ router.get('/search', authenticateToken, async (req, res) => {
   }
 });
 
-// Get user connections (mutual followers)
+// Get user connections (followers, following, mutual)
 router.get('/:userId/connections', authenticateToken, async (req, res) => {
   try {
-    const userId = req.params.userId;
-    
-    const user = await User.findById(userId)
-      .populate('followers', 'name avatar type department batch company designation location')
-      .populate('following', 'name avatar type department batch company designation location')
-      .lean();
+    const currentUser = req.user;
+    const targetUserId = req.params.userId;
 
-    if (!user) {
+    // Check if user exists
+    const targetUser = await User.findById(targetUserId);
+    if (!targetUser) {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    // Find mutual connections (users who follow each other)
-    const followers = user.followers || [];
-    const following = user.following || [];
-    
-    // Find mutual connections
-    const mutualConnections = followers.filter(follower => 
-      following.some(followingUser => followingUser._id.toString() === follower._id.toString())
-    );
+    // Get followers (users who follow the target user)
+    const followers = await User.find({
+      _id: { $in: targetUser.followers || [] }
+    }).select('_id name avatar type department batch');
 
-    // Get connection details with relationship info
-    const connections = mutualConnections.map(connection => ({
-      ...connection,
-      connectionType: 'mutual',
-      connectedSince: new Date() // You could store this in a separate collection
-    }));
+    // Get following (users the target user follows)
+    const following = await User.find({
+      _id: { $in: targetUser.following || [] }
+    }).select('_id name avatar type department batch');
 
-    res.json({ 
-      connections,
-      totalConnections: connections.length,
-      followersCount: followers.length,
-      followingCount: following.length
+    // Get mutual connections (users who follow each other)
+    const mutual = await User.find({
+      _id: { 
+        $in: targetUser.followers || [],
+        $in: targetUser.following || []
+      }
+    }).select('_id name avatar type department batch');
+
+    res.json({
+      success: true,
+      followers,
+      following,
+      mutual,
+      counts: {
+        followers: followers.length,
+        following: following.length,
+        mutual: mutual.length
+      }
     });
   } catch (error) {
     console.error('Error fetching user connections:', error);
-    res.status(500).json({ error: 'Failed to fetch connections' });
+    res.status(500).json({ error: 'Failed to fetch user connections' });
   }
 });
 

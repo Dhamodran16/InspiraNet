@@ -1,11 +1,11 @@
-import React, { useState } from 'react';
-import ProfileForm from '../components/profile/ProfileForm';
+import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import ProfileDisplay from '../components/profile/ProfileDisplay';
 import { Button } from '../components/ui/button';
-import { Edit, Eye } from 'lucide-react';
+import { Edit } from 'lucide-react';
 
 const Profile: React.FC = () => {
-  const [isEditing, setIsEditing] = useState(false);
+  const navigate = useNavigate();
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -14,34 +14,20 @@ const Profile: React.FC = () => {
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-3xl font-bold text-gray-900">Profile</h1>
           <Button
-            onClick={() => setIsEditing(!isEditing)}
-            variant={isEditing ? "outline" : "default"}
+            onClick={() => navigate('/profile/edit')}
             className="flex items-center gap-2"
           >
-            {isEditing ? (
-              <>
-                <Eye className="h-4 w-4" />
-                View Profile
-              </>
-            ) : (
-              <>
-                <Edit className="h-4 w-4" />
-                Edit Profile
-              </>
-            )}
+            <Edit className="h-4 w-4" />
+            Edit Profile
           </Button>
         </div>
 
         {/* Profile Content */}
         <div className="overflow-y-auto">
-          {isEditing ? (
-            <ProfileForm />
-          ) : (
-            <ProfileDisplay 
-              isOwnProfile={true} 
-              onEdit={() => setIsEditing(true)} 
-            />
-          )}
+          <ProfileDisplay 
+            isOwnProfile={true} 
+            onEdit={() => navigate('/profile/edit')} 
+          />
         </div>
       </div>
     </div>

@@ -97,6 +97,11 @@ const EnhancedMessagingInterface: React.FC<EnhancedMessagingInterfaceProps> = ({
           
           setMessages(prev => [...prev, newMessage]);
           scrollToBottom();
+          
+          // Mark message as read immediately if it's from another user
+          if (data.message.senderId !== currentUser._id) {
+            socketService.markMessagesAsRead(conversation._id, [newMessage._id]);
+          }
         }
       };
 
@@ -118,6 +123,7 @@ const EnhancedMessagingInterface: React.FC<EnhancedMessagingInterfaceProps> = ({
 
       // Listen for message status updates
       const handleMessageStatus = (data: any) => {
+        console.log('🔔 Message status updated:', data);
         setMessages(prev => prev.map(msg => 
           msg._id === data.messageId 
             ? { ...msg, status: data.status, readAt: data.readAt }
@@ -127,43 +133,44 @@ const EnhancedMessagingInterface: React.FC<EnhancedMessagingInterfaceProps> = ({
 
       // Listen for user online status
       const handleUserStatus = (data: any) => {
-        if (data.userId === selectedUser._id) {
-          setConversation(prev => prev ? {
-            ...prev,
-            participants: prev.participants.map(p => 
-              p._id === data.userId 
-                ? { ...p, isOnline: data.isOnline, lastSeen: data.lastSeen }
-                : p
-            )
-          } : null);
+        if (data.userId === selectedUser?._id) {
+          console.log('🔔 User status updated:', data);
+          // Update user online status if needed
         }
       };
 
-      // Listen for follow request updates
-      const handleFollowRequestAccepted = (data: any) => {
-        if (data.followerId === selectedUser._id || data.followeeId === selectedUser._id) {
-          console.log('🔔 Follow request accepted, updating messaging permissions');
-          checkFollowStatus(); // Re-check follow status
+      // Listen for conversation updates
+      const handleConversationUpdate = (data: any) => {
+        if (data.conversationId === conversation._id) {
+          console.log('🔔 Conversation updated:', data);
+          // Refresh conversation data if needed
         }
       };
 
+      // Enhanced real-time listeners
       socketService.onMessage(handleNewMessage);
       socketService.onTyping(handleTyping);
       socketService.onStopTyping(handleStopTyping);
-      socketService.onMessageStatus(handleMessageStatus);
-      socketService.onUserOnlineStatus(handleUserStatus);
-      socketService.onFollowRequestAccepted(handleFollowRequestAccepted);
+      socketService.onMessageStatus?.(handleMessageStatus);
+      socketService.onUserStatus?.(handleUserStatus);
+      socketService.onConversationUpdate?.(handleConversationUpdate);
+
+      // Join conversation room for real-time updates
+      socketService.joinConversations([conversation._id]);
 
       return () => {
         socketService.offMessage();
         socketService.offTyping();
         socketService.offStopTyping();
-        socketService.offMessageStatus();
-        socketService.offUserOnlineStatus();
-        socketService.offFollowRequestAccepted();
+        socketService.offMessageStatus?.();
+        socketService.offUserStatus?.();
+        socketService.offConversationUpdate?.();
+        
+        // Leave conversation room
+        socketService.leaveConversations([conversation._id]);
       };
     }
-  }, [conversation, currentUser._id, selectedUser._id]);
+  }, [conversation, currentUser._id, selectedUser?._id]);
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {

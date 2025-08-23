@@ -150,12 +150,13 @@ export default function AuthModal({ children, onAuthSuccess, defaultOpen, defaul
         
         // Validate role-specific fields
         if (userType === 'student') {
-          if (!signupData.department || !signupData.joinYear) {
-            throw new Error('Students must provide department and join year');
+          if (!signupData.joinYear) {
+            throw new Error('Students must provide join year');
           }
+          // Department is now optional during registration, will be collected in profile completion
         } else if (userType === 'faculty') {
-          if (!signupData.department || !signupData.email) {
-            throw new Error('Faculty must provide department and official Kongu email');
+          if (!signupData.email) {
+            throw new Error('Faculty must provide official Kongu email');
           }
         }
 

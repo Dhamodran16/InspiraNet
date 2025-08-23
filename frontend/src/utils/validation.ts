@@ -34,12 +34,12 @@ const PHONE_PATTERN = /^(\+91|91)?[6-9]\d{9}$/;
 // Password validation
 const PASSWORD_PATTERN = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
 
-// Department validation - Updated short forms
+// Department validation - Updated to use full names consistently
 const VALID_DEPARTMENTS = [
-  'mch', 'aid', 'aim', 'mtr', 'aut', 'eee', 'ece', 'cse', 'it', 'eie'
+  'mch', 'aid', 'aim', 'mtr', 'aut', 'eee', 'ece', 'cse', 'it', 'eie', 'csd'
 ];
 
-// Department display names mapping
+// Department display names mapping - Updated with full names
 export const DEPARTMENT_NAMES: Record<string, string> = {
   'mch': 'Mechanical Engineering',
   'aid': 'Artificial Intelligence and Data Science',
@@ -50,7 +50,8 @@ export const DEPARTMENT_NAMES: Record<string, string> = {
   'ece': 'Electronics and Communication Engineering',
   'cse': 'Computer Science and Engineering',
   'it': 'Information Technology',
-  'eie': 'Electronics and Instrumentation Engineering'
+  'eie': 'Electronics and Instrumentation Engineering',
+  'csd': 'Computer Science and Design'
 };
 
 // Join year validation
@@ -136,16 +137,12 @@ export const validateSignUp = (data: SignUpValidation): ValidationError[] => {
     errors.push({ field: 'userType', message: 'Please select your user type' });
   }
 
-  // Department validation (required for students and faculty)
-  if (data.userType === 'student' || data.userType === 'faculty') {
-    if (!data.department) {
-      errors.push({ field: 'department', message: 'Department is required for students and faculty' });
-    } else if (!VALID_DEPARTMENTS.includes(data.department.toLowerCase())) {
-      errors.push({ 
-        field: 'department', 
-        message: `Invalid department. Valid departments: ${VALID_DEPARTMENTS.join(', ')}` 
-      });
-    }
+  // Department validation (optional for all user types, will be collected during profile completion)
+  if (data.department && !VALID_DEPARTMENTS.includes(data.department.toLowerCase())) {
+    errors.push({ 
+      field: 'department', 
+      message: `Invalid department. Valid departments: ${VALID_DEPARTMENTS.join(', ')}` 
+    });
   }
 
   // Join Year validation (required for students)

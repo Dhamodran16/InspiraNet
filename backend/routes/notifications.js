@@ -75,6 +75,73 @@ router.get('/unread-count', authenticateToken, async (req, res) => {
   }
 });
 
+// Get notification settings
+router.get('/settings', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user._id;
+    
+    // Get or create user settings
+    let userSettings = await UserSettings.findOne({ userId });
+    
+    if (!userSettings) {
+      // Create default settings
+      userSettings = new UserSettings({
+        userId,
+        emailNotifications: {
+          newMessages: true,
+          newFollowers: true,
+          postLikes: true,
+          postComments: true,
+          systemUpdates: true
+        },
+        pushNotifications: {
+          newMessages: true,
+          newFollowers: true,
+          postLikes: true,
+          postComments: true,
+          systemUpdates: true
+        },
+        inAppNotifications: {
+          newMessages: true,
+          newFollowers: true,
+          postLikes: true,
+          postComments: true,
+          systemUpdates: true
+        }
+      });
+      await userSettings.save();
+    }
+
+    res.json({ settings: userSettings });
+  } catch (error) {
+    console.error('Error getting notification settings:', error);
+    res.status(500).json({ error: 'Failed to get notification settings' });
+  }
+});
+
+// Update notification settings
+router.patch('/settings', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { emailNotifications, pushNotifications, inAppNotifications } = req.body;
+    
+    const userSettings = await UserSettings.findOneAndUpdate(
+      { userId },
+      { 
+        emailNotifications, 
+        pushNotifications, 
+        inAppNotifications 
+      },
+      { new: true, upsert: true }
+    );
+
+    res.json({ message: 'Settings updated successfully', settings: userSettings });
+  } catch (error) {
+    console.error('Error updating notification settings:', error);
+    res.status(500).json({ error: 'Failed to update notification settings' });
+  }
+});
+
 // Mark notification as read
 router.patch('/:notificationId/read', authenticateToken, async (req, res) => {
   try {
@@ -106,9 +173,15 @@ router.patch('/mark-all-read', authenticateToken, async (req, res) => {
     const userId = req.user._id;
     const result = await NotificationService.markAllAsRead(userId);
     
+    // Emit socket event for real-time updates
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`user_${userId}`).emit('all_notifications_read');
+    }
+
     res.json({ 
       message: 'All notifications marked as read', 
-      modifiedCount: result.modifiedCount 
+      updatedCount: result.modifiedCount 
     });
   } catch (error) {
     console.error('Error marking all notifications as read:', error);
@@ -116,39 +189,43 @@ router.patch('/mark-all-read', authenticateToken, async (req, res) => {
   }
 });
 
-// Delete notification
-router.delete('/:notificationId', authenticateToken, async (req, res) => {
-  try {
-    const { notificationId } = req.params;
-    const userId = req.user._id;
-
-    const notification = await NotificationService.deleteNotification(notificationId, userId);
-    
-    if (!notification) {
-      return res.status(404).json({ error: 'Notification not found' });
-    }
-
-    res.json({ message: 'Notification deleted successfully' });
-  } catch (error) {
-    console.error('Error deleting notification:', error);
-    res.status(500).json({ error: 'Failed to delete notification' });
-  }
-});
-
 // Get user notification settings
 router.get('/settings', authenticateToken, async (req, res) => {
   try {
     const userId = req.user._id;
+    let settings = await UserSettings.findOne({ userId });
     
-    let userSettings = await UserSettings.findOne({ userId });
-    
-    if (!userSettings) {
-      // Create default settings if none exist
-      userSettings = new UserSettings({ userId });
-      await userSettings.save();
+    if (!settings) {
+      // Create default settings
+      settings = new UserSettings({
+        userId,
+        notifications: {
+          email: true,
+          push: true,
+          inApp: true,
+          types: {
+            follow_request: true,
+            follow_accepted: true,
+            post_like: true,
+            post_comment: true,
+            post_share: true,
+            message: true,
+            system_announcement: true,
+            security_alert: true
+          }
+        },
+        privacy: {
+          profileVisibility: 'public',
+          showEmail: false,
+          showPhone: false,
+          allowMessages: true,
+          allowFollowRequests: true
+        }
+      });
+      await settings.save();
     }
 
-    res.json(userSettings);
+    res.json({ success: true, settings });
   } catch (error) {
     console.error('Error getting notification settings:', error);
     res.status(500).json({ error: 'Failed to get notification settings' });
@@ -159,39 +236,69 @@ router.get('/settings', authenticateToken, async (req, res) => {
 router.put('/settings', authenticateToken, async (req, res) => {
   try {
     const userId = req.user._id;
-    const updateData = req.body;
+    const { notifications, privacy } = req.body;
+    
+    let settings = await UserSettings.findOne({ userId });
+    
+    if (!settings) {
+      settings = new UserSettings({ userId });
+    }
 
-    // Validate the update data
-    const allowedFields = [
-      'notifications',
-      'privacy', 
-      'communication',
-      'display',
-      'security'
-    ];
+    // Update notification settings
+    if (notifications) {
+      settings.notifications = { ...settings.notifications, ...notifications };
+    }
 
-    const filteredData = {};
-    allowedFields.forEach(field => {
-      if (updateData[field]) {
-        filteredData[field] = updateData[field];
-      }
-    });
+    // Update privacy settings
+    if (privacy) {
+      settings.privacy = { ...settings.privacy, ...privacy };
+    }
 
-    const userSettings = await UserSettings.findOneAndUpdate(
-      { userId },
-      filteredData,
-      { new: true, upsert: true, runValidators: true }
-    );
+    await settings.save();
+
+    // Emit socket event for real-time settings update
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`user_${userId}`).emit('settings_updated', { settings });
+    }
 
     res.json({ 
-      message: 'Settings updated successfully', 
-      settings: userSettings 
+      success: true, 
+      message: 'Settings updated successfully',
+      settings 
     });
   } catch (error) {
     console.error('Error updating notification settings:', error);
     res.status(500).json({ error: 'Failed to update notification settings' });
   }
 });
+
+// Delete notification
+router.delete('/:notificationId', authenticateToken, async (req, res) => {
+  try {
+    const { notificationId } = req.params;
+    const userId = req.user._id;
+
+    const result = await NotificationService.deleteNotification(notificationId, userId);
+    
+    if (!result) {
+      return res.status(404).json({ error: 'Notification not found' });
+    }
+
+    // Emit socket event for real-time updates
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`user_${userId}`).emit('notification_deleted', notificationId);
+    }
+
+    res.json({ message: 'Notification deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting notification:', error);
+    res.status(500).json({ error: 'Failed to delete notification' });
+  }
+});
+
+
 
 // Reset notification settings to defaults
 router.post('/settings/reset', authenticateToken, async (req, res) => {

@@ -350,7 +350,7 @@ export default function UserProfile() {
                     id="batch"
                     value={profileData.batch}
                     onChange={(e) => handleProfileChange('batch', e.target.value)}
-                    placeholder="e.g., 2020"
+                    placeholder={`e.g., ${currentYear}`}
                     disabled={!isEditing}
                   />
                 </div>

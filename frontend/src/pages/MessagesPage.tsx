@@ -382,7 +382,7 @@ const MessagesPage: React.FC = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* User List - Instagram Style */}
           <div className="lg:col-span-1">
-            <Card className="h-[calc(100vh-8rem)]">
+            <Card className="h-[calc(100vh-12rem)]">
               <CardHeader className="border-b">
                 <CardTitle className="flex items-center gap-2">
                   <Users className="h-5 w-5" />
@@ -396,7 +396,7 @@ const MessagesPage: React.FC = () => {
                 />
               </CardHeader>
               <CardContent className="p-0">
-                <div className="max-h-[calc(100vh-8rem)] overflow-y-auto">
+                <div className="max-h-[calc(100vh-12rem)] overflow-y-auto">
                   {filteredUsers.map((user) => (
                     <div
                       key={user._id}
@@ -433,7 +433,7 @@ const MessagesPage: React.FC = () => {
 
           {/* Chat Area - Instagram Style */}
           <div className="lg:col-span-2">
-            <Card className="h-[calc(100vh-8rem)]">
+            <Card className="h-[calc(100vh-12rem)]">
               {selectedUser ? (
             <>
               {/* Chat Header */}
@@ -455,7 +455,7 @@ const MessagesPage: React.FC = () => {
                   </CardHeader>
 
                   {/* Messages Area */}
-                  <div className="flex-1 h-[calc(100vh-20rem)] overflow-y-auto p-4 bg-gray-50">
+                  <div className="flex-1 h-[calc(100vh-24rem)] overflow-y-auto p-4 bg-gray-50">
                     <div className="space-y-4">
                       {messages.map((message) => {
                         const rawSender = (message as any).senderId;

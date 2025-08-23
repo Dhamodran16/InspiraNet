@@ -217,13 +217,26 @@ router.post('/request/:userId', authenticateToken, async (req, res) => {
           io.to(`user_${targetUserId}`).emit('new_follow_request', {
             requesterId: currentUser._id,
             requesterName: currentUser.name,
-            message: `${currentUser.name} sent you a follow request`
+            message: `${currentUser.name} sent you a follow request`,
+            requestId: followRequest._id,
+            timestamp: new Date()
           });
 
           // Emit to current user about pending request
           io.to(`user_${currentUser._id}`).emit('follow_request_sent', {
             targetUserId: targetUserId,
-            message: `Follow request sent to ${result.targetName}`
+            message: `Follow request sent to ${result.targetName}`,
+            requestId: followRequest._id,
+            timestamp: new Date()
+          });
+
+          // Emit to all users for real-time network updates
+          io.emit('follow_status_updated', {
+            requesterId: currentUser._id,
+            targetId: targetUserId,
+            action: 'request_sent',
+            status: 'pending',
+            timestamp: new Date()
           });
         }
       }
@@ -302,12 +315,16 @@ router.post('/accept/:requestId', authenticateToken, async (req, res) => {
         io.to(`user_${requesterId}`).emit('follow_request_accepted', {
           followeeId: currentUser._id,
           followeeName: currentUser.name,
-          message: `${currentUser.name} accepted your follow request! ✨ You can now message each other.`
+          message: `${currentUser.name} accepted your follow request! ✨ You can now message each other.`,
+          requestId: requestId,
+          timestamp: new Date()
         });
 
         io.to(`user_${currentUser._id}`).emit('follow_request_accepted', {
           followerId: requesterId,
-          message: `You accepted ${result.requesterName}'s follow request! ✨ You can now message each other.`
+          message: `You accepted ${result.requesterName}'s follow request! ✨ You can now message each other.`,
+          requestId: requestId,
+          timestamp: new Date()
         });
 
         // Emit to all users for real-time network updates
@@ -392,12 +409,25 @@ router.post('/reject/:requestId', authenticateToken, async (req, res) => {
         io.to(`user_${requesterId}`).emit('follow_request_rejected', {
           followeeId: currentUser._id,
           followeeName: currentUser.name,
-          message: `${currentUser.name} rejected your follow request`
+          message: `${currentUser.name} rejected your follow request`,
+          requestId: requestId,
+          timestamp: new Date()
         });
 
         io.to(`user_${currentUser._id}`).emit('follow_request_rejected', {
           requesterId: requesterId,
-          message: `You rejected ${result.requesterName}'s follow request`
+          message: `You rejected ${result.requesterName}'s follow request`,
+          requestId: requestId,
+          timestamp: new Date()
+        });
+
+        // Emit to all users for real-time network updates
+        io.emit('follow_status_updated', {
+          requesterId: requesterId,
+          targetId: currentUser._id,
+          action: 'rejected',
+          status: 'rejected',
+          timestamp: new Date()
         });
       }
 

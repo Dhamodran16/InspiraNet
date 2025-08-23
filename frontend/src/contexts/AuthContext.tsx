@@ -127,8 +127,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           return;
         }
 
+        // Add timeout to prevent hanging
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('Auth check timeout')), 10000); // 10 second timeout
+        });
+
         // Verify token with backend
-        const response = await api.get('/api/auth/verify');
+        const authPromise = api.get('/api/auth/verify');
+        
+        const response = await Promise.race([authPromise, timeoutPromise]) as any;
 
         if (response.data && response.data.user) {
           setUser(response.data.user);
@@ -142,16 +149,28 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             variant: "destructive",
           });
         }
-      } catch (error) {
-        console.error('Auth check failed:', error);
+      } catch (error: any) {
+        console.error('Auth check error:', error);
+        
+        // Remove invalid token
         removeAuthToken();
+        
+        // Only show error toast for network errors, not for missing tokens
+        if (error.message !== 'Auth check timeout' && error.response?.status !== 401) {
+          toast({
+            title: "Authentication Error",
+            description: "Please log in again.",
+            variant: "destructive",
+          });
+        }
       } finally {
+        // Always set loading to false, even if there are errors
         setIsLoading(false);
       }
     };
 
     checkAuth();
-  }, []);
+  }, [toast]);
 
   const login = async (email: string, password: string): Promise<boolean> => {
     try {

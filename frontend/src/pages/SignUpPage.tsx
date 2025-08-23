@@ -454,6 +454,39 @@ const SignUpPage = () => {
                 </div>
               )}
 
+              {/* Terms and Privacy Policy Acceptance */}
+              <div className="text-xs text-white/80 text-center space-y-2">
+                <p>
+                  By creating an account, you agree to our{' '}
+                  <button 
+                    type="button"
+                    onClick={() => window.open('/terms', '_blank')} 
+                    className="text-cyan-300 hover:text-cyan-200 underline"
+                  >
+                    Terms of Service
+                  </button>
+                  {' '}and{' '}
+                  <button 
+                    type="button"
+                    onClick={() => window.open('/privacy-policy', '_blank')} 
+                    className="text-cyan-300 hover:text-cyan-200 underline"
+                  >
+                    Privacy Policy
+                  </button>
+                </p>
+                <p>
+                  We use cookies to enhance your experience. See our{' '}
+                  <button 
+                    type="button"
+                    onClick={() => window.open('/cookie-policy', '_blank')} 
+                    className="text-cyan-300 hover:text-cyan-200 underline"
+                  >
+                    Cookie Policy
+                  </button>
+                  {' '}for more information.
+                </p>
+              </div>
+
               <Button type="submit" className="w-full bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white py-2.5 font-medium shadow-lg" disabled={isLoadingAuth}>
                 {isLoadingAuth ? "Creating Account..." : "Create Account"}
               </Button>

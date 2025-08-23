@@ -168,8 +168,23 @@ export const useAuth = (): UseAuthReturn => {
 
       console.log('🚀 Starting registration process...');
 
+      // Transform signupData to RegisterData format
+      const registerData: RegisterData = {
+        name: `${userData.firstName} ${userData.lastName}`,
+        email: userData.email,
+        password: userData.password,
+        type: userData.userType,
+        // Department is optional and will be collected during profile completion
+        // joinYear will be derived from currentYear in the backend
+      };
+
+      // Add currentYear for students
+      if (userData.userType === 'student' && userData.currentYear) {
+        (registerData as any).currentYear = userData.currentYear;
+      }
+
       // Sanitize user data
-      const sanitizedData = sanitizeUserData(userData);
+      const sanitizedData = sanitizeUserData(registerData);
 
       // Validate required fields
       if (!sanitizedData.name || !sanitizedData.password || !sanitizedData.type) {
@@ -178,14 +193,15 @@ export const useAuth = (): UseAuthReturn => {
 
       // Type-specific validation
       if (sanitizedData.type === 'student') {
-        if (!sanitizedData.department || !sanitizedData.joinYear) {
-          throw new Error('Students must provide department and join year');
+        if (!userData.currentYear) {
+          throw new Error('Students must provide current year (I/II/III/IV)');
         }
+        // Department is now optional during registration, will be collected in profile completion
       }
 
       if (sanitizedData.type === 'faculty') {
-        if (!sanitizedData.department || !sanitizedData.email) {
-          throw new Error('Faculty must provide department and email');
+        if (!sanitizedData.email) {
+          throw new Error('Faculty must provide email');
         }
         if (!sanitizedData.email.includes('@kongu.edu')) {
           throw new Error('Faculty must use Kongu email address');

@@ -1,19 +1,19 @@
 const VALID_DEPARTMENTS = [
-  'cse', 'ece', 'eee', 'mech', 'civil', 'chemical', 'biotech', 'it', 'ai', 'ai&ds', 'aiml'
+  'mch', 'aid', 'aim', 'mtr', 'aut', 'eee', 'ece', 'cse', 'it', 'eie', 'csd'
 ];
 
 const VALID_DEPARTMENT_NAMES = {
-  'cse': 'Computer Science Engineering',
-  'ece': 'Electronics & Communication Engineering',
-  'eee': 'Electrical & Electronics Engineering',
-  'mech': 'Mechanical Engineering',
-  'civil': 'Civil Engineering',
-  'chemical': 'Chemical Engineering',
-  'biotech': 'Biotechnology',
+  'mch': 'Mechanical Engineering',
+  'aid': 'Artificial Intelligence and Data Science',
+  'aim': 'Artificial Intelligence and Machine Learning',
+  'mtr': 'Mechatronics Engineering',
+  'aut': 'Automobile Engineering',
+  'eee': 'Electrical and Electronics Engineering',
+  'ece': 'Electronics and Communication Engineering',
+  'cse': 'Computer Science and Engineering',
   'it': 'Information Technology',
-  'ai': 'Artificial Intelligence',
-  'ai&ds': 'AI & Data Science',
-  'aiml': 'Artificial Intelligence And Machine Learning'
+  'eie': 'Electronics and Instrumentation Engineering',
+  'csd': 'Computer Science and Design'
 };
 
 /**

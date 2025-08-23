@@ -8,11 +8,11 @@
     "build": "vite build",
     "build:dev": "vite build --mode development",
     "build:prod": "vite build --mode production",
-    "build:render": "vite build",
+    "build:render": "vite build --mode production",
     "lint": "eslint .",
     "preview": "vite preview",
     "vercel-build": "vite build",
-    "render-build": "npm run build"
+    "render-build": "npm run build:prod"
   },
   "dependencies": {
     "@cloudinary/react": "^1.14.3",

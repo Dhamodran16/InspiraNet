@@ -1,67 +1,181 @@
 import React from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import { Edit, Mail, Building, Calendar, User } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { 
+  User, 
+  Mail, 
+  Phone, 
+  MapPin, 
+  Calendar, 
+  Building, 
+  GraduationCap, 
+  Briefcase, 
+  Globe, 
+  Linkedin, 
+  Github, 
+  Twitter, 
+  ExternalLink,
+  Edit,
+  FileText,
+  Award,
+  Users,
+  UserPlus,
+  UserCheck
+} from 'lucide-react';
+import ProfileForm from './ProfileForm';
+import { useEffect, useState } from 'react';
+import api from '@/services/api';
+import { socketService } from '@/services/socketService';
 
 interface ProfileDisplayProps {
   isOwnProfile?: boolean;
   onEdit?: () => void;
 }
 
-const ProfileDisplay: React.FC<ProfileDisplayProps> = ({ isOwnProfile = false, onEdit }) => {
+const ProfileDisplay = ({ isOwnProfile = true, onEdit }: ProfileDisplayProps) => {
   const { user } = useAuth();
+  const [connections, setConnections] = useState({
+    followers: 0,
+    following: 0,
+    mutual: 0
+  });
+  const [loadingConnections, setLoadingConnections] = useState(false);
+
+  useEffect(() => {
+    if (user?._id) {
+      loadConnections();
+      setupSocketListeners();
+    }
+  }, [user?._id]);
+
+  const loadConnections = async () => {
+    try {
+      setLoadingConnections(true);
+      const response = await api.get(`/api/users/${user?._id}/connections`);
+      setConnections({
+        followers: response.data.followers?.length || 0,
+        following: response.data.following?.length || 0,
+        mutual: response.data.mutual?.length || 0
+      });
+    } catch (error) {
+      console.error('Error loading connections:', error);
+    } finally {
+      setLoadingConnections(false);
+    }
+  };
+
+  const setupSocketListeners = () => {
+    // Listen for real-time connection updates
+    const handleFollowStatusUpdate = (data: any) => {
+      if (data.followerId === user?._id || data.followeeId === user?._id) {
+        loadConnections(); // Refresh connections count
+      }
+    };
+
+    const handleUserFollowed = (data: any) => {
+      if (data.followerId === user?._id || data.targetUserId === user?._id) {
+        loadConnections(); // Refresh connections count
+      }
+    };
+
+    const handleUserUnfollowed = (data: any) => {
+      if (data.followerId === user?._id || data.targetUserId === user?._id) {
+        loadConnections(); // Refresh connections count
+      }
+    };
+
+    socketService.onFollowStatusUpdate(handleFollowStatusUpdate);
+    socketService.onUserFollowed?.(handleUserFollowed);
+    socketService.onUserUnfollowed?.(handleUserUnfollowed);
+
+    return () => {
+      socketService.offFollowStatusUpdate();
+      socketService.offUserFollowed?.();
+      socketService.offUserUnfollowed?.();
+    };
+  };
 
   if (!user) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-2 border-blue-500 border-t-transparent mx-auto mb-4" />
-          <p className="text-gray-600">Loading profile...</p>
+          <User className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+          <p className="text-gray-500">No user data available</p>
         </div>
       </div>
     );
   }
 
+  // Note: This component now only displays the profile view
+  // The edit functionality is handled by the parent Profile page
+
   return (
     <div className="max-w-4xl mx-auto space-y-6">
-      {/* Profile Header */}
-      <Card>
-        <CardHeader className="text-center">
-          <div className="flex flex-col items-center space-y-4">
-            <Avatar className="h-24 w-24">
+      {/* Header with Edit Button */}
+      <div className="flex justify-between items-center">
+        <div className="flex items-center space-x-4">
+          <Avatar className="h-16 w-16">
               <AvatarImage src={user.avatar} />
-              <AvatarFallback className="text-2xl">{user.name?.charAt(0) || 'U'}</AvatarFallback>
+            <AvatarFallback className="text-xl">{user.name?.charAt(0) || 'U'}</AvatarFallback>
             </Avatar>
             <div>
-              <CardTitle className="text-2xl">{user.name}</CardTitle>
-              <div className="flex items-center justify-center gap-2 mt-2">
-                <Badge variant="secondary" className="capitalize">
-                  {user.type}
-                </Badge>
-                {user.isVerified && (
-                  <Badge variant="default" className="bg-green-500">
-                    Verified
-                  </Badge>
-                )}
+            <h1 className="text-2xl font-bold">{user.name}</h1>
+            <p className="text-gray-600">{user.type?.charAt(0).toUpperCase() + user.type?.slice(1)} • {user.department}</p>
               </div>
             </div>
-            {isOwnProfile && onEdit && (
-              <Button onClick={onEdit} className="mt-4">
-                <Edit className="h-4 w-4 mr-2" />
+        {isOwnProfile && onEdit && (
+          <Button onClick={onEdit} className="flex items-center gap-2">
+            <Edit className="h-4 w-4" />
                 Edit Profile
               </Button>
             )}
           </div>
-        </CardHeader>
-      </Card>
 
-      {/* Profile Details */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Contact Information */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Basic Information - Only show if data exists */}
+        {(user.email?.personal || user.phone || (user as any).dateOfBirth || (user as any).location) && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <User className="h-5 w-5" />
+                Basic Information
+              </CardTitle>
+        </CardHeader>
+            <CardContent className="space-y-4">
+              {user.email?.personal && (
+                <div>
+                  <Label className="text-sm font-medium text-gray-600">Personal Email</Label>
+                  <p className="text-sm">{user.email.personal}</p>
+                </div>
+              )}
+              {user.phone && (
+                <div>
+                  <Label className="text-sm font-medium text-gray-600">Phone</Label>
+                  <p className="text-sm">{user.phone}</p>
+                </div>
+              )}
+              {(user as any).dateOfBirth && (
+                <div>
+                  <Label className="text-sm font-medium text-gray-600">Date of Birth</Label>
+                  <p className="text-sm">{new Date((user as any).dateOfBirth).toLocaleDateString()}</p>
+                </div>
+              )}
+              {(user as any).location && (
+                <div>
+                  <Label className="text-sm font-medium text-gray-600">Location</Label>
+                  <p className="text-sm">{(user as any).location}</p>
+                </div>
+              )}
+            </CardContent>
+      </Card>
+        )}
+
+        {/* Contact Information - Only show if data exists */}
+        {(user.email?.college || user.email?.personal) && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -84,8 +198,25 @@ const ProfileDisplay: React.FC<ProfileDisplayProps> = ({ isOwnProfile = false, o
             )}
           </CardContent>
         </Card>
+        )}
 
-        {/* Academic Information */}
+        {/* Bio - Only show if exists */}
+        {(user as any).bio && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <User className="h-5 w-5" />
+                Bio
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-gray-700">{(user as any).bio}</p>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Academic Information - Only show if data exists */}
+        {(user.department || (user as any).academicInfo) && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -100,268 +231,297 @@ const ProfileDisplay: React.FC<ProfileDisplayProps> = ({ isOwnProfile = false, o
                 <p className="text-sm">{user.department}</p>
               </div>
             )}
-            {user.batch && (
+              {(user as any).academicInfo?.degree && (
               <div>
-                <Label className="text-sm font-medium text-gray-600">Batch</Label>
-                <p className="text-sm">{user.batch}</p>
+                  <Label className="text-sm font-medium text-gray-600">Degree</Label>
+                  <p className="text-sm">{(user as any).academicInfo.degree}</p>
               </div>
             )}
-            {user.studentInfo?.rollNumber && (
+              {(user as any).academicInfo?.institution && (
               <div>
-                <Label className="text-sm font-medium text-gray-600">Roll Number</Label>
-                <p className="text-sm">{user.studentInfo.rollNumber}</p>
+                  <Label className="text-sm font-medium text-gray-600">Institution</Label>
+                  <p className="text-sm">{(user as any).academicInfo.institution}</p>
               </div>
             )}
-            {user.studentInfo?.graduationYear && (
+              {(user as any).academicInfo?.graduationYear && (
               <div>
                 <Label className="text-sm font-medium text-gray-600">Graduation Year</Label>
-                <p className="text-sm">{user.studentInfo.graduationYear}</p>
+                  <p className="text-sm">{(user as any).academicInfo.graduationYear}</p>
               </div>
             )}
-            {user.studentInfo?.placementStatus && (
+              {(user as any).academicInfo?.cgpa && (
               <div>
-                <Label className="text-sm font-medium text-gray-600">Placement Status</Label>
-                <p className="text-sm capitalize">{user.studentInfo.placementStatus.replace('_', ' ')}</p>
-              </div>
-            )}
-            {user.studentInfo?.placementCompany && (
-              <div>
-                <Label className="text-sm font-medium text-gray-600">Placement Company</Label>
-                <p className="text-sm">{user.studentInfo.placementCompany}</p>
-              </div>
-            )}
-            {user.studentInfo?.placementPackage && (
-              <div>
-                <Label className="text-sm font-medium text-gray-600">Package</Label>
-                <p className="text-sm">{user.studentInfo.placementPackage}</p>
+                  <Label className="text-sm font-medium text-gray-600">CGPA</Label>
+                  <p className="text-sm">{(user as any).academicInfo.cgpa}</p>
               </div>
             )}
           </CardContent>
         </Card>
-
-        {/* Professional Experience - Only for Alumni */}
-        {user.type === 'alumni' && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Building className="h-5 w-5" />
-                Professional Experience
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {user.alumniInfo?.currentCompany && (
-                <div>
-                  <Label className="text-sm font-medium text-gray-600">Current Company</Label>
-                  <p className="text-sm">{user.alumniInfo.currentCompany}</p>
-                </div>
-              )}
-              {user.alumniInfo?.jobTitle && (
-                <div>
-                  <Label className="text-sm font-medium text-gray-600">Job Title</Label>
-                  <p className="text-sm">{user.alumniInfo.jobTitle}</p>
-                </div>
-              )}
-              {user.alumniInfo?.experience && (
-                <div>
-                  <Label className="text-sm font-medium text-gray-600">Experience</Label>
-                  <p className="text-sm">{user.alumniInfo.experience}</p>
-                </div>
-              )}
-              {user.alumniInfo?.salary && (
-                <div>
-                  <Label className="text-sm font-medium text-gray-600">Salary</Label>
-                  <p className="text-sm">{user.alumniInfo.salary}</p>
-                </div>
-              )}
-              {user.alumniInfo?.workLocation && (
-                <div>
-                  <Label className="text-sm font-medium text-gray-600">Work Location</Label>
-                  <p className="text-sm">{user.alumniInfo.workLocation}</p>
-                </div>
-              )}
-              {user.alumniInfo?.industry && (
-                <div>
-                  <Label className="text-sm font-medium text-gray-600">Industry</Label>
-                  <p className="text-sm">{user.alumniInfo.industry}</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
         )}
 
-        {/* Faculty Information - Only for Faculty */}
-        {user.type === 'faculty' && (
+        {/* Professional Information - Only show if data exists */}
+        {((user as any).skills || (user as any).interests || (user as any).areaOfInterest) && (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Building className="h-5 w-5" />
-                Faculty Information
+                <Briefcase className="h-5 w-5" />
+                Professional Information
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {user.facultyInfo?.designation && (
+              {(user as any).areaOfInterest && (
                 <div>
-                  <Label className="text-sm font-medium text-gray-600">Designation</Label>
-                  <p className="text-sm">{user.facultyInfo.designation}</p>
+                  <Label className="text-sm font-medium text-gray-600">Area of Interest</Label>
+                  <p className="text-sm">{(user as any).areaOfInterest}</p>
                 </div>
               )}
-              {user.facultyInfo?.qualification && (
+              {(user as any).skills && (user as any).skills.length > 0 && (
                 <div>
-                  <Label className="text-sm font-medium text-gray-600">Qualification</Label>
-                  <p className="text-sm">{user.facultyInfo.qualification}</p>
-                </div>
-              )}
-              {user.facultyInfo?.officeLocation && (
-                <div>
-                  <Label className="text-sm font-medium text-gray-600">Office Location</Label>
-                  <p className="text-sm">{user.facultyInfo.officeLocation}</p>
-                </div>
-              )}
-              {user.facultyInfo?.teachingSubjects && user.facultyInfo.teachingSubjects.length > 0 && (
-                <div>
-                  <Label className="text-sm font-medium text-gray-600">Teaching Subjects</Label>
-                  <div className="flex flex-wrap gap-2 mt-1">
-                    {user.facultyInfo.teachingSubjects.map((subject, index) => (
-                      <Badge key={index} variant="outline" className="text-xs">
-                        {subject}
-                      </Badge>
+                  <Label className="text-sm font-medium text-gray-600">Skills</Label>
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {(user as any).skills.map((skill: string, index: number) => (
+                      <Badge key={index} variant="secondary">{skill}</Badge>
                     ))}
-                  </div>
+                </div>
+                </div>
+              )}
+              {(user as any).interests && (user as any).interests.length > 0 && (
+                <div>
+                  <Label className="text-sm font-medium text-gray-600">Interests</Label>
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {(user as any).interests.map((interest: string, index: number) => (
+                      <Badge key={index} variant="outline">{interest}</Badge>
+                    ))}
+                </div>
                 </div>
               )}
             </CardContent>
           </Card>
         )}
 
-        {/* Professional Development */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <User className="h-5 w-5" />
-              Professional Development
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {user.skills && user.skills.length > 0 && (
-              <div>
-                <Label className="text-sm font-medium text-gray-600">Skills</Label>
-                <div className="flex flex-wrap gap-2 mt-1">
-                  {user.skills.map((skill, index) => (
-                    <Badge key={index} variant="secondary" className="text-xs">
-                      {skill}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-            )}
-            {user.languages && user.languages.length > 0 && (
-              <div>
-                <Label className="text-sm font-medium text-gray-600">Languages</Label>
-                <div className="flex flex-wrap gap-2 mt-1">
-                  {user.languages.map((language, index) => (
-                    <Badge key={index} variant="outline" className="text-xs">
-                      {language}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-            )}
-            {user.interests && user.interests.length > 0 && (
-              <div>
-                <Label className="text-sm font-medium text-gray-600">Interests</Label>
-                <div className="flex flex-wrap gap-2 mt-1">
-                  {user.interests.map((interest, index) => (
-                    <Badge key={index} variant="default" className="text-xs bg-blue-500">
-                      {interest}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Bio */}
-        {user.bio && (
+        {/* Social Links - Only show if data exists */}
+        {(user as any).socialLinks && Object.values((user as any).socialLinks).some(Boolean) && (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <User className="h-5 w-5" />
-                About
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-gray-700">{user.bio}</p>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Social Links */}
-        {user.socialLinks && Object.keys(user.socialLinks).length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <User className="h-5 w-5" />
+                <Globe className="h-5 w-5" />
                 Social Links
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-2">
-              {user.socialLinks.linkedin && (
-                <div>
-                  <Label className="text-sm font-medium text-gray-600">LinkedIn</Label>
-                  <a href={user.socialLinks.linkedin} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:underline">
-                    {user.socialLinks.linkedin}
-                  </a>
-                </div>
+            <CardContent className="space-y-4">
+              {(user as any).socialLinks?.linkedin && (
+                <a 
+                  href={(user as any).socialLinks.linkedin} 
+                  target="_blank" 
+                  rel="noopener noreferrer" 
+                  className="flex items-center space-x-2 text-blue-600 hover:text-blue-800"
+                >
+                  <Linkedin className="w-5 h-5" />
+                  <span>LinkedIn</span>
+                  <ExternalLink className="w-4 h-4" />
+                </a>
               )}
-              {user.socialLinks.github && (
-                <div>
-                  <Label className="text-sm font-medium text-gray-600">GitHub</Label>
-                  <a href={user.socialLinks.github} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:underline">
-                    {user.socialLinks.github}
-                  </a>
-                </div>
+              {(user as any).socialLinks?.github && (
+                <a 
+                  href={(user as any).socialLinks.github} 
+                  target="_blank" 
+                  rel="noopener noreferrer" 
+                  className="flex items-center space-x-2 text-gray-600 hover:text-gray-800"
+                >
+                  <Github className="w-5 h-5" />
+                  <span>GitHub</span>
+                  <ExternalLink className="w-4 h-4" />
+                </a>
               )}
-              {user.socialLinks.personalWebsite && (
-                <div>
-                  <Label className="text-sm font-medium text-gray-600">Personal Website</Label>
-                  <a href={user.socialLinks.personalWebsite} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:underline">
-                    {user.socialLinks.personalWebsite}
-                  </a>
-                </div>
+              {(user as any).socialLinks?.twitter && (
+                <a 
+                  href={(user as any).socialLinks.twitter} 
+                  target="_blank" 
+                  rel="noopener noreferrer" 
+                  className="flex items-center space-x-2 text-blue-400 hover:text-blue-600"
+                >
+                  <Twitter className="w-5 h-5" />
+                  <span>Twitter</span>
+                  <ExternalLink className="w-4 h-4" />
+                </a>
+              )}
+              {(user as any).socialLinks?.website && (
+                <a 
+                  href={(user as any).socialLinks.website} 
+                  target="_blank" 
+                  rel="noopener noreferrer" 
+                  className="flex items-center space-x-2 text-green-600 hover:text-green-800"
+                >
+                  <Globe className="w-5 h-5" />
+                  <span>Website</span>
+                  <ExternalLink className="w-4 h-4" />
+                </a>
               )}
             </CardContent>
           </Card>
         )}
-      </div>
 
-      {/* Profile Completion Status */}
-      {isOwnProfile && (
+        {/* Resume & Portfolio - Only show if data exists */}
+        {((user as any).resume || (user as any).portfolio) && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <User className="h-5 w-5" />
+                <FileText className="h-5 w-5" />
+                Resume & Portfolio
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+              {(user as any).resume && (
+              <div>
+                  <Label className="text-sm font-medium text-gray-600">Resume</Label>
+                  <a 
+                    href={(user as any).resume} 
+                    target="_blank" 
+                    rel="noopener noreferrer" 
+                    className="flex items-center space-x-2 text-blue-600 hover:text-blue-800"
+                  >
+                    <FileText className="w-4 h-4" />
+                    <span>View Resume</span>
+                    <ExternalLink className="w-4 h-4" />
+                  </a>
+              </div>
+            )}
+              {(user as any).portfolio && (
+              <div>
+                  <Label className="text-sm font-medium text-gray-600">Portfolio</Label>
+                  <a 
+                    href={(user as any).portfolio} 
+                    target="_blank" 
+                    rel="noopener noreferrer" 
+                    className="flex items-center space-x-2 text-blue-600 hover:text-blue-800"
+                  >
+                    <Globe className="w-4 h-4" />
+                    <span>View Portfolio</span>
+                    <ExternalLink className="w-4 h-4" />
+                  </a>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+        )}
+
+        {/* Work Experience - Only show if data exists */}
+        {(user as any).workExperience && (user as any).workExperience.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Briefcase className="h-5 w-5" />
+                Work Experience
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {(user as any).workExperience.map((exp: any, index: number) => (
+                <div key={index} className="border-l-4 border-blue-500 pl-4">
+                  <h4 className="font-medium">{exp.position}</h4>
+                  <p className="text-sm text-gray-600">{exp.company}</p>
+                  <p className="text-xs text-gray-500">
+                    {new Date(exp.startDate).toLocaleDateString()} - {exp.current ? 'Present' : new Date(exp.endDate).toLocaleDateString()}
+                  </p>
+                  {exp.description && (
+                    <p className="text-sm text-gray-700 mt-2">{exp.description}</p>
+                  )}
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Education - Only show if data exists */}
+        {(user as any).education && (user as any).education.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <GraduationCap className="h-5 w-5" />
+                Education
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {(user as any).education.map((edu: any, index: number) => (
+                <div key={index} className="border-l-4 border-green-500 pl-4">
+                  <h4 className="font-medium">{edu.degree}</h4>
+                  <p className="text-sm text-gray-600">{edu.institution}</p>
+                  <p className="text-xs text-gray-500">{edu.year}</p>
+                  {edu.gpa && (
+                    <p className="text-sm text-gray-700">GPA: {edu.gpa}</p>
+                  )}
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Profile Status */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Award className="h-5 w-5" />
               Profile Status
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
+          <CardContent className="space-y-4">
               <div className="flex items-center justify-between">
-                <span className="text-sm">Profile Completion</span>
-                <Badge variant={user.isProfileComplete ? "default" : "secondary"}>
-                  {user.isProfileComplete ? "Complete" : "Incomplete"}
-                </Badge>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm">Account Verification</span>
+              <span className="text-sm font-medium">Verification Status</span>
                 <Badge variant={user.isVerified ? "default" : "secondary"}>
                   {user.isVerified ? "Verified" : "Pending"}
                 </Badge>
               </div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium">Profile Completion</span>
+              <Badge variant={user.isProfileComplete ? "default" : "secondary"}>
+                {user.isProfileComplete ? "Complete" : "Incomplete"}
+              </Badge>
             </div>
           </CardContent>
         </Card>
-      )}
+
+        {/* Connections Section */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Users className="h-5 w-5" />
+              Connections
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {loadingConnections ? (
+              <div className="flex items-center justify-center py-4">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-3 gap-4">
+                <div className="text-center">
+                  <div className="flex items-center justify-center mb-2">
+                    <UserPlus className="h-8 w-8 text-blue-600" />
+                  </div>
+                  <div className="text-2xl font-bold text-blue-600">{connections.followers}</div>
+                  <div className="text-sm text-gray-600">Followers</div>
+                </div>
+                
+                <div className="text-center">
+                  <div className="flex items-center justify-center mb-2">
+                    <UserCheck className="h-8 w-8 text-green-600" />
+                  </div>
+                  <div className="text-2xl font-bold text-green-600">{connections.following}</div>
+                  <div className="text-sm text-gray-600">Following</div>
+                </div>
+                
+                <div className="text-center">
+                  <div className="flex items-center justify-center mb-2">
+                    <Users className="h-8 w-8 text-purple-600" />
+                  </div>
+                  <div className="text-2xl font-bold text-purple-600">{connections.mutual}</div>
+                  <div className="text-sm text-gray-600">Mutual</div>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 };

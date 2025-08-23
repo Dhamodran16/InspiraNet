@@ -63,6 +63,13 @@ export default function AlumniDirectory() {
   const { user } = useAuth();
   const navigate = useNavigate();
 
+  // Generate year options dynamically (from 2000 to current year)
+  const currentYear = new Date().getFullYear();
+  const yearOptions = [];
+  for (let year = currentYear; year >= 2000; year--) {
+    yearOptions.push(year);
+  }
+
   const loadUsers = async () => {
     try {
       setIsLoading(true);
@@ -336,10 +343,9 @@ export default function AlumniDirectory() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Batches</SelectItem>
-                  <SelectItem value="2020">2020</SelectItem>
-                  <SelectItem value="2021">2021</SelectItem>
-                  <SelectItem value="2022">2022</SelectItem>
-                  <SelectItem value="2023">2023</SelectItem>
+                  {yearOptions.map(year => (
+                    <SelectItem key={year} value={year.toString()}>{year}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>

@@ -124,12 +124,10 @@ class AuthService {
       }
 
       // Type-specific validation
-      if (data.type === 'student' && !data.department) {
-        throw new Error('Students must provide department');
-      }
+      // Department is now optional for students during registration, will be collected in profile completion
 
-      if (data.type === 'faculty' && (!data.department || !data.email)) {
-        throw new Error('Faculty must provide department and email');
+      if (data.type === 'faculty' && !data.email) {
+        throw new Error('Faculty must provide email');
       }
 
       if (data.type === 'alumni' && !data.email) {

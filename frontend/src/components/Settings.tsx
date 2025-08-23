@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -8,6 +8,7 @@ import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { 
   User, 
   Bell, 
@@ -19,11 +20,21 @@ import {
   Eye, 
   EyeOff,
   Save,
-  RefreshCw
+  RefreshCw,
+  CheckCircle,
+  AlertCircle,
+  Clock,
+  Zap,
+  Wifi,
+  WifiOff,
+  Activity,
+  Settings as SettingsIcon
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
+import { socketService } from '@/services/socketService';
 import api from '@/services/api';
+import EnhancedNotificationSettings from '@/components/notifications/EnhancedNotificationSettings';
 
 interface UserSettings {
   _id: string;
@@ -104,21 +115,266 @@ export default function Settings() {
     confirmDelete: ''
   });
 
+  // Real-time state
+  const [isOnline, setIsOnline] = useState(true);
+  const [lastSync, setLastSync] = useState<Date>(new Date());
+  const [syncStatus, setSyncStatus] = useState<'synced' | 'syncing' | 'error'>('synced');
+  const [realTimeUpdates, setRealTimeUpdates] = useState(true);
+  const [autoSave, setAutoSave] = useState(true);
+  const [livePreview, setLivePreview] = useState(true);
+  const [connectionQuality, setConnectionQuality] = useState<'excellent' | 'good' | 'poor'>('excellent');
+  const [pendingChanges, setPendingChanges] = useState<string[]>([]);
+  const [activityLog, setActivityLog] = useState<Array<{
+    id: string;
+    action: string;
+    timestamp: Date;
+    status: 'success' | 'error' | 'pending';
+    details?: string;
+  }>>([]);
+
   useEffect(() => {
     loadSettings();
+    
+    // Real-time connection monitoring
+    const checkConnection = () => {
+      const quality = navigator.onLine ? 'excellent' : 'poor';
+      setConnectionQuality(quality);
+      setIsOnline(navigator.onLine);
+    };
+
+    // Monitor online/offline status
+    window.addEventListener('online', () => {
+      setIsOnline(true);
+      setConnectionQuality('excellent');
+      addActivityLog('Connection restored', 'success', 'Back online');
+    });
+
+    window.addEventListener('offline', () => {
+      setIsOnline(false);
+      setConnectionQuality('poor');
+      addActivityLog('Connection lost', 'error', 'No internet connection');
+    });
+
+    // Socket connection monitoring
+    const handleSocketConnect = () => {
+      setIsOnline(true);
+      setConnectionQuality('excellent');
+      addActivityLog('Real-time connection established', 'success');
+    };
+
+    const handleSocketDisconnect = () => {
+      setIsOnline(false);
+      setConnectionQuality('poor');
+      addActivityLog('Real-time connection lost', 'error');
+    };
+
+    // Connect socket events - using available methods
+    if (socketService.isConnected()) {
+      handleSocketConnect();
+    } else {
+      socketService.connect();
+    }
+
+    // Initial connection check
+    checkConnection();
+
+    // Periodic sync status update
+    const syncInterval = setInterval(() => {
+      setLastSync(new Date());
+      if (isOnline && realTimeUpdates) {
+        setSyncStatus('synced');
+      }
+    }, 30000); // Every 30 seconds
+
+    return () => {
+      window.removeEventListener('online', () => {});
+      window.removeEventListener('offline', () => {});
+      clearInterval(syncInterval);
+    };
+  }, [realTimeUpdates]);
+
+  // Helper functions for real-time functionality
+  const addActivityLog = useCallback((action: string, status: 'success' | 'error' | 'pending', details?: string) => {
+    const logEntry = {
+      id: Date.now().toString(),
+      action,
+      timestamp: new Date(),
+      status,
+      details
+    };
+    setActivityLog(prev => [logEntry, ...prev.slice(0, 49)]); // Keep last 50 entries
   }, []);
+
+  const addPendingChange = useCallback((change: string) => {
+    setPendingChanges(prev => [...prev, change]);
+  }, []);
+
+  const removePendingChange = useCallback((change: string) => {
+    setPendingChanges(prev => prev.filter(c => c !== change));
+  }, []);
+
+  const syncSettings = useCallback(async () => {
+    if (!isOnline) {
+      addActivityLog('Sync failed', 'error', 'No internet connection');
+      return;
+    }
+
+    setSyncStatus('syncing');
+    try {
+      await loadSettings();
+      setSyncStatus('synced');
+      setLastSync(new Date());
+      addActivityLog('Settings synced', 'success');
+    } catch (error) {
+      setSyncStatus('error');
+      addActivityLog('Sync failed', 'error', 'Server error');
+    }
+  }, [isOnline, addActivityLog]);
 
   const loadSettings = async () => {
     try {
       setLoading(true);
       const response = await api.get('/api/notifications/settings');
-      setSettings(response.data);
+      
+      // Check if response has the expected structure
+      if (response.data && response.data.success && response.data.settings) {
+        setSettings(response.data.settings);
+      } else if (response.data && response.data.settings) {
+        // Fallback for direct settings response
+        setSettings(response.data.settings);
+      } else if (response.data) {
+        // Fallback for direct data response
+        setSettings(response.data);
+      } else {
+        // Create default settings if none exist
+        const defaultSettings: UserSettings = {
+          _id: '',
+          userId: user?._id || '',
+          notifications: {
+            followRequests: true,
+            followAccepted: true,
+            followRejected: true,
+            postLikes: true,
+            postComments: true,
+            postShares: true,
+            postMentions: true,
+            newMessages: true,
+            messageReadReceipts: true,
+            eventReminders: true,
+            eventInvitations: true,
+            jobApplications: true,
+            jobUpdates: true,
+            systemAnnouncements: true,
+            securityAlerts: true,
+          },
+          privacy: {
+            profileVisibility: 'public',
+            showEmail: false,
+            showPhone: false,
+            showLocation: false,
+            showCompany: false,
+            showBatch: false,
+            showDepartment: false,
+            allowMessagesFrom: 'everyone',
+            showOnlineStatus: true,
+          },
+          communication: {
+            emailNotifications: true,
+            pushNotifications: true,
+            inAppNotifications: true,
+            notificationFrequency: 'immediate',
+            quietHours: {
+              enabled: false,
+              startTime: '22:00',
+              endTime: '08:00',
+            },
+          },
+          display: {
+            theme: 'auto',
+            language: 'en',
+            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+            dateFormat: 'MM/DD/YYYY',
+            timeFormat: '12h',
+          },
+          security: {
+            twoFactorEnabled: false,
+            loginNotifications: true,
+            sessionTimeout: 30,
+            requirePasswordChange: false,
+            lastPasswordChange: new Date(),
+            passwordExpiryDays: 90,
+          },
+        };
+        setSettings(defaultSettings);
+      }
     } catch (error) {
       console.error('Error loading settings:', error);
+      
+      // Create default settings on error
+      const defaultSettings: UserSettings = {
+        _id: '',
+        userId: user?._id || '',
+        notifications: {
+          followRequests: true,
+          followAccepted: true,
+          followRejected: true,
+          postLikes: true,
+          postComments: true,
+          postShares: true,
+          postMentions: true,
+          newMessages: true,
+          messageReadReceipts: true,
+          eventReminders: true,
+          eventInvitations: true,
+          jobApplications: true,
+          jobUpdates: true,
+          systemAnnouncements: true,
+          securityAlerts: true,
+        },
+        privacy: {
+          profileVisibility: 'public',
+          showEmail: false,
+          showPhone: false,
+          showLocation: false,
+          showCompany: false,
+          showBatch: false,
+          showDepartment: false,
+          allowMessagesFrom: 'everyone',
+          showOnlineStatus: true,
+        },
+        communication: {
+          emailNotifications: true,
+          pushNotifications: true,
+          inAppNotifications: true,
+          notificationFrequency: 'immediate',
+          quietHours: {
+            enabled: false,
+            startTime: '22:00',
+            endTime: '08:00',
+          },
+        },
+        display: {
+          theme: 'auto',
+          language: 'en',
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          dateFormat: 'MM/DD/YYYY',
+          timeFormat: '12h',
+        },
+        security: {
+          twoFactorEnabled: false,
+          loginNotifications: true,
+          sessionTimeout: 30,
+          requirePasswordChange: false,
+          lastPasswordChange: new Date(),
+          passwordExpiryDays: 90,
+        },
+      };
+      setSettings(defaultSettings);
+      
       toast({
-        title: "Error",
-        description: "Failed to load settings",
-        variant: "destructive"
+        title: "Warning",
+        description: "Using default settings. Some features may be limited.",
+        variant: "default"
       });
     } finally {
       setLoading(false);
@@ -126,18 +382,39 @@ export default function Settings() {
   };
 
   const updateSettings = async (section: string, data: any) => {
+    const changeId = `${section}-${Date.now()}`;
+    addPendingChange(changeId);
+    
     try {
       setSaving(true);
+      setSyncStatus('syncing');
+      
       const response = await api.put('/api/notifications/settings', {
         [section]: data
       });
+      
       setSettings(response.data.settings);
+      setSyncStatus('synced');
+      setLastSync(new Date());
+      removePendingChange(changeId);
+      
+      // Emit real-time update to other connected clients
+      if (realTimeUpdates) {
+        socketService.emit('settings-updated', { section, data });
+      }
+      
+      addActivityLog(`${section} settings updated`, 'success');
+      
       toast({
         title: "Success",
         description: "Settings updated successfully"
       });
     } catch (error) {
       console.error('Error updating settings:', error);
+      setSyncStatus('error');
+      removePendingChange(changeId);
+      addActivityLog(`${section} settings update failed`, 'error', 'Server error');
+      
       toast({
         title: "Error",
         description: "Failed to update settings",
@@ -146,6 +423,24 @@ export default function Settings() {
     } finally {
       setSaving(false);
     }
+  };
+
+  // Helper function to safely access settings
+  const getSetting = (path: string, defaultValue: any = null) => {
+    if (!settings) return defaultValue;
+    
+    const keys = path.split('.');
+    let value = settings;
+    
+    for (const key of keys) {
+      if (value && typeof value === 'object' && key in value) {
+        value = value[key];
+      } else {
+        return defaultValue;
+      }
+    }
+    
+    return value;
   };
 
   const handlePasswordChange = async () => {
@@ -261,7 +556,7 @@ export default function Settings() {
     );
   }
 
-  if (!settings) {
+  if (!settings || !settings.privacy || !settings.notifications) {
     return (
       <div className="text-center py-8">
         <p className="text-muted-foreground">Failed to load settings</p>
@@ -272,6 +567,60 @@ export default function Settings() {
 
   return (
     <div className="container mx-auto py-6 space-y-6">
+      {/* Real-time Status Indicator */}
+      <Card className="border-l-4 border-l-blue-500">
+        <CardContent className="pt-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-2">
+                {isOnline ? (
+                  <Wifi className="h-4 w-4 text-green-500" />
+                ) : (
+                  <WifiOff className="h-4 w-4 text-red-500" />
+                )}
+                <span className="text-sm font-medium">
+                  {isOnline ? 'Online' : 'Offline'}
+                </span>
+              </div>
+              
+              <div className="flex items-center space-x-2">
+                <Activity className="h-4 w-4 text-blue-500" />
+                <span className="text-sm text-muted-foreground">
+                  Connection: {connectionQuality}
+                </span>
+              </div>
+              
+              <div className="flex items-center space-x-2">
+                {syncStatus === 'synced' && <CheckCircle className="h-4 w-4 text-green-500" />}
+                {syncStatus === 'syncing' && <RefreshCw className="h-4 w-4 text-blue-500 animate-spin" />}
+                {syncStatus === 'error' && <AlertCircle className="h-4 w-4 text-red-500" />}
+                <span className="text-sm text-muted-foreground">
+                  Last sync: {lastSync.toLocaleTimeString()}
+                </span>
+              </div>
+            </div>
+            
+            <div className="flex items-center space-x-2">
+              {pendingChanges.length > 0 && (
+                <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">
+                  {pendingChanges.length} pending
+                </Badge>
+              )}
+              
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={syncSettings}
+                disabled={syncStatus === 'syncing' || !isOnline}
+              >
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Sync Now
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">Settings</h1>
@@ -284,12 +633,13 @@ export default function Settings() {
       </div>
 
       <Tabs defaultValue="profile" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="profile">Profile</TabsTrigger>
           <TabsTrigger value="notifications">Notifications</TabsTrigger>
           <TabsTrigger value="privacy">Privacy</TabsTrigger>
           <TabsTrigger value="security">Security</TabsTrigger>
           <TabsTrigger value="display">Display</TabsTrigger>
+          <TabsTrigger value="activity">Activity</TabsTrigger>
         </TabsList>
 
         {/* Profile Settings */}
@@ -328,7 +678,7 @@ export default function Settings() {
                 </div>
                 <div>
                   <Label htmlFor="company">Company</Label>
-                  <Input id="company" value={user?.currentCompany || ''} disabled />
+                  <Input id="company" value={user?.company || user?.alumniInfo?.currentCompany || ''} disabled />
                 </div>
               </div>
             </CardContent>
@@ -337,206 +687,7 @@ export default function Settings() {
 
         {/* Notification Settings */}
         <TabsContent value="notifications" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Bell className="h-5 w-5" />
-                <span>Notification Preferences</span>
-              </CardTitle>
-              <CardDescription>
-                Choose what notifications you want to receive
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {/* Connection Notifications */}
-              <div>
-                <h4 className="font-medium mb-3">Connection Notifications</h4>
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="followRequests">Follow Requests</Label>
-                    <Switch
-                      id="followRequests"
-                      checked={settings.notifications.followRequests}
-                      onCheckedChange={(checked) => 
-                        updateSettings('notifications', { ...settings.notifications, followRequests: checked })
-                      }
-                    />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="followAccepted">Follow Accepted</Label>
-                    <Switch
-                      id="followAccepted"
-                      checked={settings.notifications.followAccepted}
-                      onCheckedChange={(checked) => 
-                        updateSettings('notifications', { ...settings.notifications, followAccepted: checked })
-                      }
-                    />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="followRejected">Follow Rejected</Label>
-                    <Switch
-                      id="followRejected"
-                      checked={settings.notifications.followRejected}
-                      onCheckedChange={(checked) => 
-                        updateSettings('notifications', { ...settings.notifications, followRejected: checked })
-                      }
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <Separator />
-
-              {/* Engagement Notifications */}
-              <div>
-                <h4 className="font-medium mb-3">Engagement Notifications</h4>
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="postLikes">Post Likes</Label>
-                    <Switch
-                      id="postLikes"
-                      checked={settings.notifications.postLikes}
-                      onCheckedChange={(checked) => 
-                        updateSettings('notifications', { ...settings.notifications, postLikes: checked })
-                      }
-                    />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="postComments">Post Comments</Label>
-                    <Switch
-                      id="postComments"
-                      checked={settings.notifications.postComments}
-                      onCheckedChange={(checked) => 
-                        updateSettings('notifications', { ...settings.notifications, postComments: checked })
-                      }
-                    />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="postShares">Post Shares</Label>
-                    <Switch
-                      id="postShares"
-                      checked={settings.notifications.postShares}
-                      onCheckedChange={(checked) => 
-                        updateSettings('notifications', { ...settings.notifications, postShares: checked })
-                      }
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <Separator />
-
-              {/* Communication Settings */}
-              <div>
-                <h4 className="font-medium mb-3">Communication Preferences</h4>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="emailNotifications">Email Notifications</Label>
-                    <Switch
-                      id="emailNotifications"
-                      checked={settings.communication.emailNotifications}
-                      onCheckedChange={(checked) => 
-                        updateSettings('communication', { ...settings.communication, emailNotifications: checked })
-                      }
-                    />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="pushNotifications">Push Notifications</Label>
-                    <Switch
-                      id="pushNotifications"
-                      checked={settings.communication.pushNotifications}
-                      onCheckedChange={(checked) => 
-                        updateSettings('communication', { ...settings.communication, pushNotifications: checked })
-                      }
-                    />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="inAppNotifications">In-App Notifications</Label>
-                    <Switch
-                      id="inAppNotifications"
-                      checked={settings.communication.inAppNotifications}
-                      onCheckedChange={(checked) => 
-                        updateSettings('communication', { ...settings.communication, inAppNotifications: checked })
-                      }
-                    />
-                  </div>
-                  
-                  <div>
-                    <Label htmlFor="notificationFrequency">Notification Frequency</Label>
-                    <Select
-                      value={settings.communication.notificationFrequency}
-                      onValueChange={(value) => 
-                        updateSettings('communication', { ...settings.communication, notificationFrequency: value })
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="immediate">Immediate</SelectItem>
-                        <SelectItem value="hourly">Hourly</SelectItem>
-                        <SelectItem value="daily">Daily</SelectItem>
-                        <SelectItem value="weekly">Weekly</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-              </div>
-
-              {/* Quiet Hours */}
-              <div>
-                <h4 className="font-medium mb-3">Quiet Hours</h4>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="quietHours">Enable Quiet Hours</Label>
-                  <Switch
-                      id="quietHours"
-                      checked={settings.communication.quietHours.enabled}
-                      onCheckedChange={(checked) => 
-                        updateSettings('communication', { 
-                          ...settings.communication, 
-                          quietHours: { ...settings.communication.quietHours, enabled: checked }
-                        })
-                      }
-                    />
-                  </div>
-                  
-                  {settings.communication.quietHours.enabled && (
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <Label htmlFor="startTime">Start Time</Label>
-                        <Input
-                          id="startTime"
-                          type="time"
-                          value={settings.communication.quietHours.startTime}
-                          onChange={(e) => 
-                            updateSettings('communication', { 
-                              ...settings.communication, 
-                              quietHours: { ...settings.communication.quietHours, startTime: e.target.value }
-                            })
-                          }
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="endTime">End Time</Label>
-                        <Input
-                          id="endTime"
-                          type="time"
-                          value={settings.communication.quietHours.endTime}
-                          onChange={(e) => 
-                            updateSettings('communication', { 
-                              ...settings.communication, 
-                              quietHours: { ...settings.communication.quietHours, endTime: e.target.value }
-                            })
-                          }
-                        />
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          <EnhancedNotificationSettings />
         </TabsContent>
 
         {/* Privacy Settings */}
@@ -856,6 +1007,103 @@ export default function Settings() {
                     <SelectItem value="24h">24-hour</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Activity Log */}
+        <TabsContent value="activity" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <Activity className="h-5 w-5" />
+                <span>Real-time Activity Log</span>
+              </CardTitle>
+              <CardDescription>
+                Monitor your settings changes and system activity in real-time
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {/* Real-time Controls */}
+                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                  <div className="flex items-center space-x-4">
+                    <div className="flex items-center space-x-2">
+                      <Switch
+                        checked={realTimeUpdates}
+                        onCheckedChange={setRealTimeUpdates}
+                      />
+                      <Label>Real-time Updates</Label>
+                    </div>
+                    
+                    <div className="flex items-center space-x-2">
+                      <Switch
+                        checked={autoSave}
+                        onCheckedChange={setAutoSave}
+                      />
+                      <Label>Auto Save</Label>
+                    </div>
+                    
+                    <div className="flex items-center space-x-2">
+                      <Switch
+                        checked={livePreview}
+                        onCheckedChange={setLivePreview}
+                      />
+                      <Label>Live Preview</Label>
+                    </div>
+                  </div>
+                  
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setActivityLog([])}
+                  >
+                    Clear Log
+                  </Button>
+                </div>
+
+                {/* Activity Log */}
+                <ScrollArea className="h-96">
+                  <div className="space-y-2">
+                    {activityLog.length === 0 ? (
+                      <div className="text-center py-8 text-muted-foreground">
+                        <Clock className="h-8 w-8 mx-auto mb-2" />
+                        <p>No activity yet</p>
+                      </div>
+                    ) : (
+                      activityLog.map((log) => (
+                        <div
+                          key={log.id}
+                          className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                        >
+                          <div className="flex items-center space-x-3">
+                            {log.status === 'success' && (
+                              <CheckCircle className="h-4 w-4 text-green-500" />
+                            )}
+                            {log.status === 'error' && (
+                              <AlertCircle className="h-4 w-4 text-red-500" />
+                            )}
+                            {log.status === 'pending' && (
+                              <Clock className="h-4 w-4 text-yellow-500" />
+                            )}
+                            
+                            <div>
+                              <p className="text-sm font-medium">{log.action}</p>
+                              {log.details && (
+                                <p className="text-xs text-muted-foreground">{log.details}</p>
+                              )}
+                            </div>
+                          </div>
+                          
+                          <div className="text-xs text-muted-foreground">
+                            {log.timestamp.toLocaleTimeString()}
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </ScrollArea>
               </div>
             </CardContent>
           </Card>
