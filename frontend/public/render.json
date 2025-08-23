@@ -45,15 +45,19 @@
       "dest": "/index.html"
     },
     {
-      "src": "/meeting/*",
+      "src": "/meeting",
       "dest": "/index.html"
     },
     {
-      "src": "/profile/*",
+      "src": "/meeting/(.*)",
       "dest": "/index.html"
     },
     {
-      "src": "/messages/*",
+      "src": "/profile/(.*)",
+      "dest": "/index.html"
+    },
+    {
+      "src": "/messages/(.*)",
       "dest": "/index.html"
     },
     {
@@ -71,5 +75,6 @@
     "/icons/**": {
       "Cache-Control": "public, max-age=31536000, immutable"
     }
-  }
+  },
+  "error_page": "index.html"
 }

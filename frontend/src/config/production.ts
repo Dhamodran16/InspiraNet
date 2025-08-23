@@ -6,7 +6,8 @@ interface ProductionConfig {
   frontendUrl: string;
   socketUrl: string;
   meetingUrl: string;
-
+  // 🚀 Dev Tunnel URL for external access
+  devTunnelUrl: string;
   cloudinary: {
     cloudName: string;
     uploadPreset: string;
