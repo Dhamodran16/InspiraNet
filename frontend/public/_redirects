@@ -1,0 +1,16 @@
+# SPA Routing for Render
+/*    /index.html   200
+
+# Handle specific routes that might cause issues
+/signin    /index.html   200
+/signup    /index.html   200
+/privacy-policy    /index.html   200
+/terms    /index.html   200
+/cookie-policy    /index.html   200
+/team    /index.html   200
+/meeting/*    /index.html   200
+/dashboard    /index.html   200
+/profile    /index.html   200
+/messages    /index.html   200
+/notifications    /index.html   200
+/create-post    /index.html   200
