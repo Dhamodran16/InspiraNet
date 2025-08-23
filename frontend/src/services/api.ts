@@ -17,7 +17,7 @@ export const apiConfig = {
 
 // Create axios instance with base configuration
 const api: AxiosInstance = axios.create({
-  baseURL: import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000',
+  baseURL: API_BASE_URL, // Use the dynamic URL from urlConfig
   timeout: 60000, // Increased to 60s to handle slower backend responses
   headers: {
     'Content-Type': 'application/json',
@@ -70,7 +70,7 @@ api.interceptors.response.use(
         
         if (token) {
           const refreshResponse = await axios.post(
-            `${import.meta.env.VITE_BACKEND_URL}/api/auth/refresh`,
+            `${API_BASE_URL}/api/auth/refresh`,
             {},
             {
               headers: {

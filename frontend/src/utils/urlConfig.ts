@@ -11,10 +11,10 @@ export interface URLConfig {
 
 // Development configuration
 export const devConfig: URLConfig = {
-  apiUrl: 'http://localhost:5000',
-  socketUrl: 'http://localhost:5000',
-  meetingUrl: 'http://localhost:5000',
-  frontendUrl: 'http://localhost:8083',
+  apiUrl: import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000',
+  socketUrl: import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000',
+  meetingUrl: import.meta.env.VITE_MEETING_URL || 'http://localhost:5000',
+  frontendUrl: import.meta.env.VITE_FRONTEND_URL || 'http://localhost:8083',
   environment: 'development'
 };
 

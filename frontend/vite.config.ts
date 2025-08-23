@@ -19,6 +19,21 @@ export default defineConfig(({ mode }) => ({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  define: {
+    // Set production environment variables
+    'import.meta.env.VITE_BACKEND_URL': mode === 'production' 
+      ? '"https://inspiranet-backend.onrender.com"' 
+      : '"http://localhost:5000"',
+    'import.meta.env.VITE_FRONTEND_URL': mode === 'production' 
+      ? '"https://inspiranet.onrender.com"' 
+      : '"http://localhost:8083"',
+    'import.meta.env.VITE_SOCKET_URL': mode === 'production' 
+      ? '"https://inspiranet-backend.onrender.com"' 
+      : '"http://localhost:5000"',
+    'import.meta.env.VITE_MEETING_URL': mode === 'production' 
+      ? '"https://inspiranet-backend.onrender.com"' 
+      : '"http://localhost:5000"',
+  },
   build: {
     outDir: 'dist',
     sourcemap: false,
