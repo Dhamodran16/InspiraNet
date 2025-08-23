@@ -31,20 +31,20 @@ interface UserProfile {
 	socialLinks?: { linkedin?: string; github?: string; twitter?: string; website?: string };
 	skills?: string[];
 	interests?: string[];
-	achievements?: Array<{ title: string; description: string; date: string; certificate?: string }>;
+	
 	education?: Array<{ degree: string; institution: string; year: string; gpa?: string }>;
 	workExperience?: Array<{ company: string; position: string; startDate: string; endDate?: string; current: boolean; description?: string }>;
 	createdAt?: string;
 }
 
-interface ProfileStats { posts: number; connections: number; events: number; achievements: number }
+interface ProfileStats { posts: number; connections: number; events: number }
 
 interface ProfileViewProps { profileUserId?: string }
 
 export default function ProfileView({ profileUserId }: ProfileViewProps) {
   const { user: currentUser } = useAuth();
   const [profile, setProfile] = useState<UserProfile | null>(null);
-	const [stats, setStats] = useState<ProfileStats>({ posts: 0, connections: 0, events: 0, achievements: 0 });
+	const [stats, setStats] = useState<ProfileStats>({ posts: 0, connections: 0, events: 0 });
   const [isLoading, setIsLoading] = useState(true);
   const [isOwnProfile, setIsOwnProfile] = useState(true);
 	const [isFollowing, setIsFollowing] = useState(false);
@@ -247,7 +247,7 @@ export default function ProfileView({ profileUserId }: ProfileViewProps) {
 				<Card><CardContent className="p-4 text-center"><div className="text-2xl font-bold text-primary">{stats.posts}</div><p className="text-sm text-muted-foreground">Posts</p></CardContent></Card>
 				<Card><CardContent className="p-4 text-center"><div className="text-2xl font-bold text-primary">{stats.connections}</div><p className="text-sm text-muted-foreground">Connections</p></CardContent></Card>
 				<Card><CardContent className="p-4 text-center"><div className="text-2xl font-bold text-primary">{stats.events}</div><p className="text-sm text-muted-foreground">Events</p></CardContent></Card>
-				<Card><CardContent className="p-4 text-center"><div className="text-2xl font-bold text-primary">{stats.achievements}</div><p className="text-sm text-muted-foreground">Achievements</p></CardContent></Card>
+				
       </div>
 
       <Tabs defaultValue="overview" className="space-y-6">

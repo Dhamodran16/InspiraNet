@@ -459,7 +459,7 @@ const ProfileDisplay = ({ isOwnProfile = true, onEdit }: ProfileDisplayProps) =>
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Award className="h-5 w-5" />
+              <User className="h-5 w-5" />
               Profile Status
             </CardTitle>
           </CardHeader>
@@ -519,6 +519,23 @@ const ProfileDisplay = ({ isOwnProfile = true, onEdit }: ProfileDisplayProps) =>
                 </div>
               </div>
             )}
+          </CardContent>
+        </Card>
+
+        {/* Events Section */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Calendar className="h-5 w-5" />
+              Recent Events
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-center py-4">
+              <Calendar className="h-12 w-12 text-gray-400 mx-auto mb-2" />
+              <p className="text-sm text-gray-600">No events to display</p>
+              <p className="text-xs text-gray-500 mt-1">Events you attend will appear here</p>
+            </div>
           </CardContent>
         </Card>
       </div>

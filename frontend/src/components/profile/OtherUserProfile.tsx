@@ -61,12 +61,7 @@ interface UserProfile {
   };
   skills: string[];
   interests: string[];
-  achievements: Array<{
-    title: string;
-    description: string;
-    date: string;
-    certificate?: string;
-  }>;
+
   education: Array<{
     degree: string;
     institution: string;
@@ -88,7 +83,7 @@ interface ProfileStats {
   posts: number;
   connections: number;
   events: number;
-  achievements: number;
+
 }
 
 interface OtherUserProfileProps {
@@ -105,7 +100,7 @@ export default function OtherUserProfile({ userId }: OtherUserProfileProps) {
     posts: 0,
     connections: 0,
     events: 0,
-    achievements: 0
+
   });
   const [loading, setLoading] = useState(true);
   const [followStatus, setFollowStatus] = useState<'none' | 'following' | 'followers' | 'mutual' | 'requested' | 'not-following'>('none');
@@ -386,10 +381,7 @@ export default function OtherUserProfile({ userId }: OtherUserProfileProps) {
                     <div className="text-2xl font-bold text-primary">{stats.events}</div>
                     <div className="text-sm text-muted-foreground">Events</div>
                   </div>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-primary">{stats.achievements}</div>
-                    <div className="text-sm text-muted-foreground">Achievements</div>
-                  </div>
+                  
                 </div>
               </CardContent>
             </Card>
@@ -471,9 +463,9 @@ export default function OtherUserProfile({ userId }: OtherUserProfileProps) {
           {/* Right Column - Tabs */}
           <div className="lg:col-span-2">
             <Tabs defaultValue="posts" className="space-y-6">
-              <TabsList className="grid w-full grid-cols-4">
+                              <TabsList className="grid w-full grid-cols-3">
                 <TabsTrigger value="posts">Posts</TabsTrigger>
-                <TabsTrigger value="achievements">Achievements</TabsTrigger>
+
                 <TabsTrigger value="education">Education</TabsTrigger>
                 <TabsTrigger value="connections">Connections</TabsTrigger>
               </TabsList>
@@ -482,45 +474,7 @@ export default function OtherUserProfile({ userId }: OtherUserProfileProps) {
                 <PostFeed />
               </TabsContent>
 
-              <TabsContent value="achievements" className="space-y-4">
-                {profile.achievements && profile.achievements.length > 0 ? (
-                  <div className="space-y-4">
-                    {profile.achievements.map((achievement, index) => (
-                      <Card key={index}>
-                        <CardHeader>
-                          <CardTitle className="flex items-center space-x-2">
-                            <Award className="h-5 w-5 text-yellow-500" />
-                            <span>{achievement.title}</span>
-                          </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <p className="text-sm text-muted-foreground mb-2">{achievement.description}</p>
-                          <div className="flex items-center justify-between text-xs text-muted-foreground">
-                            <span>{achievement.date}</span>
-                            {achievement.certificate && (
-                              <a 
-                                href={achievement.certificate} 
-                                target="_blank" 
-                                rel="noopener noreferrer"
-                                className="text-primary hover:underline"
-                              >
-                                View Certificate
-                              </a>
-                            )}
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                ) : (
-                  <Card>
-                    <CardContent className="text-center py-8">
-                      <Award className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                      <p className="text-muted-foreground">No achievements yet</p>
-                    </CardContent>
-                  </Card>
-                )}
-              </TabsContent>
+
 
               <TabsContent value="education" className="space-y-4">
                 {profile.education && profile.education.length > 0 ? (

@@ -1,26 +1,20 @@
-# SPA Routing for Render - Enhanced with Meeting Routes
+# SPA Routing for Render - Simplified and Reliable
 /*    /index.html   200
 
-# Explicit route handling for common paths
+# Explicit routes for critical paths
 /signin    /index.html   200
 /signup    /index.html   200
+/dashboard    /index.html   200
+/meeting    /index.html   200
+/meeting/*    /index.html   200
+/profile    /index.html   200
+/messages    /index.html   200
+/notifications    /index.html   200
 /privacy-policy    /index.html   200
 /terms    /index.html   200
 /cookie-policy    /index.html   200
 /team    /index.html   200
-/dashboard    /index.html   200
-/profile    /index.html   200
-/messages    /index.html   200
-/notifications    /index.html   200
 /create-post    /index.html   200
-
-# Meeting routes - CRITICAL for fixing 404 errors
-/meeting    /index.html   200
-/meeting/*    /index.html   200
-
-# Profile and message sub-routes
-/profile/*    /index.html   200
-/messages/*    /index.html   200
 
 # Catch-all for any other routes
 /*    /index.html   200
