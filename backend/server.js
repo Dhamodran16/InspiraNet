@@ -84,6 +84,9 @@ const corsOptions = {
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept']
 };
 
+// Trust proxy for rate limiting behind load balancers
+app.set('trust proxy', 1);
+
 // Apply CORS middleware
 app.use(cors(corsOptions));
 
@@ -330,8 +333,7 @@ const connectDB = async () => {
       family: 4,                              // Force IPv4
       heartbeatFrequencyMS: 10000,           // Heartbeat every 10 seconds
       retryReads: true,
-      bufferCommands: false,                  // Disable mongoose buffering
-      bufferMaxEntries: 0                     // Disable mongoose buffering
+      bufferCommands: false                   // Disable mongoose buffering
     };
 
     await mongoose.connect(process.env.MONGODB_URI, options);
