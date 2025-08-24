@@ -16,7 +16,7 @@ class PerformanceService {
     return PerformanceService.instance;
   }
 
-  // Cache management555
+  // Cache management
   setCache(key: string, data: any, ttl: number = 5 * 60 * 1000): void {
     this.cache.set(key, {
       data,
@@ -289,16 +289,40 @@ class PerformanceService {
     console.log('Compression should be enabled on the server');
   }
 
-  // Service Worker management - Disabled to prevent MIME type errors
-  async registerServiceWorker(): Promise<void> {
-    // Service Worker registration disabled to prevent MIME type errors
-    console.log('Service Worker registration disabled');
+  // Preload critical resources - simplified version
+  async preloadResources(resources: string[]): Promise<void> {
+    try {
+      resources.forEach(resource => {
+        const link = document.createElement('link');
+        link.rel = 'preload';
+        link.href = resource;
+        
+        if (resource.endsWith('.css')) {
+          link.as = 'style';
+        } else if (resource.endsWith('.js')) {
+          link.as = 'script';
+        } else if (resource.match(/\.(png|jpg|jpeg|gif|webp|svg)$/)) {
+          link.as = 'image';
+        }
+        
+        document.head.appendChild(link);
+      });
+    } catch (error) {
+      console.warn('Failed to preload resources:', error);
+    }
   }
 
-  // Background sync for offline support
-  async setupBackgroundSync(): Promise<void> {
-    // Background sync disabled to prevent Service Worker issues
-    console.log('Background sync disabled');
+  // Optimize bundle - simplified version
+  optimizeBundle(): void {
+    try {
+      // Optimize images
+      this.optimizeImages();
+      
+      // Enable compression
+      this.enableCompression();
+    } catch (error) {
+      console.warn('Bundle optimization failed:', error);
+    }
   }
 }
 

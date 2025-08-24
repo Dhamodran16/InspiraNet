@@ -84,6 +84,7 @@ interface AuthContextType {
   logout: () => void;
   refreshToken: () => Promise<boolean>;
   updateUser: (userData: Partial<User>) => void;
+  checkSessionExpiry: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -91,6 +92,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 // Token management utilities
 const TOKEN_KEY = 'authToken';
 const REFRESH_TOKEN_KEY = 'refreshToken';
+const SESSION_TIMEOUT = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
 
 export const getAuthToken = (): string | null => {
   return localStorage.getItem(TOKEN_KEY) || sessionStorage.getItem(TOKEN_KEY);
@@ -99,8 +101,10 @@ export const getAuthToken = (): string | null => {
 export const setAuthToken = (token: string, rememberMe: boolean = false): void => {
   if (rememberMe) {
     localStorage.setItem(TOKEN_KEY, token);
+    localStorage.setItem('tokenTimestamp', Date.now().toString());
   } else {
     sessionStorage.setItem(TOKEN_KEY, token);
+    sessionStorage.setItem('tokenTimestamp', Date.now().toString());
   }
 };
 
@@ -109,6 +113,8 @@ export const removeAuthToken = (): void => {
   sessionStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(REFRESH_TOKEN_KEY);
   sessionStorage.removeItem(REFRESH_TOKEN_KEY);
+  localStorage.removeItem('tokenTimestamp');
+  sessionStorage.removeItem('tokenTimestamp');
 };
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
@@ -116,6 +122,25 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const navigate = useNavigate();
+
+  // Check session expiry
+  const checkSessionExpiry = () => {
+    const token = getAuthToken();
+    if (!token) return;
+
+    const timestamp = localStorage.getItem('tokenTimestamp') || sessionStorage.getItem('tokenTimestamp');
+    if (!timestamp) return;
+
+    const tokenAge = Date.now() - parseInt(timestamp);
+    if (tokenAge > SESSION_TIMEOUT) {
+      logout();
+      toast({
+        title: "Session Expired",
+        description: "Your session has expired. Please log in again.",
+        variant: "destructive",
+      });
+    }
+  };
 
   // Check if user is authenticated on mount
   useEffect(() => {
@@ -126,6 +151,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           setIsLoading(false);
           return;
         }
+
+        // Check session expiry first
+        checkSessionExpiry();
 
         // Add timeout to prevent hanging
         const timeoutPromise = new Promise((_, reject) => {
@@ -170,6 +198,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     };
 
     checkAuth();
+
+    // Set up periodic session checks
+    const sessionCheckInterval = setInterval(checkSessionExpiry, 5 * 60 * 1000); // Check every 5 minutes
+
+    return () => {
+      clearInterval(sessionCheckInterval);
+    };
   }, [toast]);
 
   const login = async (email: string, password: string): Promise<boolean> => {
@@ -338,6 +373,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     logout,
     refreshToken,
     updateUser,
+    checkSessionExpiry,
   };
 
   return (

@@ -9,7 +9,7 @@ const API_BASE_URL = getBackendUrl();
 // API service configuration
 export const apiConfig = {
   baseURL: API_BASE_URL,
-  timeout: 30000,
+  timeout: parseInt(import.meta.env.VITE_API_TIMEOUT || '30000'),
   headers: {
     'Content-Type': 'application/json',
   },
@@ -17,8 +17,8 @@ export const apiConfig = {
 
 // Create axios instance with base configuration
 const api: AxiosInstance = axios.create({
-  baseURL: API_BASE_URL, // Use the dynamic URL from urlConfig
-  timeout: 60000, // Increased to 60s to handle slower backend responses
+  baseURL: API_BASE_URL,
+  timeout: parseInt(import.meta.env.VITE_API_TIMEOUT || '60000'),
   headers: {
     'Content-Type': 'application/json',
   },
@@ -31,6 +31,10 @@ api.interceptors.request.use(
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    
+    // Add request timestamp for debugging
+    config.metadata = { startTime: new Date() };
+    
     return config;
   },
   (error: AxiosError) => {
@@ -41,6 +45,15 @@ api.interceptors.request.use(
 // Response interceptor to handle auth errors and token refresh
 api.interceptors.response.use(
   (response: AxiosResponse) => {
+    // Log response time for debugging
+    if (response.config.metadata?.startTime) {
+      const endTime = new Date();
+      const duration = endTime.getTime() - response.config.metadata.startTime.getTime();
+      if (duration > 1000) {
+        console.warn(`Slow API response: ${response.config.url} took ${duration}ms`);
+      }
+    }
+    
     return response;
   },
   async (error: AxiosError) => {
@@ -59,7 +72,7 @@ api.interceptors.response.use(
         });
         
         // Redirect to login page
-        window.location.href = '/signin';
+        window.location.href = '/#/signin';
         return Promise.reject(error);
       }
 
@@ -76,6 +89,7 @@ api.interceptors.response.use(
               headers: {
                 Authorization: `Bearer ${token}`,
               },
+              timeout: 10000, // 10 second timeout for refresh
             }
           );
 
@@ -100,7 +114,7 @@ api.interceptors.response.use(
         variant: "destructive",
       });
       
-              window.location.href = '/signin';
+      window.location.href = '/#/signin';
     }
 
     // Handle other errors
@@ -146,6 +160,12 @@ api.interceptors.response.use(
         description: "The request took too long. Please try again.",
         variant: "destructive",
       });
+    } else if (error.code === 'ERR_NETWORK') {
+      toast({
+        title: "Network Error",
+        description: "Unable to connect to the server. Please check your internet connection.",
+        variant: "destructive",
+      });
     }
 
     return Promise.reject(error);
@@ -166,7 +186,7 @@ export const makeAuthenticatedRequest = async <T>(
       }
       throw new Error(error.response?.data?.error || error.message);
     }
-      throw error;
+    throw error;
   }
 };
 
@@ -181,7 +201,7 @@ export const uploadFile = async (
 
   try {
     const response = await api.post(url, formData, {
-        headers: {
+      headers: {
         'Content-Type': 'multipart/form-data',
       },
       onUploadProgress: (progressEvent) => {
@@ -192,13 +212,14 @@ export const uploadFile = async (
           onProgress(progress);
         }
       },
+      timeout: 120000, // 2 minutes for file uploads
     });
     return response.data;
-    } catch (error) {
+  } catch (error) {
     if (axios.isAxiosError(error)) {
       throw new Error(error.response?.data?.error || 'Upload failed');
     }
-      throw error;
+    throw error;
   }
 };
 
@@ -216,9 +237,10 @@ export const getUserStats = async (userId: string): Promise<any> => {
 // Helper function to check server health
 export const checkServerHealth = async (): Promise<boolean> => {
   try {
-    const response = await api.get('/api/health');
+    const response = await api.get('/api/health', { timeout: 5000 });
     return response.status === 200;
-    } catch (error) {
+  } catch (error) {
+    console.error('Server health check failed:', error);
     return false;
   }
 };

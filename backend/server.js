@@ -55,16 +55,14 @@ if (process.env.NODE_ENV === 'development') {
   frontendUrls.push('http://localhost:8083', 'http://localhost:8084', 'http://localhost:8085', 'http://localhost:3000', 'http://localhost:5173');
 }
 
-
-
-// CORS configuration
+// Simplified CORS configuration
 const corsOptions = {
   origin: function (origin, callback) {
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
     
     // Check if origin is in allowed list
-    if (frontendUrls.indexOf(origin) !== -1) {
+    if (frontendUrls.includes(origin)) {
       return callback(null, true);
     }
     
@@ -78,44 +76,20 @@ const corsOptions = {
       return callback(null, true);
     }
     
+    console.log('CORS blocked origin:', origin);
     return callback(new Error('Not allowed by CORS'));
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept']
 };
 
 // Apply CORS middleware
 app.use(cors(corsOptions));
 
-// Initialize Socket.io
+// Initialize Socket.io with simplified CORS
 const io = new Server(server, {
-  cors: {
-    origin: function (origin, callback) {
-      // Allow requests with no origin (like mobile apps or curl requests)
-      if (!origin) return callback(null, true);
-      
-      // Check if origin is in allowed list
-      if (frontendUrls.indexOf(origin) !== -1) {
-        return callback(null, true);
-      }
-      
-      // For development, allow all localhost origins
-      if (process.env.NODE_ENV === 'development' && origin.includes('localhost')) {
-        return callback(null, true);
-      }
-      
-      // Allow the production frontend URL
-      if (origin === 'https://inspiranet.onrender.com') {
-        return callback(null, true);
-      }
-      
-      return callback(new Error('Not allowed by CORS'));
-    },
-    credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
-  },
+  cors: corsOptions,
   transports: ["websocket", "polling"],
   pingTimeout: 60000,
   pingInterval: 25000,
@@ -328,33 +302,7 @@ io.on('connection', (socket) => {
 
 // Middleware
 app.use(helmet());
-app.use(cors({
-  origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) return callback(null, true);
-    
-    // Check if origin is in allowed list
-    if (frontendUrls.indexOf(origin) !== -1) {
-      return callback(null, true);
-    }
-    
-    // For development, allow all localhost origins
-    if (process.env.NODE_ENV === 'development' && origin.includes('localhost')) {
-      return callback(null, true);
-    }
-    
-    // Allow the production frontend URL
-    if (origin === 'https://inspiranet.onrender.com') {
-      return callback(null, true);
-    }
-    
-    console.log('CORS blocked origin:', origin);
-    return callback(new Error('Not allowed by CORS'));
-  },
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept']
-}));
+// CORS is already applied above
 app.use(morgan('combined'));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
@@ -371,24 +319,25 @@ const connectDB = async () => {
     }
     
     const options = {
-      serverSelectionTimeoutMS: 60000,        // Increased to 60s
-      socketTimeoutMS: 120000,                // Increased to 120s
-      connectTimeoutMS: 60000,                // Increased to 60s
+      serverSelectionTimeoutMS: 30000,        // Reduced to 30s for faster failure detection
+      socketTimeoutMS: 60000,                 // Reduced to 60s
+      connectTimeoutMS: 30000,                // Reduced to 30s
       retryWrites: true,
       w: 'majority',
-      maxPoolSize: 5,                         // Reduced for stability
-      minPoolSize: 1,                         // Reduced for stability
-      maxIdleTimeMS: 60000,                   // Increased to 60s
+      maxPoolSize: 10,                        // Increased for better performance
+      minPoolSize: 2,                         // Increased for better performance
+      maxIdleTimeMS: 30000,                   // Reduced to 30s
       family: 4,                              // Force IPv4
-      heartbeatFrequencyMS: 30000,           // Heartbeat every 30 seconds
-      retryReads: true
-      // Removed unsupported options: keepAlive, keepAliveInitialDelay, autoReconnect, reconnectTries, reconnectInterval
+      heartbeatFrequencyMS: 10000,           // Heartbeat every 10 seconds
+      retryReads: true,
+      bufferCommands: false,                  // Disable mongoose buffering
+      bufferMaxEntries: 0                     // Disable mongoose buffering
     };
 
     await mongoose.connect(process.env.MONGODB_URI, options);
     console.log('✅ Connected to MongoDB Atlas successfully');
     
-    // Wait longer for connection to fully stabilize
+    // Wait for connection to stabilize
     setTimeout(async () => {
       try {
         if (mongoose.connection.readyState === 1 && mongoose.connection.db) {
@@ -400,7 +349,7 @@ const connectDB = async () => {
       } catch (pingError) {
         console.log('⚠️ Ping test failed:', pingError.message);
       }
-    }, 5000); // Wait 5 seconds instead of 2
+    }, 2000); // Wait 2 seconds
     
   } catch (err) {
     console.error('❌ MongoDB connection error:', err.message);
@@ -424,8 +373,8 @@ const connectDB = async () => {
       console.error('   - Network issues');
     }
     
-    console.log('🔄 Retrying connection in 15 seconds...');
-    setTimeout(connectDB, 15000);
+    console.log('🔄 Retrying connection in 10 seconds...');
+    setTimeout(connectDB, 10000);
   }
 };
 
@@ -610,10 +559,10 @@ const gracefulShutdown = async (signal) => {
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
-// Rate limiting
+// Rate limiting - More reasonable limits for a social network
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 1000, // limit each IP to 1000 requests per windowMs (increased significantly)
+  max: 5000, // limit each IP to 5000 requests per windowMs (increased for social network usage)
   message: {
     error: 'Too many requests. Please wait a moment and try again.',
     retryAfter: Math.ceil(15 * 60 / 60) // minutes
@@ -622,20 +571,31 @@ const limiter = rateLimit({
   legacyHeaders: false
 });
 
-// Specific rate limiting for health checks (more lenient)
+// Specific rate limiting for health checks (very lenient)
 const healthLimiter = rateLimit({
   windowMs: 1 * 60 * 1000, // 1 minute
-  max: 100 // limit each IP to 100 health checks per minute (increased)
+  max: 300 // limit each IP to 300 health checks per minute
 });
 
-// Specific rate limiting for stats (very lenient for real-time updates)
+// Specific rate limiting for stats (lenient for real-time updates)
 const statsLimiter = rateLimit({
   windowMs: 1 * 60 * 1000, // 1 minute
-  max: 200 // limit each IP to 200 stats requests per minute
+  max: 500 // limit each IP to 500 stats requests per minute
+});
+
+// Specific rate limiting for auth endpoints (more restrictive)
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // limit each IP to 100 auth requests per 15 minutes
+  message: {
+    error: 'Too many authentication attempts. Please wait a moment and try again.',
+    retryAfter: Math.ceil(15 * 60 / 60)
+  }
 });
 
 app.use('/api/health', healthLimiter);
 app.use('/api/stats', statsLimiter);
+app.use('/api/auth', authLimiter);
 app.use('/api/', limiter);
 
 // Multer configuration moved to individual route files
@@ -874,8 +834,55 @@ app.get('/admin/system-stats', (req, res) => {
 
 // Error handling middleware
 app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({ error: 'Something went wrong!' });
+  console.error('Error occurred:', {
+    message: err.message,
+    stack: err.stack,
+    url: req.url,
+    method: req.method,
+    timestamp: new Date().toISOString()
+  });
+
+  // Handle specific error types
+  if (err.name === 'ValidationError') {
+    return res.status(400).json({
+      error: 'Validation Error',
+      message: err.message,
+      details: err.errors
+    });
+  }
+
+  if (err.name === 'MongoError' || err.name === 'MongoServerError') {
+    if (err.code === 11000) {
+      return res.status(409).json({
+        error: 'Duplicate Error',
+        message: 'A record with this information already exists'
+      });
+    }
+    return res.status(500).json({
+      error: 'Database Error',
+      message: 'A database error occurred'
+    });
+  }
+
+  if (err.name === 'JsonWebTokenError') {
+    return res.status(401).json({
+      error: 'Authentication Error',
+      message: 'Invalid token'
+    });
+  }
+
+  if (err.name === 'TokenExpiredError') {
+    return res.status(401).json({
+      error: 'Authentication Error',
+      message: 'Token has expired'
+    });
+  }
+
+  // Default error response
+  res.status(err.status || 500).json({
+    error: err.message || 'Something went wrong!',
+    ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
+  });
 });
 
 // 404 handler

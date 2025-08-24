@@ -20,17 +20,36 @@ export const devConfig: URLConfig = {
 
 // Production configuration
 export const prodConfig: URLConfig = {
-  apiUrl: 'https://inspiranet-backend.onrender.com',
-  socketUrl: 'https://inspiranet-backend.onrender.com',
-  meetingUrl: 'https://inspiranet-backend.onrender.com',
-  frontendUrl: 'https://inspiranet.onrender.com',
+  apiUrl: import.meta.env.VITE_BACKEND_URL || 'https://inspiranet-backend.onrender.com',
+  socketUrl: import.meta.env.VITE_SOCKET_URL || 'https://inspiranet-backend.onrender.com',
+  meetingUrl: import.meta.env.VITE_MEETING_URL || 'https://inspiranet-backend.onrender.com',
+  frontendUrl: import.meta.env.VITE_FRONTEND_URL || 'https://inspiranet.onrender.com',
   environment: 'production'
+};
+
+// Staging configuration
+export const stagingConfig: URLConfig = {
+  apiUrl: import.meta.env.VITE_BACKEND_URL || 'https://inspiranet-backend-staging.onrender.com',
+  socketUrl: import.meta.env.VITE_SOCKET_URL || 'https://inspiranet-backend-staging.onrender.com',
+  meetingUrl: import.meta.env.VITE_MEETING_URL || 'https://inspiranet-backend-staging.onrender.com',
+  frontendUrl: import.meta.env.VITE_FRONTEND_URL || 'https://inspiranet-staging.onrender.com',
+  environment: 'staging'
 };
 
 // Get current configuration based on environment
 export const getCurrentConfig = (): URLConfig => {
-  const isDev = import.meta.env.MODE === 'development';
-  return isDev ? devConfig : prodConfig;
+  const mode = import.meta.env.MODE;
+  const env = import.meta.env.VITE_ENVIRONMENT || mode;
+  
+  switch (env) {
+    case 'development':
+      return devConfig;
+    case 'staging':
+      return stagingConfig;
+    case 'production':
+    default:
+      return prodConfig;
+  }
 };
 
 // Get specific URL by type
@@ -52,6 +71,21 @@ export const getSocketUrl = (): string => {
 // Get appropriate meeting URL based on current environment
 export const getMeetingUrl = (): string => {
   return getUrl('meetingUrl');
+};
+
+// Validate URL configuration
+export const validateConfig = (): boolean => {
+  const config = getCurrentConfig();
+  const requiredUrls = ['apiUrl', 'socketUrl', 'meetingUrl'];
+  
+  for (const url of requiredUrls) {
+    if (!config[url as keyof URLConfig]) {
+      console.error(`Missing required URL configuration: ${url}`);
+      return false;
+    }
+  }
+  
+  return true;
 };
 
 // Export default configuration

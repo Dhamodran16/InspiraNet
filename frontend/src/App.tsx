@@ -6,7 +6,6 @@ import { ThemeProvider } from '@/contexts/ThemeContext';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import CookieConsent from '@/components/CookieConsent';
 import ScrollToTop from '@/components/ScrollToTop';
-import performanceService from '@/services/performanceService';
 
 // Lazy load components for better performance
 const LandingPage = React.lazy(() => import('@/pages/LandingPage'));
@@ -35,24 +34,22 @@ const LoadingSpinner = () => (
 
 function App() {
   useEffect(() => {
-    // Initialize performance optimizations
+    // Initialize basic performance optimizations
     const initializePerformance = async () => {
       try {
         // Preload critical resources
-        performanceService.preloadResources([
+        const criticalResources = [
           '/api/config/departments',
           '/api/config/designations',
           '/api/config/placement-statuses'
-        ]);
+        ];
 
-        // Register service worker for caching
-        await performanceService.registerServiceWorker();
-
-        // Setup background sync for offline support
-        await performanceService.setupBackgroundSync();
-
-        // Optimize bundle
-        performanceService.optimizeBundle();
+        // Preload critical resources using fetch
+        criticalResources.forEach(resource => {
+          fetch(resource, { method: 'HEAD' }).catch(() => {
+            // Silently fail for preload attempts
+          });
+        });
 
         console.log('Performance optimizations initialized');
       } catch (error) {
@@ -61,11 +58,6 @@ function App() {
     };
 
     initializePerformance();
-
-    // Cleanup on unmount
-    return () => {
-      performanceService.cleanup();
-    };
   }, []);
 
   return (

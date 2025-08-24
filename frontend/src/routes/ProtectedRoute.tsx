@@ -75,24 +75,6 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     }
   }
 
-  // For dashboard route, check if user has basic profile information
-  if (location.pathname === '/dashboard') {
-    const hasBasicProfile = user.name && user.email && (user.department || user.bio || user.skills?.length > 0);
-    
-    if (!hasBasicProfile) {
-      return (
-        <Navigate 
-          to="/profile-completion" 
-          state={{ 
-            from: location,
-            message: "Please complete your profile to access the dashboard." 
-          }} 
-          replace 
-        />
-      );
-    }
-  }
-
   // All checks passed, render children
   return <>{children}</>;
 };

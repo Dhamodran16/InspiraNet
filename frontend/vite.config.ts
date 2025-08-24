@@ -1,44 +1,10 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react-swc'
 import path from 'path'
-import { copy } from 'fs-extra'
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  plugins: [
-    react(),
-    {
-      name: 'copy-config-files',
-      closeBundle: async () => {
-        // Copy critical configuration files to dist folder
-        const filesToCopy = [
-          '_redirects',
-          '_headers',
-          '404.html',
-          'vercel.json',
-          'render.yaml',
-          'netlify.toml',
-          'static.json',
-          'render.json'
-        ]
-        
-        for (const file of filesToCopy) {
-          try {
-            await copy(`public/${file}`, `dist/${file}`)
-            console.log(`✅ Copied ${file} to dist folder`)
-          } catch (error) {
-            try {
-              // Fallback: try copying from root directory
-              await copy(file, `dist/${file}`)
-              console.log(`✅ Copied ${file} to dist folder (fallback)`)
-            } catch (fallbackError: any) {
-              console.warn(`⚠️ Could not copy ${file}:`, fallbackError.message)
-            }
-          }
-        }
-      }
-    }
-  ],
+  plugins: [react()],
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
@@ -51,12 +17,31 @@ export default defineConfig({
         manualChunks: {
           vendor: ['react', 'react-dom'],
           router: ['react-router-dom'],
+          ui: ['@radix-ui/react-dialog', '@radix-ui/react-dropdown-menu', '@radix-ui/react-toast'],
+          utils: ['axios', 'socket.io-client', 'date-fns']
         }
       }
-    }
+    },
+    // Optimize build performance
+    minify: 'terser',
+    sourcemap: false,
+    // Reduce bundle size
+    chunkSizeWarningLimit: 1000
   },
   server: {
     port: 8083,
-    host: "::"
+    host: "::",
+    // Enable CORS for development
+    cors: true
+  },
+  // Optimize dependencies
+  optimizeDeps: {
+    include: [
+      'react',
+      'react-dom',
+      'react-router-dom',
+      'axios',
+      'socket.io-client'
+    ]
   }
 })

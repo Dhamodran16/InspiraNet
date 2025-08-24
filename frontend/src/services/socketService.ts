@@ -79,18 +79,28 @@ class SocketService {
   private socket: Socket | null = null;
   private isConnected = false;
   private reconnectAttempts = 0;
-  private maxReconnectAttempts = 5;
+  private maxReconnectAttempts = 10;
   private reconnectDelay = 1000;
+  private reconnectTimer: NodeJS.Timeout | null = null;
+  private connectionCheckInterval: NodeJS.Timeout | null = null;
 
   constructor() {
-    this.setupSocket();
+    this.setupConnectionMonitoring();
+  }
+
+  private setupConnectionMonitoring() {
+    // Monitor connection health every 30 seconds
+    this.connectionCheckInterval = setInterval(() => {
+      if (this.socket && !this.socket.connected && this.isConnected) {
+        console.log('Socket connection lost, attempting to reconnect...');
+        this.reconnect();
+      }
+    }, 30000);
   }
 
   private setupSocket() {
     if (this.socket || this.isConnected) return;
 
-    this.isConnected = true;
-    
     try {
       const token = localStorage.getItem('authToken') || sessionStorage.getItem('authToken');
       if (!token) {
@@ -105,6 +115,8 @@ class SocketService {
         reconnection: true,
         reconnectionAttempts: this.maxReconnectAttempts,
         reconnectionDelay: this.reconnectDelay,
+        reconnectionDelayMax: 5000,
+        maxReconnectionAttempts: this.maxReconnectAttempts,
         auth: {
           token: token
         }
@@ -118,6 +130,7 @@ class SocketService {
     } catch (error) {
       console.error('Error setting up socket connection:', error);
       this.isConnected = false;
+      this.scheduleReconnect();
     }
   }
 
@@ -139,12 +152,17 @@ class SocketService {
     this.socket.on('auth_error', (error) => {
       console.error('❌ Socket authentication failed:', error);
       this.isConnected = false;
-      this.reconnectAttempts++;
+      this.handleAuthError();
     });
 
     this.socket.on('disconnect', (reason) => {
       console.log('Socket disconnected:', reason);
       this.isConnected = false;
+      
+      if (reason === 'io server disconnect') {
+        // Server disconnected us, try to reconnect
+        this.scheduleReconnect();
+      }
     });
 
     this.socket.on('connect_error', (error) => {
@@ -154,13 +172,64 @@ class SocketService {
       
       if (this.reconnectAttempts >= this.maxReconnectAttempts) {
         console.error('Max reconnection attempts reached');
+        this.handleMaxReconnectAttempts();
+      } else {
+        this.scheduleReconnect();
       }
     });
 
     this.socket.on('reconnect', (attemptNumber) => {
       console.log('Socket reconnected after', attemptNumber, 'attempts');
       this.reconnectAttempts = 0;
+      this.isConnected = true;
+      
+      // Re-authenticate after reconnection
+      const token = localStorage.getItem('authToken') || sessionStorage.getItem('authToken');
+      if (token && this.socket) {
+        this.socket.emit('authenticate', { token });
+      }
     });
+
+    this.socket.on('reconnect_error', (error) => {
+      console.error('Socket reconnection error:', error);
+      this.scheduleReconnect();
+    });
+
+    this.socket.on('reconnect_failed', () => {
+      console.error('Socket reconnection failed');
+      this.handleMaxReconnectAttempts();
+    });
+  }
+
+  private handleAuthError() {
+    // Clear invalid token and stop trying to reconnect
+    localStorage.removeItem('authToken');
+    sessionStorage.removeItem('authToken');
+    this.disconnect();
+  }
+
+  private handleMaxReconnectAttempts() {
+    console.error('Maximum reconnection attempts reached. Stopping reconnection attempts.');
+    this.disconnect();
+  }
+
+  private scheduleReconnect() {
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+    }
+    
+    const delay = Math.min(this.reconnectDelay * Math.pow(2, this.reconnectAttempts), 30000);
+    this.reconnectTimer = setTimeout(() => {
+      this.reconnect();
+    }, delay);
+  }
+
+  private reconnect() {
+    if (this.socket) {
+      this.socket.disconnect();
+      this.socket = null;
+    }
+    this.setupSocket();
   }
 
   // Connection management
@@ -173,15 +242,32 @@ class SocketService {
   }
 
   disconnect() {
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+    
     if (this.socket) {
       this.socket.disconnect();
       this.socket = null;
     }
+    
+    this.isConnected = false;
+    this.reconnectAttempts = 0;
   }
 
   // Connection status
   getConnectionStatus(): boolean {
-    return this.isConnected;
+    return this.isConnected && this.socket?.connected === true;
+  }
+
+  // Cleanup method
+  cleanup() {
+    this.disconnect();
+    if (this.connectionCheckInterval) {
+      clearInterval(this.connectionCheckInterval);
+      this.connectionCheckInterval = null;
+    }
   }
 
 

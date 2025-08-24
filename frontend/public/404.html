@@ -32,12 +32,6 @@
             margin-bottom: 2rem;
             opacity: 0.9;
         }
-        .redirect-info {
-            background: rgba(255,255,255,0.1);
-            padding: 1rem;
-            border-radius: 8px;
-            margin-bottom: 2rem;
-        }
         .btn {
             display: inline-block;
             background: rgba(255,255,255,0.2);
@@ -52,19 +46,6 @@
             background: rgba(255,255,255,0.3);
             transform: translateY(-2px);
         }
-        .spinner {
-            display: inline-block;
-            width: 20px;
-            height: 20px;
-            border: 2px solid rgba(255,255,255,0.3);
-            border-radius: 50%;
-            border-top-color: white;
-            animation: spin 1s ease-in-out infinite;
-            margin-right: 10px;
-        }
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
     </style>
 </head>
 <body>
@@ -72,52 +53,16 @@
         <div class="logo">InspiraNet</div>
         <div class="message">Page not found</div>
         
-        <div class="redirect-info">
-            <p>This page doesn't exist, but we're redirecting you to the main application...</p>
-        </div>
-        
-        <div id="redirect-status">
-            <span class="spinner"></span>
-            <span>Redirecting automatically...</span>
-        </div>
-        
         <div style="margin-top: 2rem;">
             <a href="/" class="btn">Go to Homepage</a>
         </div>
     </div>
 
     <script>
-        // Enhanced redirect logic for SPA routing
-        (function() {
-            const currentPath = window.location.pathname;
-            const searchParams = window.location.search;
-            const hash = window.location.hash;
-            
-            // Try to redirect to the main app
-            function redirectToApp() {
-                try {
-                    // First try to redirect to index.html
-                    window.location.href = '/index.html' + searchParams + hash;
-                } catch (e) {
-                    // Fallback to root
-                    window.location.href = '/' + searchParams + hash;
-                }
-            }
-            
-            // Auto-redirect after a short delay
-            setTimeout(redirectToApp, 2000);
-            
-            // Also try immediate redirect
-            redirectToApp();
-            
-            // Update status after 1 second
-            setTimeout(() => {
-                const status = document.getElementById('redirect-status');
-                if (status) {
-                    status.innerHTML = '<span class="spinner"></span><span>Still redirecting...</span>';
-                }
-            }, 1000);
-        })();
+        // Simple redirect to main app for HashRouter
+        setTimeout(() => {
+            window.location.href = '/';
+        }, 3000);
     </script>
 </body>
 </html>

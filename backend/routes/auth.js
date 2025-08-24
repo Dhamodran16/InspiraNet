@@ -284,6 +284,44 @@ router.post('/refresh', async (req, res) => {
   }
 });
 
+// Token refresh endpoint
+router.post('/refresh', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    
+    // Get user from database
+    const user = await User.findById(userId).select('-password');
+    if (!user) {
+      return res.status(401).json({ error: 'User not found' });
+    }
+
+    // Generate new token
+    const token = jwt.sign(
+      { userId: user._id, email: user.email.college || user.email.personal },
+      process.env.JWT_SECRET,
+      { expiresIn: '24h' }
+    );
+
+    res.json({
+      token,
+      user: {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        type: user.type,
+        avatar: user.avatar,
+        department: user.department,
+        batch: user.batch,
+        isVerified: user.isVerified,
+        isProfileComplete: user.isProfileComplete
+      }
+    });
+  } catch (error) {
+    console.error('Token refresh error:', error);
+    res.status(500).json({ error: 'Token refresh failed' });
+  }
+});
+
 // Student conversion (admin/faculty)
 router.post('/convert-student/:studentId', authenticateToken, async (req, res) => {
   try {
