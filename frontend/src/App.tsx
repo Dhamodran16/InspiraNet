@@ -39,9 +39,9 @@ function App() {
       try {
         // Preload critical resources
         const criticalResources = [
-          '/api/config/departments',
-          '/api/config/designations',
-          '/api/config/placement-statuses'
+          'https://inspiranet-backend.onrender.com/api/config/departments',
+          'https://inspiranet-backend.onrender.com/api/config/designations',
+          'https://inspiranet-backend.onrender.com/api/config/placement-statuses'
         ];
 
         // Preload critical resources using fetch
