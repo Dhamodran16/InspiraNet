@@ -3,28 +3,31 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { FileText, Shield, Users, AlertTriangle, CheckCircle } from 'lucide-react';
 import CollegeHeader from '@/components/CollegeHeader';
 import Footer from '@/components/Footer';
+import { useTheme } from '@/contexts/ThemeContext';
 
 const TermsPage = () => {
+  const { isDark } = useTheme();
+  
   return (
-    <div className="min-h-screen bg-white">
+    <div className={`min-h-screen ${isDark ? 'bg-gray-900' : 'bg-white'}`}>
       <CollegeHeader showNav={false} />
 
       {/* Main Content */}
       <div className="container mx-auto px-4 py-12">
         <div className="max-w-4xl mx-auto space-y-8">
           {/* Introduction */}
-          <Card className="border border-gray-200">
+          <Card className={`border ${isDark ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-white'}`}>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-2xl text-blue-800">
-                <FileText className="h-6 w-6 text-blue-600" />
+              <CardTitle className={`flex items-center gap-2 text-2xl ${isDark ? 'text-blue-400' : 'text-blue-800'}`}>
+                <FileText className={`h-6 w-6 ${isDark ? 'text-blue-400' : 'text-blue-600'}`} />
                 Terms and Conditions
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <p className="text-gray-600">
+              <p className={isDark ? 'text-gray-300' : 'text-gray-600'}>
                 Last updated: {new Date().toLocaleDateString()}
               </p>
-              <p className="text-gray-600">
+              <p className={isDark ? 'text-gray-300' : 'text-gray-600'}>
                 Welcome to the KEC Alumni Network. These Terms and Conditions govern your use of our alumni network platform 
                 and the services we provide. By accessing or using our platform, you agree to be bound by these terms.
               </p>
@@ -32,20 +35,20 @@ const TermsPage = () => {
           </Card>
 
           {/* Acceptance of Terms */}
-          <Card className="border border-gray-200">
+          <Card className={`border ${isDark ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-white'}`}>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-blue-800">
-                <CheckCircle className="h-5 w-5 text-blue-600" />
+              <CardTitle className={`flex items-center gap-2 ${isDark ? 'text-blue-400' : 'text-blue-800'}`}>
+                <CheckCircle className={`h-5 w-5 ${isDark ? 'text-blue-400' : 'text-blue-600'}`} />
                 Acceptance of Terms
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <p className="text-gray-600">
+              <p className={isDark ? 'text-gray-300' : 'text-gray-600'}>
                 By accessing or using the KEC Alumni Network platform, you acknowledge that you have read, understood, 
                 and agree to be bound by these Terms and Conditions. If you do not agree with any part of these terms, 
                 you must not use our platform.
               </p>
-              <p className="text-gray-600">
+              <p className={isDark ? 'text-gray-300' : 'text-gray-600'}>
                 We reserve the right to modify these terms at any time. Continued use of the platform after changes 
                 constitutes acceptance of the updated terms.
               </p>
@@ -53,43 +56,43 @@ const TermsPage = () => {
           </Card>
 
           {/* Eligibility */}
-          <Card className="border border-gray-200">
+          <Card className={`border ${isDark ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-white'}`}>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-blue-800">
-                <Users className="h-5 w-5 text-blue-600" />
+              <CardTitle className={`flex items-center gap-2 ${isDark ? 'text-blue-400' : 'text-blue-800'}`}>
+                <Users className={`h-5 w-5 ${isDark ? 'text-blue-400' : 'text-blue-600'}`} />
                 Eligibility and Registration
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <p className="text-gray-600">
+              <p className={isDark ? 'text-gray-300' : 'text-gray-600'}>
                 To use our platform, you must meet the following eligibility requirements:
               </p>
-              <ul className="list-disc list-inside text-gray-600 space-y-2 ml-4">
+              <ul className={`list-disc list-inside space-y-2 ml-4 ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>
                 <li>Be a current student, alumni, or faculty member of Kongu Engineering College</li>
                 <li>Be at least 18 years old or have parental consent</li>
                 <li>Provide accurate and complete registration information</li>
                 <li>Maintain the security of your account credentials</li>
                 <li>Comply with all applicable laws and regulations</li>
               </ul>
-              <p className="text-gray-600">
+              <p className={isDark ? 'text-gray-300' : 'text-gray-600'}>
                 We reserve the right to verify your eligibility and may suspend or terminate accounts that violate these requirements.
               </p>
             </CardContent>
           </Card>
 
           {/* User Conduct */}
-          <Card className="border border-gray-200">
+          <Card className={`border ${isDark ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-white'}`}>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-blue-800">
-                <Shield className="h-5 w-5 text-blue-600" />
+              <CardTitle className={`flex items-center gap-2 ${isDark ? 'text-blue-400' : 'text-blue-800'}`}>
+                <Shield className={`h-5 w-5 ${isDark ? 'text-blue-400' : 'text-blue-600'}`} />
                 User Conduct and Responsibilities
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <p className="text-gray-600">
+              <p className={isDark ? 'text-gray-300' : 'text-gray-600'}>
                 As a user of our platform, you agree to:
               </p>
-              <ul className="list-disc list-inside text-gray-600 space-y-2 ml-4">
+              <ul className={`list-disc list-inside space-y-2 ml-4 ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>
                 <li>Use the platform for lawful purposes only</li>
                 <li>Respect the privacy and rights of other users</li>
                 <li>Not engage in harassment, discrimination, or abusive behavior</li>
