@@ -20,10 +20,10 @@ export const devConfig: URLConfig = {
 
 // Production configuration
 export const prodConfig: URLConfig = {
-  apiUrl: import.meta.env.VITE_BACKEND_URL || 'https://inspiranet-backend.onrender.com',
-  socketUrl: import.meta.env.VITE_SOCKET_URL || 'https://inspiranet-backend.onrender.com',
-  meetingUrl: import.meta.env.VITE_MEETING_URL || 'https://inspiranet-backend.onrender.com',
-  frontendUrl: import.meta.env.VITE_FRONTEND_URL || 'https://inspiranet.onrender.com',
+  apiUrl: 'https://inspiranet-backend.onrender.com',
+  socketUrl: 'https://inspiranet-backend.onrender.com',
+  meetingUrl: 'https://inspiranet-backend.onrender.com',
+  frontendUrl: 'https://inspiranet.onrender.com',
   environment: 'production'
 };
 
