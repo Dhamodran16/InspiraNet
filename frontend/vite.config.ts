@@ -17,7 +17,9 @@ export default defineConfig({
           '404.html',
           'vercel.json',
           'render.yaml',
-          'netlify.toml'
+          'netlify.toml',
+          'static.json',
+          'render.json'
         ]
         
         for (const file of filesToCopy) {

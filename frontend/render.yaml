@@ -1,84 +1,11 @@
-services:
-  - type: web
-    name: inspiranet-frontend
-    env: static
+staticSites:
+  - name: inspiranet-frontend
     buildCommand: npm run build
-    staticPublishPath: ./dist
-    routes:
-      # Root route
-      - type: rewrite
-        source: /
+    publishPath: ./dist
+    redirects:
+      - source: /*
         destination: /index.html
-      
-      # Main application routes
-      - type: rewrite
-        source: /signin
-        destination: /index.html
-      - type: rewrite
-        source: /signup
-        destination: /index.html
-      - type: rewrite
-        source: /dashboard
-        destination: /index.html
-      - type: rewrite
-        source: /profile
-        destination: /index.html
-      - type: rewrite
-        source: /profile/(.*)
-        destination: /index.html
-      - type: rewrite
-        source: /messages
-        destination: /index.html
-      - type: rewrite
-        source: /notifications
-        destination: /index.html
-      - type: rewrite
-        source: /create-post
-        destination: /index.html
-      - type: rewrite
-        source: /profile-completion
-        destination: /index.html
-      
-      # Legal and policy pages - CRITICAL FOR YOUR ISSUE
-      - type: rewrite
-        source: /privacy-policy
-        destination: /index.html
-      - type: rewrite
-        source: /terms
-        destination: /index.html
-      - type: rewrite
-        source: /cookie-policy
-        destination: /index.html
-      - type: rewrite
-        source: /cookies
-        destination: /index.html
-      - type: rewrite
-        source: /team
-        destination: /index.html
-      
-      # Meeting routes
-      - type: rewrite
-        source: /meeting
-        destination: /index.html
-      - type: rewrite
-        source: /meeting/(.*)
-        destination: /index.html
-      
-      # Additional fallback routes
-      - type: rewrite
-        source: /index.html
-        destination: /index.html
-      - type: rewrite
-        source: /404
-        destination: /index.html
-      - type: rewrite
-        source: /error
-        destination: /index.html
-      
-      # Catch-all for any other routes - MUST BE LAST
-      - type: rewrite
-        source: /(.*)
-        destination: /index.html
+        status: 200
     headers:
       - path: /*
         name: Cache-Control

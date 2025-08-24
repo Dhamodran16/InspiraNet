@@ -90,8 +90,8 @@ export default function MeetingRoom() {
         if (data && data.rtcConfig && Array.isArray(data.rtcConfig.iceServers)) {
           setRtcConfig(data.rtcConfig);
         }
-      }
-    } catch (error) {
+        }
+      } catch (error) {
       console.warn('Could not load RTC config, using defaults');
     }
   }, []);
@@ -103,13 +103,13 @@ export default function MeetingRoom() {
       reconnection: true,
       reconnectionAttempts: 8,
       reconnectionDelay: 1000,
-    });
+      });
       
-    setMeetingSocket(socket);
+      setMeetingSocket(socket);
       
-    return () => {
-      socket.disconnect();
-    };
+      return () => {
+        socket.disconnect();
+      };
   }, []);
 
   // Load RTC config and initialize meeting
@@ -140,7 +140,7 @@ export default function MeetingRoom() {
 
     const socket = meetingSocket;
       
-    // Listen for media state updates
+      // Listen for media state updates
     socket.on('media-state-update', handleParticipantUpdate);
 
     // Listen for room joining confirmation
@@ -260,7 +260,7 @@ export default function MeetingRoom() {
       delete peerUsernamesRef.current[userId];
       updateParticipantsList();
         
-      toast({
+        toast({
         title: "Participant Left",
         description: `${userName} has left the room`,
       });
@@ -304,8 +304,8 @@ export default function MeetingRoom() {
       
       if (userId !== socket.id && !isReactionNotificationShowing) {
         setIsReactionNotificationShowing(true);
-        
-        toast({
+    
+    toast({
           title: "Reaction",
           description: `${userName} reacted with ${emoji}!`,
         });
@@ -481,11 +481,11 @@ export default function MeetingRoom() {
     }
 
     if (!username.trim()) {
-      toast({
+        toast({
         title: "Error",
         description: "Please enter your name",
-        variant: "destructive"
-      });
+          variant: "destructive"
+        });
       return;
     }
 
@@ -507,8 +507,8 @@ export default function MeetingRoom() {
         id: meetingSocket?.id || 'local',
         username,
         isHost: true,
-        isMuted: false,
-        isVideoOff: false,
+      isMuted: false,
+      isVideoOff: false,
         isHandRaised: false
       }]);
 
@@ -534,11 +534,11 @@ export default function MeetingRoom() {
     if (!localStreamRef.current) return;
 
     const audioTrack = localStreamRef.current.getAudioTracks()[0];
-    if (audioTrack) {
-      audioTrack.enabled = !audioTrack.enabled;
-      const newMutedState = !audioTrack.enabled;
-      setIsMuted(newMutedState);
-      
+      if (audioTrack) {
+        audioTrack.enabled = !audioTrack.enabled;
+        const newMutedState = !audioTrack.enabled;
+        setIsMuted(newMutedState);
+        
       if (newMutedState && wasMutedByHost) {
         setWasMutedByHost(false);
         toast({
@@ -556,16 +556,16 @@ export default function MeetingRoom() {
     if (!localStreamRef.current) return;
 
     const videoTrack = localStreamRef.current.getVideoTracks()[0];
-    if (videoTrack) {
-      videoTrack.enabled = !videoTrack.enabled;
-      const newVideoOffState = !videoTrack.enabled;
-      setIsVideoOff(newVideoOffState);
-      
-      meetingSocket?.emit('participant_media_update', {
-        roomId,
+      if (videoTrack) {
+        videoTrack.enabled = !videoTrack.enabled;
+        const newVideoOffState = !videoTrack.enabled;
+        setIsVideoOff(newVideoOffState);
+        
+        meetingSocket?.emit('participant_media_update', {
+          roomId,
         isMuted,
-        isVideoOff: newVideoOffState
-      });
+          isVideoOff: newVideoOffState
+        });
     }
   }, [meetingSocket, roomId, isMuted]);
 
@@ -599,7 +599,7 @@ export default function MeetingRoom() {
     } catch (error) {
       console.error('Error toggling screen share:', error);
       if (error instanceof Error && error.name === 'NotAllowedError') {
-        toast({
+      toast({
           title: "Permission Denied",
           description: "Screen sharing permission was denied. Please allow screen sharing and try again.",
           variant: "destructive"
@@ -608,8 +608,8 @@ export default function MeetingRoom() {
         toast({
           title: "Screen Share Error",
           description: "Failed to start screen sharing. Please try again.",
-          variant: "destructive"
-        });
+        variant: "destructive"
+      });
       }
     }
   }, [isScreenSharing, toast]);
@@ -760,7 +760,7 @@ export default function MeetingRoom() {
                     placeholder="Enter room ID"
                     className="bg-gray-700 border-gray-600 text-white"
                   />
-                </div>
+            </div>
                 
                 <div>
                   <label className="block text-sm font-medium mb-2">Your Name</label>
@@ -770,18 +770,18 @@ export default function MeetingRoom() {
                     placeholder="Enter your name"
                     className="bg-gray-700 border-gray-600 text-white"
                   />
-                </div>
-                
-                <Button 
+            </div>
+            
+              <Button 
                   onClick={handleCreateMeeting}
                   disabled={isJoining || !roomId.trim() || !username.trim()}
                   className="w-full bg-blue-600 hover:bg-blue-700"
                 >
                   {isJoining ? 'Joining...' : 'Join Meeting'}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
         </div>
       </div>
     );
@@ -790,30 +790,30 @@ export default function MeetingRoom() {
   return (
     <div className="min-h-screen bg-gray-900 text-white relative">
       {/* Main video area */}
-      <div className="flex-1 p-4">
+        <div className="flex-1 p-4">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {/* Local video */}
-          <div className="relative bg-gray-800 rounded-lg overflow-hidden">
-            <video
-              ref={localVideoRef}
-              autoPlay
-              playsInline
-              muted
+            <div className="relative bg-gray-800 rounded-lg overflow-hidden">
+              <video
+                ref={localVideoRef}
+                autoPlay
+                playsInline
+                muted
               className="w-full h-64 object-cover"
             />
-            <div className="absolute bottom-2 left-2 bg-black bg-opacity-50 px-2 py-1 rounded text-sm">
-              {username} (You)
-            </div>
+                <div className="absolute bottom-2 left-2 bg-black bg-opacity-50 px-2 py-1 rounded text-sm">
+                  {username} (You)
+              </div>
             {isHandRaised && (
               <div className="absolute top-2 right-2 bg-blue-500 px-2 py-1 rounded text-sm">
                 ✋
-              </div>
-            )}
-          </div>
-          
+                </div>
+              )}
+            </div>
+              
           {/* Remote videos would be rendered here */}
+          </div>
         </div>
-      </div>
 
       {/* Controls */}
       <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 flex gap-4 bg-gray-800 p-4 rounded-full border border-gray-600">
@@ -867,50 +867,50 @@ export default function MeetingRoom() {
           )}
         </Button>
         
-        <Button
+                <Button
           onClick={() => setIsParticipantsOpen(!isParticipantsOpen)}
           variant={isParticipantsOpen ? "default" : "secondary"}
           size="icon"
           className="w-12 h-12 rounded-full"
         >
           <Users />
-        </Button>
+                          </Button>
         
         {isHost && (
-          <Button
+                          <Button
             onClick={hostMuteAll}
             variant="destructive"
             size="icon"
             className="w-12 h-12 rounded-full"
           >
             <MicOff />
-          </Button>
+                          </Button>
         )}
         
-        <Button
+                          <Button
           onClick={endCall}
           variant="destructive"
           size="icon"
           className="w-12 h-12 rounded-full"
         >
           <Phone />
-        </Button>
-      </div>
+                </Button>
+              </div>
 
       {/* Chat Panel */}
       {isChatOpen && (
         <div className="fixed right-6 top-6 bottom-24 w-80 bg-gray-800 rounded-lg border border-gray-600 flex flex-col">
           <div className="p-4 border-b border-gray-600 flex justify-between items-center">
             <h3 className="font-semibold">Chat</h3>
-            <Button
-              variant="ghost"
+                          <Button
+                            variant="ghost"
               size="icon"
               onClick={() => setIsChatOpen(false)}
               className="h-8 w-8"
-            >
+                          >
               <X />
-            </Button>
-          </div>
+                          </Button>
+                    </div>
           
           <div className="flex-1 overflow-y-auto p-4 space-y-3">
             {messages.map((message) => (
@@ -924,42 +924,42 @@ export default function MeetingRoom() {
               >
                 <div className="text-xs text-gray-300 mb-1">
                   {message.user}
-                </div>
+                  </div>
                 <div className="text-sm">{message.text}</div>
                 <div className="text-xs text-gray-400 mt-1">
                   {new Date(message.timestamp).toLocaleTimeString()}
-                </div>
+                    </div>
               </div>
             ))}
             
-            {typingUsers.length > 0 && (
-              <div className="text-sm text-gray-400 italic">
+                {typingUsers.length > 0 && (
+                  <div className="text-sm text-gray-400 italic">
                 {typingUsers.length === 1 ? 'Someone is typing...' : 'Multiple people are typing...'}
+                  </div>
+                )}
               </div>
-            )}
-          </div>
           
           <div className="p-4 border-t border-gray-600">
             <div className="flex gap-2">
-              <Input
+                  <Input
                 value={newMessage}
                 onChange={(e) => {
                   setNewMessage(e.target.value);
                   handleTyping(e.target.value.length > 0);
                 }}
                 onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
-                placeholder="Type a message..."
+                    placeholder="Type a message..."
                 className="flex-1 bg-gray-700 border-gray-600 text-white"
-              />
+                  />
               <Button onClick={sendMessage} size="icon" className="w-10 h-10">
                 <Send className="w-4 h-4" />
-              </Button>
+                  </Button>
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
-      )}
+          )}
 
-      {/* Participants Panel */}
+            {/* Participants Panel */}
       {isParticipantsOpen && (
         <div className="fixed right-6 top-6 bottom-24 w-80 bg-gray-800 rounded-lg border border-gray-600 flex flex-col">
           <div className="p-4 border-b border-gray-600 flex justify-between items-center">
@@ -972,36 +972,36 @@ export default function MeetingRoom() {
             >
               <X />
             </Button>
-          </div>
+                </div>
           
           <div className="flex-1 overflow-y-auto p-4 space-y-2">
-            {participants.map((participant) => (
-              <div
-                key={participant.id}
+                  {participants.map((participant) => (
+                    <div
+                      key={participant.id}
                 className="flex items-center gap-3 p-2 rounded-lg bg-gray-700"
-              >
+                    >
                 <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-sm font-semibold">
-                  {participant.username.charAt(0).toUpperCase()}
-                </div>
+                        {participant.username.charAt(0).toUpperCase()}
+              </div>
                 <div className="flex-1">
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-medium">{participant.username}</span>
                     {participant.isHost && <Crown className="w-4 h-4 text-yellow-500" />}
                     {participant.id === meetingSocket?.id && (
                       <Badge variant="secondary" className="text-xs">You</Badge>
-                    )}
+                        )}
                   </div>
                   <div className="flex items-center gap-2 text-xs text-gray-400">
                     {participant.isMuted && <MicOff className="w-3 h-3" />}
                     {participant.isVideoOff && <VideoOff className="w-3 h-3" />}
                     {participant.isHandRaised && <Hand className="w-3 h-3 text-blue-400" />}
                   </div>
-                </div>
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-        </div>
-      )}
+            </div>
+          )}
 
       {/* Reactions Menu */}
       <div className="fixed bottom-24 left-1/2 transform -translate-x-1/2 flex gap-2 bg-gray-800 p-2 rounded-full border border-gray-600">
@@ -1016,7 +1016,7 @@ export default function MeetingRoom() {
             {emoji}
           </Button>
         ))}
+        </div>
       </div>
-    </div>
-  );
-}
+    );
+  }
