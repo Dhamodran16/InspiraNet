@@ -34,3 +34,9 @@ staticSites:
       - path: /*.js
         name: Cache-Control
         value: public, max-age=31536000, immutable
+
+# Additional routing rules for maximum compatibility
+routes:
+  - source: "/(.*)"
+    destination: "/index.html"
+    status: 200

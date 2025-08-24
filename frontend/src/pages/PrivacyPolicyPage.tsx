@@ -13,14 +13,14 @@ const PrivacyPolicyPage = () => {
       <div className="container mx-auto px-4 py-12">
         <div className="max-w-4xl mx-auto space-y-8">
           {/* Introduction */}
-          <Card className="border border-gray-200">
-            <CardHeader>
+          <Card className="border border-gray-200 bg-white shadow-sm">
+            <CardHeader className="bg-white">
               <CardTitle className="flex items-center gap-2 text-2xl text-blue-800">
                 <Shield className="h-6 w-6 text-blue-600" />
                 Privacy Policy
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-4 bg-white">
               <p className="text-gray-600">
                 Last updated: {new Date().toLocaleDateString()}
               </p>
@@ -32,14 +32,14 @@ const PrivacyPolicyPage = () => {
           </Card>
 
           {/* Information We Collect */}
-          <Card className="border border-gray-200">
-            <CardHeader>
+          <Card className="border border-gray-200 bg-white shadow-sm">
+            <CardHeader className="bg-white">
               <CardTitle className="flex items-center gap-2 text-blue-800">
                 <Database className="h-5 w-5 text-blue-600" />
                 Information We Collect
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-4 bg-white">
               <div>
                 <h4 className="font-semibold text-gray-900 mb-2">Personal Information</h4>
                 <ul className="list-disc list-inside text-gray-600 space-y-1 ml-4">
@@ -64,14 +64,14 @@ const PrivacyPolicyPage = () => {
           </Card>
 
           {/* How We Use Information */}
-          <Card className="border border-gray-200">
-            <CardHeader>
+          <Card className="border border-gray-200 bg-white shadow-sm">
+            <CardHeader className="bg-white">
               <CardTitle className="flex items-center gap-2 text-blue-800">
                 <Eye className="h-5 w-5 text-blue-600" />
                 How We Use Your Information
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-4 bg-white">
               <ul className="list-disc list-inside text-gray-600 space-y-2 ml-4">
                 <li>To provide and maintain our alumni network platform</li>
                 <li>To facilitate connections between alumni members</li>
@@ -84,14 +84,14 @@ const PrivacyPolicyPage = () => {
           </Card>
 
           {/* Information Sharing */}
-          <Card className="border border-gray-200">
-            <CardHeader>
+          <Card className="border border-gray-200 bg-white shadow-sm">
+            <CardHeader className="bg-white">
               <CardTitle className="flex items-center gap-2 text-blue-800">
                 <Users className="h-5 w-5 text-blue-600" />
                 Information Sharing and Disclosure
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-4 bg-white">
               <p className="text-gray-600">
                 We do not sell, trade, or rent your personal information to third parties. We may share your information in the following circumstances:
               </p>
@@ -105,14 +105,14 @@ const PrivacyPolicyPage = () => {
           </Card>
 
           {/* Data Security */}
-          <Card className="border border-gray-200">
-            <CardHeader>
+          <Card className="border border-gray-200 bg-white shadow-sm">
+            <CardHeader className="bg-white">
               <CardTitle className="flex items-center gap-2 text-blue-800">
                 <Lock className="h-5 w-5 text-blue-600" />
                 Data Security
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-4 bg-white">
               <p className="text-gray-600">
                 We implement appropriate technical and organizational measures to protect your personal information:
               </p>
@@ -127,14 +127,14 @@ const PrivacyPolicyPage = () => {
           </Card>
 
           {/* Your Rights */}
-          <Card className="border border-gray-200">
-            <CardHeader>
+          <Card className="border border-gray-200 bg-white shadow-sm">
+            <CardHeader className="bg-white">
               <CardTitle className="flex items-center gap-2 text-blue-800">
                 <Shield className="h-5 w-5 text-blue-600" />
                 Your Rights and Choices
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-4 bg-white">
               <p className="text-gray-600">
                 You have the following rights regarding your personal information:
               </p>
@@ -150,14 +150,14 @@ const PrivacyPolicyPage = () => {
           </Card>
 
           {/* Cookies */}
-          <Card className="border border-gray-200">
-            <CardHeader>
+          <Card className="border border-gray-200 bg-white shadow-sm">
+            <CardHeader className="bg-white">
               <CardTitle className="flex items-center gap-2 text-blue-800">
                 <Lock className="h-5 w-5 text-blue-600" />
                 Cookies and Tracking
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-4 bg-white">
               <p className="text-gray-600">
                 We use cookies and similar technologies to enhance your experience:
               </p>

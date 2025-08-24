@@ -13,14 +13,14 @@ const CookiePolicyPage = () => {
       <div className="container mx-auto px-4 py-12">
         <div className="max-w-4xl mx-auto space-y-8">
           {/* Introduction */}
-          <Card className="border border-gray-200">
-            <CardHeader>
+          <Card className="border border-gray-200 bg-white shadow-sm">
+            <CardHeader className="bg-white">
               <CardTitle className="flex items-center gap-2 text-2xl text-blue-800">
                 <Cookie className="h-6 w-6 text-blue-600" />
                 Cookie Policy
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-4 bg-white">
               <p className="text-gray-600">
                 Last updated: {new Date().toLocaleDateString()}
               </p>
@@ -33,14 +33,14 @@ const CookiePolicyPage = () => {
           </Card>
 
           {/* What Are Cookies */}
-          <Card className="border border-gray-200">
-            <CardHeader>
+          <Card className="border border-gray-200 bg-white shadow-sm">
+            <CardHeader className="bg-white">
               <CardTitle className="flex items-center gap-2 text-blue-800">
                 <Info className="h-5 w-5 text-blue-600" />
                 What Are Cookies?
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-4 bg-white">
               <p className="text-gray-600">
                 Cookies are small data files that are placed on your computer or mobile device when you visit a website. 
                 Cookies are widely used by website owners to make their websites work, or to work more efficiently, 
@@ -55,14 +55,14 @@ const CookiePolicyPage = () => {
           </Card>
 
           {/* Types of Cookies We Use */}
-          <Card className="border border-gray-200">
-            <CardHeader>
+          <Card className="border border-gray-200 bg-white shadow-sm">
+            <CardHeader className="bg-white">
               <CardTitle className="flex items-center gap-2 text-blue-800">
                 <Settings className="h-5 w-5 text-blue-600" />
                 Types of Cookies We Use
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-4 bg-white">
               <div>
                 <h4 className="font-semibold text-gray-900 mb-2">Essential Cookies</h4>
                 <p className="text-gray-600 mb-4">
@@ -106,14 +106,14 @@ const CookiePolicyPage = () => {
           </Card>
 
           {/* How to Control Cookies */}
-          <Card className="border border-gray-200">
-            <CardHeader>
+          <Card className="border border-gray-200 bg-white shadow-sm">
+            <CardHeader className="bg-white">
               <CardTitle className="flex items-center gap-2 text-blue-800">
                 <Shield className="h-5 w-5 text-blue-600" />
                 How to Control Cookies
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-4 bg-white">
               <p className="text-gray-600">
                 You have several options to control cookies:
               </p>
@@ -133,14 +133,14 @@ const CookiePolicyPage = () => {
           </Card>
 
           {/* Third-Party Cookies */}
-          <Card className="border border-gray-200">
-            <CardHeader>
+          <Card className="border border-gray-200 bg-white shadow-sm">
+            <CardHeader className="bg-white">
               <CardTitle className="flex items-center gap-2 text-blue-800">
                 <Info className="h-5 w-5 text-blue-600" />
                 Third-Party Cookies
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-4 bg-white">
               <p className="text-gray-600">
                 We may use third-party services that set their own cookies:
               </p>
@@ -158,14 +158,14 @@ const CookiePolicyPage = () => {
           </Card>
 
           {/* Updates to Policy */}
-          <Card className="border border-gray-200">
-            <CardHeader>
+          <Card className="border border-gray-200 bg-white shadow-sm">
+            <CardHeader className="bg-white">
               <CardTitle className="flex items-center gap-2 text-blue-800">
                 <Settings className="h-5 w-5 text-blue-600" />
                 Updates to This Policy
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-4 bg-white">
               <p className="text-gray-600">
                 We may update this Cookie Policy from time to time to reflect changes in our practices or for other operational, 
                 legal, or regulatory reasons. We will notify you of any material changes by posting the new Cookie Policy on this page.

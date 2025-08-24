@@ -13,14 +13,14 @@ const TermsPage = () => {
       <div className="container mx-auto px-4 py-12">
         <div className="max-w-4xl mx-auto space-y-8">
           {/* Introduction */}
-          <Card className="border border-gray-200">
-            <CardHeader>
+          <Card className="border border-gray-200 bg-white shadow-sm">
+            <CardHeader className="bg-white">
               <CardTitle className="flex items-center gap-2 text-2xl text-blue-800">
                 <FileText className="h-6 w-6 text-blue-600" />
                 Terms and Conditions
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-4 bg-white">
               <p className="text-gray-600">
                 Last updated: {new Date().toLocaleDateString()}
               </p>
@@ -32,14 +32,14 @@ const TermsPage = () => {
           </Card>
 
           {/* Acceptance of Terms */}
-          <Card className="border border-gray-200">
-            <CardHeader>
+          <Card className="border border-gray-200 bg-white shadow-sm">
+            <CardHeader className="bg-white">
               <CardTitle className="flex items-center gap-2 text-blue-800">
                 <CheckCircle className="h-5 w-5 text-blue-600" />
                 Acceptance of Terms
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-4 bg-white">
               <p className="text-gray-600">
                 By accessing or using the KEC Alumni Network platform, you acknowledge that you have read, understood, 
                 and agree to be bound by these Terms and Conditions. If you do not agree with any part of these terms, 
@@ -53,14 +53,14 @@ const TermsPage = () => {
           </Card>
 
           {/* Eligibility */}
-          <Card className="border border-gray-200">
-            <CardHeader>
+          <Card className="border border-gray-200 bg-white shadow-sm">
+            <CardHeader className="bg-white">
               <CardTitle className="flex items-center gap-2 text-blue-800">
                 <Users className="h-5 w-5 text-blue-600" />
                 Eligibility and Registration
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-4 bg-white">
               <p className="text-gray-600">
                 To use our platform, you must meet the following eligibility requirements:
               </p>
@@ -78,14 +78,14 @@ const TermsPage = () => {
           </Card>
 
           {/* User Conduct */}
-          <Card className="border border-gray-200">
-            <CardHeader>
+          <Card className="border border-gray-200 bg-white shadow-sm">
+            <CardHeader className="bg-white">
               <CardTitle className="flex items-center gap-2 text-blue-800">
                 <Shield className="h-5 w-5 text-blue-600" />
                 User Conduct and Responsibilities
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-4 bg-white">
               <p className="text-gray-600">
                 As a user of our platform, you agree to:
               </p>
@@ -102,14 +102,14 @@ const TermsPage = () => {
           </Card>
 
           {/* Prohibited Activities */}
-          <Card className="border border-gray-200">
-            <CardHeader>
+          <Card className="border border-gray-200 bg-white shadow-sm">
+            <CardHeader className="bg-white">
               <CardTitle className="flex items-center gap-2 text-red-600">
                 <AlertTriangle className="h-5 w-5 text-red-600" />
                 Prohibited Activities
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-4 bg-white">
               <p className="text-gray-600">
                 The following activities are strictly prohibited:
               </p>
@@ -126,14 +126,14 @@ const TermsPage = () => {
           </Card>
 
           {/* Content Guidelines */}
-          <Card className="border border-gray-200">
-            <CardHeader>
+          <Card className="border border-gray-200 bg-white shadow-sm">
+            <CardHeader className="bg-white">
               <CardTitle className="flex items-center gap-2 text-blue-800">
                 <FileText className="h-5 w-5 text-blue-600" />
                 Content Guidelines
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-4 bg-white">
               <p className="text-gray-600">
                 When posting content on our platform, you must ensure:
               </p>
@@ -152,14 +152,14 @@ const TermsPage = () => {
           </Card>
 
           {/* Privacy and Data */}
-          <Card className="border border-gray-200">
-            <CardHeader>
+          <Card className="border border-gray-200 bg-white shadow-sm">
+            <CardHeader className="bg-white">
               <CardTitle className="flex items-center gap-2 text-blue-800">
                 <Shield className="h-5 w-5 text-blue-600" />
                 Privacy and Data Protection
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-4 bg-white">
               <p className="text-gray-600">
                 Your privacy is important to us. Our data collection and usage practices are governed by our Privacy Policy, 
                 which is incorporated into these Terms and Conditions by reference.
@@ -177,14 +177,14 @@ const TermsPage = () => {
           </Card>
 
           {/* Intellectual Property */}
-          <Card className="border border-gray-200">
-            <CardHeader>
+          <Card className="border border-gray-200 bg-white shadow-sm">
+            <CardHeader className="bg-white">
               <CardTitle className="flex items-center gap-2 text-blue-800">
                 <FileText className="h-5 w-5 text-blue-600" />
                 Intellectual Property Rights
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-4 bg-white">
               <p className="text-gray-600">
                 The KEC Alumni Network platform and its content are protected by intellectual property laws:
               </p>
@@ -199,14 +199,14 @@ const TermsPage = () => {
           </Card>
 
           {/* Limitation of Liability */}
-          <Card className="border border-gray-200">
-            <CardHeader>
+          <Card className="border border-gray-200 bg-white shadow-sm">
+            <CardHeader className="bg-white">
               <CardTitle className="flex items-center gap-2 text-orange-600">
                 <AlertTriangle className="h-5 w-5 text-orange-600" />
                 Limitation of Liability
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-4 bg-white">
               <p className="text-gray-600">
                 To the maximum extent permitted by law:
               </p>
@@ -221,14 +221,14 @@ const TermsPage = () => {
           </Card>
 
           {/* Termination */}
-          <Card className="border border-gray-200">
-            <CardHeader>
+          <Card className="border border-gray-200 bg-white shadow-sm">
+            <CardHeader className="bg-white">
               <CardTitle className="flex items-center gap-2 text-red-600">
                 <AlertTriangle className="h-5 w-5 text-red-600" />
                 Account Termination
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-4 bg-white">
               <p className="text-gray-600">
                 We may terminate or suspend your account at any time for:
               </p>
