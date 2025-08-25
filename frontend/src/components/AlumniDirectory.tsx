@@ -429,7 +429,7 @@ export default function AlumniDirectory() {
                     <Avatar className="h-16 w-16 sm:h-20 sm:w-20 flex-shrink-0 ring-2 ring-primary/20">
                       <AvatarImage src={user.avatar} alt={user.name} />
                       <AvatarFallback className="text-xl font-bold bg-gradient-to-br from-primary/20 to-primary/10 text-primary">
-                        {user.name.charAt(0).toUpperCase()}
+                        {user.name.charAt(0).toUpperCase() || 'U'}
                       </AvatarFallback>
                     </Avatar>
                     

@@ -260,7 +260,7 @@ export default function UserProfile() {
                 <Avatar className="w-24 h-24">
                   <AvatarImage src={avatarPreview || user.avatar || undefined} />
                   <AvatarFallback className="text-2xl">
-                    {user.name.split(' ').map(n => n[0]).join('')}
+                    {user.name.split(' ').map(n => n[0]).join('').toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
                 

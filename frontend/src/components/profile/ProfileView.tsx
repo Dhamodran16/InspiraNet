@@ -182,7 +182,7 @@ export default function ProfileView({ profileUserId }: ProfileViewProps) {
 					<div className="flex items-start space-x-6">
 						<Avatar className="h-24 w-24">
 							<AvatarImage src={profile.avatar} alt={profile.name} />
-							<AvatarFallback className="text-2xl">{profile.name?.charAt(0)?.toUpperCase()}</AvatarFallback>
+							            <AvatarFallback className="text-2xl">{profile.name?.charAt(0)?.toUpperCase() || 'U'}</AvatarFallback>
             </Avatar>
 						<div className="flex-1">
 							<div className="flex items-center space-x-3 mb-2">
@@ -328,7 +328,7 @@ export default function ProfileView({ profileUserId }: ProfileViewProps) {
 								<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
 									{connections.map((c) => (
 										<div key={c._id} className="flex items-center space-x-3 p-3 border rounded-lg">
-											<Avatar className="h-10 w-10"><AvatarImage src={c.avatar} alt={c.name} /><AvatarFallback>{c.name?.charAt(0)?.toUpperCase()}</AvatarFallback></Avatar>
+											            <Avatar className="h-10 w-10"><AvatarImage src={c.avatar} alt={c.name} /><AvatarFallback>{c.name?.charAt(0)?.toUpperCase() || 'U'}</AvatarFallback></Avatar>
 											<div className="flex-1 min-w-0">
 												<p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{c.name}</p>
 												<p className="text-xs text-gray-500 dark:text-gray-400 truncate">{c.designation} at {c.company}</p>

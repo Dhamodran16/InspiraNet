@@ -79,23 +79,40 @@ class SocketService {
   private socket: Socket | null = null;
   private isConnected = false;
   private reconnectAttempts = 0;
-  private maxReconnectAttempts = 10;
+  private maxReconnectAttempts = 5; // Reduced from 10
   private reconnectDelay = 1000;
   private reconnectTimer: NodeJS.Timeout | null = null;
   private connectionCheckInterval: NodeJS.Timeout | null = null;
+  private eventHandlers: Map<string, Set<Function>> = new Map();
+  private debounceTimers: Map<string, NodeJS.Timeout> = new Map();
+  private lastActivity = Date.now();
+  private heartbeatInterval: NodeJS.Timeout | null = null;
 
   constructor() {
     this.setupConnectionMonitoring();
+    this.setupActivityTracking();
+  }
+
+  private setupActivityTracking() {
+    // Track user activity to prevent unnecessary reconnections
+    const trackActivity = () => {
+      this.lastActivity = Date.now();
+    };
+
+    // Listen for user activity
+    ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'].forEach(event => {
+      document.addEventListener(event, trackActivity, { passive: true });
+    });
   }
 
   private setupConnectionMonitoring() {
-    // Monitor connection health every 30 seconds
+    // Monitor connection health every 60 seconds (increased from 30)
     this.connectionCheckInterval = setInterval(() => {
       if (this.socket && !this.socket.connected && this.isConnected) {
         console.log('Socket connection lost, attempting to reconnect...');
         this.reconnect();
       }
-    }, 30000);
+    }, 60000);
   }
 
   private setupSocket() {
@@ -111,18 +128,23 @@ class SocketService {
 
       this.socket = io(SOCKET_URL, {
         transports: ['websocket', 'polling'],
-        timeout: 20000,
+        timeout: 15000, // Reduced from 20000
         reconnection: true,
         reconnectionAttempts: this.maxReconnectAttempts,
         reconnectionDelay: this.reconnectDelay,
-        reconnectionDelayMax: 5000,
+        reconnectionDelayMax: 3000, // Reduced from 5000
         maxReconnectionAttempts: this.maxReconnectAttempts,
         auth: {
           token: token
-        }
+        },
+        // Performance optimizations
+        forceNew: false,
+        multiplex: true,
+        autoConnect: false
       });
 
       this.setupEventHandlers();
+      this.setupHeartbeat();
       
       // Authenticate with the backend
       this.socket.emit('authenticate', { token });
@@ -132,6 +154,17 @@ class SocketService {
       this.isConnected = false;
       this.scheduleReconnect();
     }
+  }
+
+  private setupHeartbeat() {
+    if (!this.socket) return;
+
+    // Send heartbeat every 30 seconds to keep connection alive
+    this.heartbeatInterval = setInterval(() => {
+      if (this.socket && this.socket.connected) {
+        this.socket.emit('heartbeat', { timestamp: Date.now() });
+      }
+    }, 30000);
   }
 
   private setupEventHandlers() {
@@ -149,103 +182,204 @@ class SocketService {
       this.reconnectAttempts = 0;
     });
 
-    this.socket.on('auth_error', (error) => {
-      console.error('❌ Socket authentication failed:', error);
-      this.isConnected = false;
-      this.handleAuthError();
-    });
-
     this.socket.on('disconnect', (reason) => {
       console.log('Socket disconnected:', reason);
       this.isConnected = false;
       
       if (reason === 'io server disconnect') {
-        // Server disconnected us, try to reconnect
-        this.scheduleReconnect();
+        // Server disconnected us, don't reconnect
+        return;
       }
+      
+      this.scheduleReconnect();
     });
 
     this.socket.on('connect_error', (error) => {
       console.error('Socket connection error:', error);
       this.isConnected = false;
-      this.reconnectAttempts++;
-      
-      if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-        console.error('Max reconnection attempts reached');
-        this.handleMaxReconnectAttempts();
-      } else {
-        this.scheduleReconnect();
-      }
-    });
-
-    this.socket.on('reconnect', (attemptNumber) => {
-      console.log('Socket reconnected after', attemptNumber, 'attempts');
-      this.reconnectAttempts = 0;
-      this.isConnected = true;
-      
-      // Re-authenticate after reconnection
-      const token = localStorage.getItem('authToken') || sessionStorage.getItem('authToken');
-      if (token && this.socket) {
-        this.socket.emit('authenticate', { token });
-      }
-    });
-
-    this.socket.on('reconnect_error', (error) => {
-      console.error('Socket reconnection error:', error);
       this.scheduleReconnect();
     });
 
-    this.socket.on('reconnect_failed', () => {
-      console.error('Socket reconnection failed');
-      this.handleMaxReconnectAttempts();
-    });
+    // Optimized event handlers with debouncing
+    this.socket.on('new_message', this.debounceHandler('new_message', (data: any) => {
+      this.emitToHandlers('new_message', data);
+    }, 100));
+
+    this.socket.on('message_read', this.debounceHandler('message_read', (data: any) => {
+      this.emitToHandlers('message_read', data);
+    }, 100));
+
+    this.socket.on('new_notification', this.debounceHandler('new_notification', (data: any) => {
+      this.emitToHandlers('new_notification', data);
+    }, 200));
+
+    this.socket.on('notification_read', this.debounceHandler('notification_read', (data: any) => {
+      this.emitToHandlers('notification_read', data);
+    }, 100));
+
+    this.socket.on('post_update', this.debounceHandler('post_update', (data: any) => {
+      this.emitToHandlers('post_update', data);
+    }, 300));
+
+    this.socket.on('user_status_update', this.debounceHandler('user_status_update', (data: any) => {
+      this.emitToHandlers('user_status_update', data);
+    }, 500));
+
+    this.socket.on('follow_status_update', this.debounceHandler('follow_status_update', (data: any) => {
+      this.emitToHandlers('follow_status_update', data);
+    }, 200));
   }
 
-  private handleAuthError() {
-    // Clear invalid token and stop trying to reconnect
-    localStorage.removeItem('authToken');
-    sessionStorage.removeItem('authToken');
-    this.disconnect();
+  private debounceHandler(eventName: string, handler: Function, delay: number) {
+    return (...args: any[]) => {
+      const key = `${eventName}_${JSON.stringify(args)}`;
+      
+      if (this.debounceTimers.has(key)) {
+        clearTimeout(this.debounceTimers.get(key)!);
+      }
+      
+      const timer = setTimeout(() => {
+        handler(...args);
+        this.debounceTimers.delete(key);
+      }, delay);
+      
+      this.debounceTimers.set(key, timer);
+    };
   }
 
-  private handleMaxReconnectAttempts() {
-    console.error('Maximum reconnection attempts reached. Stopping reconnection attempts.');
-    this.disconnect();
+  private emitToHandlers(eventName: string, data: any) {
+    const handlers = this.eventHandlers.get(eventName);
+    if (handlers) {
+      handlers.forEach(handler => {
+        try {
+          handler(data);
+        } catch (error) {
+          console.error(`Error in ${eventName} handler:`, error);
+        }
+      });
+    }
   }
 
   private scheduleReconnect() {
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
     }
+
+    if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+      console.log('Max reconnection attempts reached');
+      return;
+    }
+
+    this.reconnectAttempts++;
+    const delay = Math.min(this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1), 10000);
     
-    const delay = Math.min(this.reconnectDelay * Math.pow(2, this.reconnectAttempts), 30000);
     this.reconnectTimer = setTimeout(() => {
-      this.reconnect();
+      this.setupSocket();
     }, delay);
   }
 
-  private reconnect() {
-    if (this.socket) {
-      this.socket.disconnect();
-      this.socket = null;
-    }
-    this.setupSocket();
-  }
-
-  // Connection management
+  // Public methods
   connect() {
-    // Only try to connect if we have a token
-    const token = localStorage.getItem('authToken') || sessionStorage.getItem('authToken');
-    if (token && (!this.socket || !this.socket.connected)) {
+    if (!this.socket) {
       this.setupSocket();
+    } else if (!this.socket.connected) {
+      this.socket.connect();
     }
   }
 
   disconnect() {
+    if (this.socket) {
+      this.socket.disconnect();
+      this.isConnected = false;
+    }
+  }
+
+  getConnectionStatus(): boolean {
+    return this.isConnected && this.socket?.connected === true;
+  }
+
+  // Event handling with optimized registration
+  on(eventName: string, handler: Function) {
+    if (!this.eventHandlers.has(eventName)) {
+      this.eventHandlers.set(eventName, new Set());
+    }
+    this.eventHandlers.get(eventName)!.add(handler);
+  }
+
+  off(eventName: string, handler?: Function) {
+    if (handler) {
+      this.eventHandlers.get(eventName)?.delete(handler);
+    } else {
+      this.eventHandlers.delete(eventName);
+    }
+  }
+
+  // Specific event methods for better performance
+  onNewMessage(handler: Function) { this.on('new_message', handler); }
+  offNewMessage() { this.off('new_message'); }
+  
+  onMessageRead(handler: Function) { this.on('message_read', handler); }
+  offMessageRead() { this.off('message_read'); }
+  
+  onNewNotification(handler: Function) { this.on('new_notification', handler); }
+  offNewNotification() { this.off('new_notification'); }
+  
+  onNotificationRead(handler: Function) { this.on('notification_read', handler); }
+  offNotificationRead() { this.off('notification_read'); }
+  
+  onPostUpdate(handler: Function) { this.on('post_update', handler); }
+  offPostUpdate() { this.off('post_update'); }
+  
+  onUserStatusUpdate(handler: Function) { this.on('user_status_update', handler); }
+  offUserStatusUpdate() { this.off('user_status_update'); }
+  
+  onFollowStatusUpdate(handler: Function) { this.on('follow_status_update', handler); }
+  offFollowStatusUpdate() { this.off('follow_status_update'); }
+
+  // Emit methods with error handling
+  emit(eventName: string, data: any) {
+    if (this.socket && this.socket.connected) {
+      try {
+        this.socket.emit(eventName, data);
+      } catch (error) {
+        console.error(`Error emitting ${eventName}:`, error);
+      }
+    } else {
+      console.warn(`Socket not connected, cannot emit ${eventName}`);
+    }
+  }
+
+  // Specific emit methods
+  sendMessage(messageData: any) {
+    this.emit('send_message', messageData);
+  }
+
+  markMessagesAsRead(conversationId: string, messageIds: string[]) {
+    this.emit('mark_messages_read', { conversationId, messageIds });
+  }
+
+  markNotificationAsRead(notificationId: string) {
+    this.emit('mark_notification_read', { notificationId });
+  }
+
+  // Cleanup
+  destroy() {
+    if (this.heartbeatInterval) {
+      clearInterval(this.heartbeatInterval);
+    }
+    if (this.connectionCheckInterval) {
+      clearInterval(this.connectionCheckInterval);
+    }
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
-      this.reconnectTimer = null;
     }
+    
+    // Clear all debounce timers
+    this.debounceTimers.forEach(timer => clearTimeout(timer));
+    this.debounceTimers.clear();
+    
+    // Clear event handlers
+    this.eventHandlers.clear();
     
     if (this.socket) {
       this.socket.disconnect();
@@ -253,566 +387,8 @@ class SocketService {
     }
     
     this.isConnected = false;
-    this.reconnectAttempts = 0;
   }
-
-  // Connection status
-  getConnectionStatus(): boolean {
-    return this.isConnected && this.socket?.connected === true;
-  }
-
-  // Cleanup method
-  cleanup() {
-    this.disconnect();
-    if (this.connectionCheckInterval) {
-      clearInterval(this.connectionCheckInterval);
-      this.connectionCheckInterval = null;
-    }
-  }
-
-
-
-  sendMessage(conversationId: string, content: string, messageType: 'text' | 'image' | 'file' = 'text', mediaUrl?: string) {
-    if (this.socket?.connected) {
-      this.socket.emit('send_message', {
-        conversationId,
-        content,
-        messageType,
-        mediaUrl
-      });
-    }
-  }
-
-  startTyping(conversationId: string) {
-    if (this.socket?.connected) {
-      this.socket.emit('typing_start', { conversationId });
-    }
-  }
-
-  // Meeting-related methods
-  onUserConnected(callback: (userId: string, userName: string) => void) {
-    if (this.socket) {
-      this.socket.on('user-connected', callback);
-    }
-  }
-
-  offUserConnected() {
-    if (this.socket) {
-      this.socket.off('user-connected');
-    }
-  }
-
-  onUserDisconnected(callback: (userId: string, userName: string) => void) {
-    if (this.socket) {
-      this.socket.on('user-disconnected', callback);
-    }
-  }
-
-  offUserDisconnected() {
-    if (this.socket) {
-      this.socket.off('user-disconnected');
-    }
-  }
-
-  onOffer(callback: (offer: RTCSessionDescriptionInit, senderId: string) => void) {
-    if (this.socket) {
-      this.socket.on('offer', callback);
-    }
-  }
-
-  offOffer() {
-    if (this.socket) {
-      this.socket.off('offer');
-    }
-  }
-
-  onAnswer(callback: (answer: RTCSessionDescriptionInit, senderId: string) => void) {
-    if (this.socket) {
-      this.socket.on('answer', callback);
-    }
-  }
-
-  offAnswer() {
-    if (this.socket) {
-      this.socket.off('answer');
-    }
-  }
-
-  onIceCandidate(callback: (candidate: RTCIceCandidateInit, senderId: string) => void) {
-    if (this.socket) {
-      this.socket.on('ice-candidate', callback);
-    }
-  }
-
-  offIceCandidate() {
-    if (this.socket) {
-      this.socket.off('ice-candidate');
-    }
-  }
-
-  onUserTyping(callback: (userId: string, isTyping: boolean, userName: string) => void) {
-    if (this.socket) {
-      this.socket.on('user-typing', callback);
-    }
-  }
-
-  offUserTyping() {
-    if (this.socket) {
-      this.socket.off('user-typing');
-    }
-  }
-
-  onUserRaisedHand(callback: (userId: string, raised: boolean, userName: string) => void) {
-    if (this.socket) {
-      this.socket.on('user-raised-hand', callback);
-    }
-  }
-
-  offUserRaisedHand() {
-    if (this.socket) {
-      this.socket.off('user-raised-hand');
-    }
-  }
-
-  onHostMuteAll(callback: () => void) {
-    if (this.socket) {
-      this.socket.on('host-mute-all', callback);
-    }
-  }
-
-  offHostMuteAll() {
-    if (this.socket) {
-      this.socket.off('host-mute-all');
-    }
-  }
-
-  onRoomInfo(callback: (info: any) => void) {
-    if (this.socket) {
-      this.socket.on('room-info', callback);
-    }
-  }
-
-  offRoomInfo() {
-    if (this.socket) {
-      this.socket.off('room-info');
-    }
-  }
-
-  stopTyping(conversationId: string) {
-    if (this.socket?.connected) {
-      this.socket.emit('typing_stop', { conversationId });
-    }
-  }
-
-  // Event listeners for messaging
-  onMessage(callback: (message: Message) => void) {
-    if (this.socket) {
-      this.socket.on('new_message', callback);
-    }
-  }
-
-  onTyping(callback: (data: TypingIndicator) => void) {
-    if (this.socket) {
-      this.socket.on('user_typing', callback);
-    }
-  }
-
-  onStopTyping(callback: (data: TypingIndicator) => void) {
-    if (this.socket) {
-      this.socket.on('user_stop_typing', callback);
-    }
-  }
-
-  offMessage() {
-    if (this.socket) {
-      this.socket.off('new_message');
-    }
-  }
-
-  offTyping() {
-    if (this.socket) {
-      this.socket.off('user_typing');
-    }
-  }
-
-  offStopTyping() {
-    if (this.socket) {
-      this.socket.off('user_stop_typing');
-    }
-  }
-
-  // Notification methods
-  onNewNotification(callback: (notification: Notification) => void) {
-    if (this.socket) {
-      this.socket.on('new_notification', callback);
-    }
-  }
-
-  onNotificationRead(callback: (notificationId: string) => void) {
-    if (this.socket) {
-      this.socket.on('notification_read', callback);
-    }
-  }
-
-  onPreferenceUpdate(callback: (preferences: any) => void) {
-    if (this.socket) {
-      this.socket.on('preference_updated', callback);
-    }
-  }
-
-  offNewNotification() {
-    if (this.socket) {
-      this.socket.off('new_notification');
-    }
-  }
-
-  offNotificationRead() {
-    if (this.socket) {
-      this.socket.off('notification_read');
-    }
-  }
-
-  offPreferenceUpdate() {
-    if (this.socket) {
-      this.socket.off('preference_updated');
-    }
-  }
-
-  emitPreferenceUpdate(preferences: any) {
-    if (this.socket?.connected) {
-      this.socket.emit('update_preferences', preferences);
-    }
-  }
-
-  // Post methods
-  onNewPost(callback: (post: Post) => void) {
-    if (this.socket) {
-      this.socket.on('new_post', callback);
-    }
-  }
-
-  offNewPost() {
-    if (this.socket) {
-      this.socket.off('new_post');
-    }
-  }
-
-  // Post like notifications
-  onPostLikeUpdate(callback: (data: { postId: string; liked: boolean; likeCount: number; userId: string; timestamp: Date }) => void) {
-    if (this.socket) {
-      this.socket.on('post_like_updated', callback);
-    }
-  }
-
-  offPostLikeUpdate() {
-    if (this.socket) {
-      this.socket.off('post_like_updated');
-    }
-  }
-
-  // Post comment notifications
-  onPostCommentAdded(callback: (data: { postId: string; comment: any; commentCount: number; timestamp: Date }) => void) {
-    if (this.socket) {
-      this.socket.on('post_comment_added', callback);
-    }
-  }
-
-  offPostCommentAdded() {
-    if (this.socket) {
-      this.socket.off('post_comment_added');
-    }
-  }
-
-  // Message read status listeners
-  onMessageRead(callback: (data: any) => void) {
-    if (this.socket) {
-      this.socket.on('message_read', callback);
-    }
-  }
-
-  offMessageRead() {
-    if (this.socket) {
-      this.socket.off('message_read');
-    }
-  }
-
-  // User status methods
-  onUserStatusChange(callback: (status: UserStatus) => void) {
-    if (this.socket) {
-      this.socket.on('user_status_change', callback);
-    }
-  }
-
-  offUserStatusChange() {
-    if (this.socket) {
-      this.socket.off('user_status_change');
-    }
-  }
-
-  // Follower methods
-  onNewFollower(callback: (data: { followerId: string; followerName: string }) => void) {
-    if (this.socket) {
-      this.socket.on('new_follower', callback);
-    }
-  }
-
-  offNewFollower() {
-    if (this.socket) {
-      this.socket.off('new_follower');
-    }
-  }
-
-  // Achievement methods
-  onNewAchievement(callback: (achievement: Achievement) => void) {
-    if (this.socket) {
-      this.socket.on('new_achievement', callback);
-    }
-  }
-
-  offNewAchievement() {
-    if (this.socket) {
-      this.socket.off('new_achievement');
-    }
-  }
-
-  // Event methods
-  onEventUpdate(callback: (event: Event) => void) {
-    if (this.socket) {
-      this.socket.on('event_update', callback);
-    }
-  }
-
-  offEventUpdate() {
-    if (this.socket) {
-      this.socket.off('event_update');
-    }
-  }
-
-  // Stats methods
-  onStatsUpdate(callback: (stats: any) => void) {
-    if (this.socket) {
-      this.socket.on('stats_update', callback);
-    }
-  }
-
-  offStatsUpdate() {
-    if (this.socket) {
-      this.socket.off('stats_update');
-    }
-  }
-
-  // Message read status
-  onMessagesRead(callback: (data: { conversationId: string; userId: string }) => void) {
-    if (this.socket) {
-      this.socket.on('messages_read', callback);
-    }
-  }
-
-  offMessagesRead() {
-    if (this.socket) {
-      this.socket.off('messages_read');
-    }
-  }
-
-  // Mark messages as read
-  markMessagesAsRead(conversationId: string, messageIds: string[]) {
-    if (this.socket?.connected) {
-      this.socket.emit('mark_as_read', { conversationId, messageIds });
-    }
-  }
-
-
-
-  onUserOnlineStatus(callback: (data: { userId: string; isOnline: boolean; lastSeen?: string }) => void) {
-    if (this.socket) {
-      this.socket.on('user_online_status', callback);
-    }
-  }
-
-  offUserOnlineStatus() {
-    if (this.socket) {
-      this.socket.off('user_online_status');
-    }
-  }
-
-  // Poll voting methods
-  onPollVoteUpdate(callback: (data: any) => void) {
-    if (this.socket) {
-      this.socket.on('poll_vote_updated', callback);
-    }
-  }
-
-  offPollVoteUpdate() {
-    if (this.socket) {
-      this.socket.off('poll_vote_updated');
-    }
-  }
-
-  voteOnPoll(postId: string, optionId: string) {
-    if (this.socket?.connected) {
-      this.socket.emit('poll_vote', { postId, optionId });
-    }
-  }
-
-  // Follow request methods
-  onFollowRequestAccepted(callback: (data: any) => void) {
-    if (this.socket) {
-      this.socket.on('follow_request_accepted', callback);
-    }
-  }
-
-  offFollowRequestAccepted() {
-    if (this.socket) {
-      this.socket.off('follow_request_accepted');
-    }
-  }
-
-  onFollowRequestRejected(callback: (data: any) => void) {
-    if (this.socket) {
-      this.socket.on('follow_request_rejected', callback);
-    }
-  }
-
-  offFollowRequestRejected() {
-    if (this.socket) {
-      this.socket.off('follow_request_rejected');
-    }
-  }
-
-
-
-  // Follow/Unfollow listeners
-  onFollowStatusUpdate(callback: (data: any) => void) {
-    if (this.socket) {
-      this.socket.on('follow_status_updated', callback);
-    }
-  }
-
-  offFollowStatusUpdate() {
-    if (this.socket) {
-      this.socket.off('follow_status_updated');
-    }
-  }
-
-  onNewFollowRequest(callback: (data: any) => void) {
-    if (this.socket) {
-      this.socket.on('new_follow_request', callback);
-    }
-  }
-
-  offNewFollowRequest() {
-    if (this.socket) {
-      this.socket.off('new_follow_request');
-    }
-  }
-
-  onFollowRequestSent(callback: (data: any) => void) {
-    if (this.socket) {
-      this.socket.on('follow_request_sent', callback);
-    }
-  }
-
-  offFollowRequestSent() {
-    if (this.socket) {
-      this.socket.off('follow_request_sent');
-    }
-  }
-
-  onUserFollowed(callback: (data: any) => void) {
-    if (this.socket) {
-      this.socket.on('user_followed', callback);
-    }
-  }
-
-  offUserFollowed() {
-    if (this.socket) {
-      this.socket.off('user_followed');
-    }
-  }
-
-  onUserUnfollowed(callback: (data: any) => void) {
-    if (this.socket) {
-      this.socket.on('user_unfollowed', callback);
-    }
-  }
-
-  offUserUnfollowed() {
-    if (this.socket) {
-      this.socket.off('user_unfollowed');
-    }
-  }
-
-  // Enhanced real-time messaging methods
-  onMessageStatus(callback: (data: any) => void) {
-    if (this.socket) {
-      this.socket.on('message_status_update', callback);
-    }
-  }
-
-  offMessageStatus() {
-    if (this.socket) {
-      this.socket.off('message_status_update');
-    }
-  }
-
-  onUserStatus(callback: (data: any) => void) {
-    if (this.socket) {
-      this.socket.on('user_status_change', callback);
-    }
-  }
-
-  offUserStatus() {
-    if (this.socket) {
-      this.socket.off('user_status_change');
-    }
-  }
-
-  onConversationUpdate(callback: (data: any) => void) {
-    if (this.socket) {
-      this.socket.on('conversation_update', callback);
-    }
-  }
-
-  offConversationUpdate() {
-    if (this.socket) {
-      this.socket.off('conversation_update');
-    }
-  }
-
-  onNotificationUpdated(callback: (data: any) => void) {
-    if (this.socket) {
-      this.socket.on('notification_updated', callback);
-    }
-  }
-
-  offNotificationUpdated() {
-    if (this.socket) {
-      this.socket.off('notification_updated');
-    }
-  }
-
-  // Join and leave conversation rooms
-  joinConversations(conversationIds: string[]) {
-    conversationIds.forEach(id => {
-      this.socket?.emit('join_conversation', { conversationId: id });
-    });
-  }
-
-  leaveConversations(conversationIds: string[]) {
-    conversationIds.forEach(id => {
-      this.socket?.emit('leave_conversation', { conversationId: id });
-    });
-  }
-
-  // Generic emit method for custom events
-  emit(event: string, data: any) {
-    if (this.socket?.connected) {
-      this.socket.emit(event, data);
-    }
-  }
-
 }
 
-// Create and export a singleton instance
+// Export singleton instance
 export const socketService = new SocketService();
-export default socketService;

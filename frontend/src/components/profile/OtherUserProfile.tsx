@@ -303,7 +303,7 @@ export default function OtherUserProfile({ userId }: OtherUserProfileProps) {
                 <Avatar className="h-24 w-24 mx-auto mb-4">
                   <AvatarImage src={profile.avatar} />
                   <AvatarFallback className="text-2xl">
-                    {profile.name.split(' ').map(n => n[0]).join('')}
+                    {profile.name.split(' ').map(n => n[0]).join('').toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
                 <CardTitle className="text-xl">{profile.name}</CardTitle>

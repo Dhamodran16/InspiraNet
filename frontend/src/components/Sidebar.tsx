@@ -99,65 +99,33 @@ export default function Sidebar({ currentSection, onSectionChange, onLogout, onC
         }
       })();
 
-      // Listen for new messages
-      const handleNewMessage = (data: any) => {
-        if (data.senderId !== user._id) {
-          setUnreadMessages(prev => prev + 1);
-        }
+      // Real-time updates for unread counts
+      const handleNewMessage = () => {
+        setUnreadMessages(prev => prev + 1);
       };
 
-      // Listen for new notifications
-      const handleNewNotification = (data: any) => {
+      const handleMessageRead = () => {
+        setUnreadMessages(prev => Math.max(0, prev - 1));
+      };
+
+      const handleNewNotification = () => {
         setUnreadNotifications(prev => prev + 1);
       };
 
-      // Listen for message read status
-      const handleMessageRead = () => {
-        // For simplicity, decrement to zero on any read event
-        setUnreadMessages(0);
-      };
-
-      // Listen for notification read status
       const handleNotificationRead = () => {
-        setUnreadNotifications(0);
+        setUnreadNotifications(prev => Math.max(0, prev - 1));
       };
 
-      socketService.onMessage(handleNewMessage);
+      socketService.onNewMessage(handleNewMessage);
+      socketService.onMessageRead(handleMessageRead);
       socketService.onNewNotification(handleNewNotification);
-      socketService.onMessagesRead(handleMessageRead);
       socketService.onNotificationRead(handleNotificationRead);
 
-      // Also adjust counts when follow status changes (new conversations may appear)
-      socketService.onFollowStatusUpdate(() => {
-        // Re-fetch minimal counts
-        (async () => {
-          try {
-            const api = (await import('@/services/api')).default;
-            const convRes = await api.get('/api/conversations');
-            const conversations = convRes.data.conversations || [];
-            const userId = user._id;
-            const totalUnread = conversations.reduce((acc: number, c: any) => {
-              try {
-                if (c.unreadCount && typeof c.unreadCount.get === 'function') {
-                  return acc + (c.unreadCount.get(userId) || 0);
-                }
-                if (c.unreadCount && typeof c.unreadCount === 'object') {
-                  return acc + (c.unreadCount[userId] || 0);
-                }
-              } catch {}
-              return acc;
-            }, 0);
-            setUnreadMessages(totalUnread);
-          } catch {}
-        })();
-      });
-
       return () => {
-        socketService.offMessage();
+        socketService.offNewMessage();
+        socketService.offMessageRead();
         socketService.offNewNotification();
-        socketService.offMessagesRead();
         socketService.offNotificationRead();
-        socketService.offFollowStatusUpdate();
       };
     }
   }, [user]);
@@ -170,7 +138,7 @@ export default function Sidebar({ currentSection, onSectionChange, onLogout, onC
   return (
     <div
       className={cn(
-        "fixed left-0 top-0 h-screen bg-white text-gray-800 transition-all duration-700 ease-out z-50 border-r border-gray-200 shadow-lg backdrop-blur-sm",
+        "fixed left-0 top-0 h-screen bg-sidebar text-sidebar-foreground transition-all duration-700 ease-out z-50 border-r border-sidebar-border shadow-lg backdrop-blur-sm",
         isHovered ? "w-64" : "w-16"
       )}
       onMouseEnter={() => setIsHovered(true)}
@@ -181,7 +149,7 @@ export default function Sidebar({ currentSection, onSectionChange, onLogout, onC
       }}
     >
       {/* Header Section */}
-      <div className="flex-shrink-0 p-4 border-b border-gray-200 bg-gradient-to-r from-purple-50 to-blue-50">
+      <div className="flex-shrink-0 p-4 border-b border-sidebar-border bg-sidebar-accent">
         <div className={cn(
           "flex items-center transition-all duration-500 ease-out",
           isHovered ? "justify-start" : "justify-center"
@@ -196,44 +164,44 @@ export default function Sidebar({ currentSection, onSectionChange, onLogout, onC
               )}
             />
             {/* Online indicator with pulse animation */}
-            <div className="absolute -bottom-1 -right-1 h-2 w-2 bg-green-500 rounded-full border-2 border-white animate-pulse"></div>
+            <div className="absolute -bottom-1 -right-1 h-2 w-2 bg-green-500 rounded-full border-2 border-sidebar shadow-sm animate-pulse"></div>
           </div>
           {isHovered && (
             <div className="ml-3 flex flex-col animate-in slide-in-from-left-3 duration-500 ease-out">
-              <span className="text-lg font-bold leading-tight text-gray-900 bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
+              <span className="text-lg font-bold leading-tight text-sidebar-primary bg-gradient-to-r from-sidebar-primary to-sidebar-accent bg-clip-text text-transparent">
                 KEC Alumni
               </span>
-              <span className="text-xs text-gray-500 leading-tight">Network</span>
+              <span className="text-xs text-sidebar-muted-foreground leading-tight">Network</span>
             </div>
           )}
         </div>
       </div>
 
       {/* User Profile Section */}
-      <div className="flex-shrink-0 p-4 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white">
+      <div className="flex-shrink-0 p-4 border-b border-sidebar-border bg-sidebar-accent/50">
         <div
           className={cn(
-            "flex items-center cursor-pointer hover:bg-gradient-to-r hover:from-purple-50 hover:to-blue-50 p-3 rounded-xl transition-all duration-500 ease-out group transform hover:scale-105",
+            "flex items-center cursor-pointer hover:bg-sidebar-accent p-3 rounded-xl transition-all duration-500 ease-out group transform hover:scale-105",
             isHovered ? "justify-start space-x-3" : "justify-center"
           )}
           onClick={() => onSectionChange("profile")}
         >
           <Avatar className={cn(
-            "transition-all duration-500 ease-out ring-2 ring-transparent group-hover:ring-purple-200",
+            "transition-all duration-500 ease-out ring-2 ring-transparent group-hover:ring-sidebar-ring",
             isHovered ? "h-10 w-10" : "h-8 w-8"
           )}>
             <AvatarImage src={user?.avatar || "/placeholder.svg"} alt="User" />
-            <AvatarFallback className="bg-gradient-to-r from-purple-600 to-blue-600 text-white font-bold text-sm">
-              {userName.split(' ').map(n => n[0]).join('')}
+            <AvatarFallback className="bg-sidebar-primary text-sidebar-primary-foreground font-bold text-sm">
+              {userName.split(' ').map(n => n[0]).join('').toUpperCase()}
             </AvatarFallback>
           </Avatar>
 
           {isHovered && (
             <div className="flex-1 min-w-0 animate-in slide-in-from-left-3 duration-500 ease-out">
-              <div className="font-semibold text-sm truncate text-gray-900 group-hover:text-purple-700 transition-colors duration-300">
+              <div className="font-semibold text-sm truncate text-sidebar-foreground group-hover:text-sidebar-primary transition-colors duration-300">
                 {userName}
               </div>
-              <div className="text-xs text-gray-500 truncate group-hover:text-gray-600 transition-colors duration-300">
+              <div className="text-xs text-sidebar-muted-foreground truncate group-hover:text-sidebar-foreground transition-colors duration-300">
                 {getUserDepartmentDisplay()}
                 {getUserYearDisplay() && ` • ${getUserYearDisplay()}`}
               </div>
@@ -251,10 +219,10 @@ export default function Sidebar({ currentSection, onSectionChange, onLogout, onC
                 key={item.id}
                 variant="ghost"
                 className={cn(
-                  "w-full justify-start text-gray-600 hover:text-gray-900 relative h-12 text-sm font-medium transition-all duration-500 ease-out group transform hover:scale-105",
+                  "w-full justify-start text-sidebar-muted-foreground hover:text-sidebar-foreground relative h-12 text-sm font-medium transition-all duration-500 ease-out group transform hover:scale-105",
                   currentSection === item.id
-                    ? "bg-gradient-to-r from-purple-600 to-blue-600 text-white hover:from-purple-700 hover:to-blue-700 shadow-lg rounded-xl"
-                    : "hover:bg-gradient-to-r hover:from-gray-50 hover:to-purple-50 rounded-xl"
+                    ? "bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary/90 shadow-lg rounded-xl"
+                    : "hover:bg-sidebar-accent rounded-xl"
                 )}
                 onClick={() => onSectionChange(item.id)}
               >
@@ -264,12 +232,12 @@ export default function Sidebar({ currentSection, onSectionChange, onLogout, onC
                 )}>
                   <item.icon className={cn(
                     "h-5 w-5 flex-shrink-0 transition-all duration-300 group-hover:scale-110",
-                    currentSection === item.id ? "text-white" : "text-gray-600 group-hover:text-purple-600"
+                    currentSection === item.id ? "text-sidebar-primary-foreground" : "text-sidebar-muted-foreground group-hover:text-sidebar-primary"
                   )} />
 
                   {isHovered && (
                     <div className="flex-1 flex items-center justify-between ml-3 animate-in slide-in-from-left-3 duration-500 ease-out">
-                      <span className="font-medium transition-colors duration-300 group-hover:text-gray-900">
+                      <span className="font-medium transition-colors duration-300 group-hover:text-sidebar-foreground">
                         {item.name}
                       </span>
 
@@ -294,19 +262,19 @@ export default function Sidebar({ currentSection, onSectionChange, onLogout, onC
       </nav>
 
       {/* Footer Actions Section - Fixed at bottom */}
-      <div className="flex-shrink-0 p-2 border-t border-gray-200 bg-gradient-to-r from-gray-50 to-white">
+      <div className="flex-shrink-0 p-2 border-t border-sidebar-border bg-sidebar-accent/50">
         <div className="space-y-2">
           <Button
             variant="ghost"
             className={cn(
-              "w-full justify-start text-gray-600 hover:text-purple-700 h-12 text-sm font-medium transition-all duration-500 ease-out hover:bg-gradient-to-r hover:from-purple-50 hover:to-blue-50 rounded-xl transform hover:scale-105 group",
+              "w-full justify-start text-sidebar-muted-foreground hover:text-sidebar-primary h-12 text-sm font-medium transition-all duration-500 ease-out hover:bg-sidebar-accent rounded-xl transform hover:scale-105 group",
               isHovered ? "justify-start" : "justify-center"
             )}
             onClick={() => onSectionChange("settings")}
           >
-            <Settings className="h-5 w-5 transition-all duration-300 group-hover:scale-110 group-hover:text-purple-600" />
+            <Settings className="h-5 w-5 transition-all duration-300 group-hover:scale-110 group-hover:text-sidebar-primary" />
             {isHovered && (
-              <span className="font-medium ml-3 animate-in slide-in-from-left-3 duration-500 ease-out transition-colors duration-300 group-hover:text-purple-700">
+              <span className="font-medium ml-3 animate-in slide-in-from-left-3 duration-500 ease-out transition-colors duration-300 group-hover:text-sidebar-primary">
                 Settings
               </span>
             )}
@@ -315,7 +283,7 @@ export default function Sidebar({ currentSection, onSectionChange, onLogout, onC
           <Button
             variant="ghost"
             className={cn(
-              "w-full justify-start text-gray-600 hover:text-red-600 h-12 text-sm font-medium transition-all duration-500 ease-out hover:bg-gradient-to-r hover:from-red-50 hover:to-pink-50 rounded-xl transform hover:scale-105 group",
+              "w-full justify-start text-sidebar-muted-foreground hover:text-red-600 h-12 text-sm font-medium transition-all duration-500 ease-out hover:bg-red-50 dark:hover:bg-red-950/20 rounded-xl transform hover:scale-105 group",
               isHovered ? "justify-start" : "justify-center"
             )}
             onClick={handleLogout}
