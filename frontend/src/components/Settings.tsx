@@ -400,7 +400,7 @@ export default function Settings() {
       
       // Emit real-time update to other connected clients
       if (realTimeUpdates) {
-        socketService.emit('settings-updated', { section, data });
+        socketService.updateSettings(section, data);
       }
       
       addActivityLog(`${section} settings updated`, 'success');

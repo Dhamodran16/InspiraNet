@@ -8,7 +8,25 @@ import PostRenderer from './PostRenderer';
 import { Button } from '@/components/ui/button';
 import { Plus, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { socketService } from '@/services/socketService';
+
+// Import socket service with fallback
+let socketService: any = null;
+try {
+  const { socketService: importedSocketService } = require('@/services/socketService');
+  socketService = importedSocketService;
+} catch (error) {
+  console.warn('Socket service not available:', error);
+  // Create a mock socket service for fallback
+  socketService = {
+    onPostCommentAdded: () => {},
+    offPostCommentAdded: () => {},
+    onNewNotification: () => {},
+    offNewNotification: () => {},
+    connect: () => {},
+    disconnect: () => {},
+    getConnectionStatus: () => false
+  };
+}
 
 const PostFeed: React.FC = () => {
   const navigate = useNavigate();
@@ -104,38 +122,48 @@ const PostFeed: React.FC = () => {
     // Listen for new comments
     const handlePostCommentAdded = (data: any) => {
       console.log('PostFeed: Received new comment:', data);
-      setPosts(prev => prev.map(post => {
-        if (post._id === data.postId) {
-          return {
-            ...post,
-            comments: [...(post.comments || []), data.comment]
-          };
-        }
-        return post;
-      }));
+      try {
+        setPosts(prev => prev.map(post => {
+          if (post._id === data.postId) {
+            return {
+              ...post,
+              comments: [...(post.comments || []), data.comment]
+            };
+          }
+          return post;
+        }));
+      } catch (error) {
+        console.error('PostFeed: Error handling new comment:', error);
+      }
     };
 
     // Listen for new notifications
     const handleNewNotification = (notification: any) => {
       console.log('PostFeed: Received new notification:', notification);
-      if (notification.type === 'post_like' || notification.type === 'post_comment') {
-        toast({
-          title: notification.title,
-          description: notification.message,
-        });
+      try {
+        if (notification.type === 'post_like' || notification.type === 'post_comment') {
+          toast({
+            title: notification.title,
+            description: notification.message,
+          });
+        }
+      } catch (error) {
+        console.error('PostFeed: Error handling notification:', error);
       }
     };
 
-    // Add socket listeners with error handling
+    // Add socket listeners with comprehensive error handling
     try {
       if (socketService && typeof socketService.onPostCommentAdded === 'function') {
         socketService.onPostCommentAdded(handlePostCommentAdded);
+        console.log('PostFeed: onPostCommentAdded listener added');
       } else {
         console.warn('PostFeed: socketService.onPostCommentAdded is not available');
       }
       
       if (socketService && typeof socketService.onNewNotification === 'function') {
         socketService.onNewNotification(handleNewNotification);
+        console.log('PostFeed: onNewNotification listener added');
       } else {
         console.warn('PostFeed: socketService.onNewNotification is not available');
       }
@@ -151,9 +179,11 @@ const PostFeed: React.FC = () => {
       try {
         if (socketService && typeof socketService.offPostCommentAdded === 'function') {
           socketService.offPostCommentAdded();
+          console.log('PostFeed: onPostCommentAdded listener removed');
         }
         if (socketService && typeof socketService.offNewNotification === 'function') {
           socketService.offNewNotification();
+          console.log('PostFeed: onNewNotification listener removed');
         }
       } catch (error) {
         console.error('PostFeed: Error cleaning up socket listeners:', error);

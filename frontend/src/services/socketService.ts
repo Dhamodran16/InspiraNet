@@ -341,6 +341,46 @@ class SocketService {
   onFollowStatusUpdate(handler: Function) { this.on('follow_status_update', handler); }
   offFollowStatusUpdate() { this.off('follow_status_update'); }
 
+  // Additional methods used by other components
+  onMessage(handler: Function) { this.on('new_message', handler); }
+  offMessage() { this.off('new_message'); }
+  
+  onTyping(handler: Function) { this.on('typing', handler); }
+  offTyping() { this.off('typing'); }
+  
+  onStopTyping(handler: Function) { this.on('stop_typing', handler); }
+  offStopTyping() { this.off('stop_typing'); }
+  
+  onMessageStatus(handler: Function) { this.on('message_status', handler); }
+  offMessageStatus() { this.off('message_status'); }
+  
+  onUserStatus(handler: Function) { this.on('user_status', handler); }
+  offUserStatus() { this.off('user_status'); }
+  
+  onConversationUpdate(handler: Function) { this.on('conversation_update', handler); }
+  offConversationUpdate() { this.off('conversation_update'); }
+  
+  onNotificationUpdated(handler: Function) { this.on('notification_updated', handler); }
+  offNotificationUpdated() { this.off('notification_updated'); }
+  
+  onFollowRequestAccepted(handler: Function) { this.on('follow_request_accepted', handler); }
+  offFollowRequestAccepted() { this.off('follow_request_accepted'); }
+  
+  onFollowRequestRejected(handler: Function) { this.on('follow_request_rejected', handler); }
+  offFollowRequestRejected() { this.off('follow_request_rejected'); }
+  
+  onNewFollowRequest(handler: Function) { this.on('new_follow_request', handler); }
+  offNewFollowRequest() { this.off('new_follow_request'); }
+  
+  onUserFollowed(handler: Function) { this.on('user_followed', handler); }
+  offUserFollowed() { this.off('user_followed'); }
+  
+  onUserUnfollowed(handler: Function) { this.on('user_unfollowed', handler); }
+  offUserUnfollowed() { this.off('user_unfollowed'); }
+  
+  onStatsUpdate(handler: Function) { this.on('stats_update', handler); }
+  offStatsUpdate() { this.off('stats_update'); }
+
   // Emit methods with error handling
   emit(eventName: string, data: any) {
     if (this.socket && this.socket.connected) {
@@ -365,6 +405,28 @@ class SocketService {
 
   markNotificationAsRead(notificationId: string) {
     this.emit('mark_notification_read', { notificationId });
+  }
+
+  // Additional emit methods used by other components
+  joinConversations(conversationIds: string[]) {
+    this.emit('join_conversations', { conversationIds });
+  }
+
+  leaveConversations(conversationIds: string[]) {
+    this.emit('leave_conversations', { conversationIds });
+  }
+
+  startTyping(conversationId: string) {
+    this.emit('start_typing', { conversationId });
+  }
+
+  stopTyping(conversationId: string) {
+    this.emit('stop_typing', { conversationId });
+  }
+
+  // Settings update
+  updateSettings(section: string, data: any) {
+    this.emit('settings-updated', { section, data });
   }
 
   // Cleanup
@@ -396,4 +458,14 @@ class SocketService {
 }
 
 // Export singleton instance
-export const socketService = new SocketService();
+const socketService = new SocketService();
+
+// Ensure the service is properly initialized
+if (typeof window !== 'undefined') {
+  // Initialize socket connection when the service is imported
+  setTimeout(() => {
+    socketService.connect();
+  }, 100);
+}
+
+export { socketService };

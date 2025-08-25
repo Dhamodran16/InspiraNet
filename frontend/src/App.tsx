@@ -58,6 +58,33 @@ function App() {
     };
 
     initializePerformance();
+
+    // Global error handler for socket-related errors
+    const handleGlobalError = (event: ErrorEvent) => {
+      if (event.error && event.error.message && event.error.message.includes('onPostCommentAdded')) {
+        console.warn('Socket service error detected, attempting recovery...');
+        // Prevent the error from crashing the app
+        event.preventDefault();
+        return false;
+      }
+    };
+
+    // Global unhandled promise rejection handler
+    const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
+      if (event.reason && event.reason.message && event.reason.message.includes('onPostCommentAdded')) {
+        console.warn('Socket service promise rejection detected, attempting recovery...');
+        event.preventDefault();
+        return false;
+      }
+    };
+
+    window.addEventListener('error', handleGlobalError);
+    window.addEventListener('unhandledrejection', handleUnhandledRejection);
+
+    return () => {
+      window.removeEventListener('error', handleGlobalError);
+      window.removeEventListener('unhandledrejection', handleUnhandledRejection);
+    };
   }, []);
 
   return (
