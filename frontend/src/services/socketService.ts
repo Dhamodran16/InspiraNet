@@ -110,7 +110,7 @@ class SocketService {
     this.connectionCheckInterval = setInterval(() => {
       if (this.socket && !this.socket.connected && this.isConnected) {
         console.log('Socket connection lost, attempting to reconnect...');
-        this.reconnect();
+        this.setupSocket();
       }
     }, 60000);
   }
@@ -133,7 +133,6 @@ class SocketService {
         reconnectionAttempts: this.maxReconnectAttempts,
         reconnectionDelay: this.reconnectDelay,
         reconnectionDelayMax: 3000, // Reduced from 5000
-        maxReconnectionAttempts: this.maxReconnectAttempts,
         auth: {
           token: token
         },
@@ -329,6 +328,12 @@ class SocketService {
   
   onPostUpdate(handler: Function) { this.on('post_update', handler); }
   offPostUpdate() { this.off('post_update'); }
+  
+  onPostCommentAdded(handler: Function) { this.on('post_comment_added', handler); }
+  offPostCommentAdded() { this.off('post_comment_added'); }
+  
+  onPostLikeUpdated(handler: Function) { this.on('post_like_updated', handler); }
+  offPostLikeUpdated() { this.off('post_like_updated'); }
   
   onUserStatusUpdate(handler: Function) { this.on('user_status_update', handler); }
   offUserStatusUpdate() { this.off('user_status_update'); }

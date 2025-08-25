@@ -267,24 +267,6 @@ router.get('/departments', async (_req, res) => {
 });
 
 // Refresh token
-router.post('/refresh', async (req, res) => {
-  try {
-    const { refreshToken } = req.body;
-		if (!refreshToken) return res.status(400).json({ error: 'Refresh token required' });
-    const decoded = jwt.verify(refreshToken, process.env.JWT_SECRET);
-    const user = await User.findById(decoded.userId).select('-password');
-		if (!user) return res.status(401).json({ error: 'Invalid refresh token' });
-		const token = generateToken(user._id);
-    const newRefreshToken = generateRefreshToken(user._id);
-		res.json({ token, refreshToken: newRefreshToken, user: { _id: user._id, name: user.name, email: user.email, type: user.type, department: user.department, avatar: user.avatar, isVerified: user.isVerified } });
-	} catch (e) {
-		if (e.name === 'JsonWebTokenError') return res.status(401).json({ error: 'Invalid refresh token' });
-		if (e.name === 'TokenExpiredError') return res.status(401).json({ error: 'Refresh token expired' });
-    res.status(500).json({ error: 'Token refresh failed' });
-  }
-});
-
-// Token refresh endpoint
 router.post('/refresh', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.userId;
@@ -313,7 +295,12 @@ router.post('/refresh', authenticateToken, async (req, res) => {
         department: user.department,
         batch: user.batch,
         isVerified: user.isVerified,
-        isProfileComplete: user.isProfileComplete
+        isProfileComplete: user.isProfileComplete,
+        bio: user.bio,
+        location: user.location,
+        studentInfo: user.studentInfo,
+        alumniInfo: user.alumniInfo,
+        facultyInfo: user.facultyInfo
       }
     });
   } catch (error) {

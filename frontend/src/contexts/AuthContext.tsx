@@ -339,21 +339,52 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const refreshToken = async (): Promise<boolean> => {
     try {
       const token = getAuthToken();
-      if (!token) return false;
+      if (!token) {
+        console.log('No token available for refresh');
+        return false;
+      }
 
-      const response = await api.post('/api/auth/refresh');
+      console.log('Attempting token refresh...');
+      const response = await api.post('/api/auth/refresh', {}, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        timeout: 15000, // 15 second timeout
+      });
 
       if (response.data && response.data.token) {
+        console.log('Token refresh successful');
         setAuthToken(response.data.token, true);
+        
+        // Update user data if provided
+        if (response.data.user) {
+          setUser(response.data.user);
+        }
+        
         return true;
       } else {
+        console.error('Token refresh response missing token:', response.data);
         removeAuthToken();
         setUser(null);
         setIsAuthenticated(false);
         return false;
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Token refresh failed:', error);
+      
+      // Handle specific error types
+      if (error.response?.status === 400) {
+        console.error('Bad request during token refresh:', error.response.data);
+      } else if (error.response?.status === 401) {
+        console.error('Token refresh unauthorized');
+      } else if (error.code === 'ECONNABORTED') {
+        console.error('Token refresh timeout');
+      }
+      
+      removeAuthToken();
+      setUser(null);
+      setIsAuthenticated(false);
       return false;
     }
   };

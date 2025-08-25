@@ -82,28 +82,44 @@ api.interceptors.response.use(
         const token = getAuthToken();
         
         if (token) {
+          console.log('Attempting token refresh...');
           const refreshResponse = await axios.post(
             `${API_BASE_URL}/api/auth/refresh`,
             {},
             {
               headers: {
                 Authorization: `Bearer ${token}`,
+                'Content-Type': 'application/json',
               },
-              timeout: 10000, // 10 second timeout for refresh
+              timeout: 15000, // 15 second timeout for refresh
             }
           );
 
-          if (refreshResponse.data.token) {
+          if (refreshResponse.data && refreshResponse.data.token) {
+            console.log('Token refresh successful');
             // Store new token
             localStorage.setItem('authToken', refreshResponse.data.token);
             
             // Retry original request with new token
             originalRequest.headers.Authorization = `Bearer ${refreshResponse.data.token}`;
             return api(originalRequest);
+          } else {
+            console.error('Token refresh response missing token:', refreshResponse.data);
           }
+        } else {
+          console.error('No token available for refresh');
         }
-      } catch (refreshError) {
+      } catch (refreshError: any) {
         console.error('Token refresh failed:', refreshError);
+        
+        // Handle specific refresh errors
+        if (refreshError.response?.status === 400) {
+          console.error('Bad request during token refresh:', refreshError.response.data);
+        } else if (refreshError.response?.status === 401) {
+          console.error('Token refresh unauthorized');
+        } else if (refreshError.code === 'ECONNABORTED') {
+          console.error('Token refresh timeout');
+        }
       }
 
       // If refresh fails, remove token and redirect

@@ -108,7 +108,7 @@ const PostFeed: React.FC = () => {
         if (post._id === data.postId) {
           return {
             ...post,
-            comments: [...post.comments, data.comment]
+            comments: [...(post.comments || []), data.comment]
           };
         }
         return post;
@@ -126,17 +126,38 @@ const PostFeed: React.FC = () => {
       }
     };
 
-    // Add socket listeners (removed like updates to prevent conflicts)
-    socketService.onPostCommentAdded(handlePostCommentAdded);
-    socketService.onNewNotification(handleNewNotification);
+    // Add socket listeners with error handling
+    try {
+      if (socketService && typeof socketService.onPostCommentAdded === 'function') {
+        socketService.onPostCommentAdded(handlePostCommentAdded);
+      } else {
+        console.warn('PostFeed: socketService.onPostCommentAdded is not available');
+      }
+      
+      if (socketService && typeof socketService.onNewNotification === 'function') {
+        socketService.onNewNotification(handleNewNotification);
+      } else {
+        console.warn('PostFeed: socketService.onNewNotification is not available');
+      }
+    } catch (error) {
+      console.error('PostFeed: Error setting up socket listeners:', error);
+    }
 
     console.log('PostFeed: Socket listeners set up successfully');
 
     // Cleanup
     return () => {
       console.log('PostFeed: Cleaning up socket listeners');
-      socketService.offPostCommentAdded();
-      socketService.offNewNotification();
+      try {
+        if (socketService && typeof socketService.offPostCommentAdded === 'function') {
+          socketService.offPostCommentAdded();
+        }
+        if (socketService && typeof socketService.offNewNotification === 'function') {
+          socketService.offNewNotification();
+        }
+      } catch (error) {
+        console.error('PostFeed: Error cleaning up socket listeners:', error);
+      }
     };
   }, [user?._id, toast]);
 
