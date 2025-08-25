@@ -153,14 +153,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         // Check session expiry first
         checkSessionExpiry();
 
-        // Add timeout to prevent hanging - reduced from 10s to 5s
+        // Add timeout to prevent hanging - increase to 8s to reduce false timeouts on cold starts
         const timeoutPromise = new Promise((_, reject) => {
-          setTimeout(() => reject(new Error('Auth check timeout')), 5000); // 5 second timeout
+          setTimeout(() => reject(new Error('Auth check timeout')), 8000);
         });
 
         // Verify token with backend with specific timeout
         const authPromise = api.get('/api/auth/verify', {
-          timeout: 5000 // 5 second timeout for auth check
+          timeout: 8000
         });
         
         const response = await Promise.race([authPromise, timeoutPromise]) as any;

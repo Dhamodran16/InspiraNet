@@ -456,49 +456,30 @@ export default function OtherUserProfile({ userId }: OtherUserProfileProps) {
 
           {/* Right Column - Tabs */}
           <div className="lg:col-span-2">
-            <Tabs defaultValue="posts" className="space-y-6">
-                              <TabsList className="grid w-full grid-cols-3">
+            <Tabs defaultValue="info" className="space-y-6">
+              <TabsList className="grid w-full grid-cols-3">
+                <TabsTrigger value="info">Info</TabsTrigger>
                 <TabsTrigger value="posts">Posts</TabsTrigger>
-
-                <TabsTrigger value="education">Education</TabsTrigger>
                 <TabsTrigger value="connections">Connections</TabsTrigger>
               </TabsList>
 
-              <TabsContent value="posts" className="space-y-4">
-                <PostFeed />
+              <TabsContent value="info" className="space-y-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Info</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    {profile.email?.college && <p className="text-sm">College Email: {profile.email.college}</p>}
+                    {profile.email?.personal && <p className="text-sm">Personal Email: {profile.email.personal}</p>}
+                    {profile.location && <p className="text-sm">Location: {profile.location}</p>}
+                    {profile.company && <p className="text-sm">Company: {profile.company}</p>}
+                    {profile.designation && <p className="text-sm">Designation: {profile.designation}</p>}
+                  </CardContent>
+                </Card>
               </TabsContent>
 
-
-
-              <TabsContent value="education" className="space-y-4">
-                {profile.education && profile.education.length > 0 ? (
-                  <div className="space-y-4">
-                    {profile.education.map((edu, index) => (
-                      <Card key={index}>
-                        <CardHeader>
-                          <CardTitle className="flex items-center space-x-2">
-                            <GraduationCap className="h-5 w-5 text-blue-500" />
-                            <span>{edu.degree}</span>
-                          </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <p className="text-sm text-muted-foreground mb-2">{edu.institution}</p>
-                          <div className="flex items-center justify-between text-xs text-muted-foreground">
-                            <span>{edu.year}</span>
-                            {edu.gpa && <span>GPA: {edu.gpa}</span>}
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                ) : (
-                  <Card>
-                    <CardContent className="text-center py-8">
-                      <GraduationCap className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                      <p className="text-muted-foreground">No education history yet</p>
-                    </CardContent>
-                  </Card>
-                )}
+              <TabsContent value="posts" className="space-y-4">
+                <PostFeed />
               </TabsContent>
 
               <TabsContent value="connections" className="space-y-4">

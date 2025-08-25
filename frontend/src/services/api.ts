@@ -16,7 +16,7 @@ const API_BASE_URL = getBackendUrl();
 // API service configuration
 export const apiConfig = {
   baseURL: API_BASE_URL,
-  timeout: parseInt(import.meta.env.VITE_API_TIMEOUT || '15000'), // Reduced from 30000 to 15000
+  timeout: parseInt(import.meta.env.VITE_API_TIMEOUT || '20000'),
   headers: {
     'Content-Type': 'application/json',
   },
@@ -25,7 +25,7 @@ export const apiConfig = {
 // Create axios instance with base configuration
 const api: AxiosInstance = axios.create({
   baseURL: API_BASE_URL,
-  timeout: parseInt(import.meta.env.VITE_API_TIMEOUT || '15000'), // Reduced from 60000 to 15000
+  timeout: parseInt(import.meta.env.VITE_API_TIMEOUT || '20000'),
   headers: {
     'Content-Type': 'application/json',
   },

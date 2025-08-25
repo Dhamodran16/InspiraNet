@@ -128,7 +128,7 @@ export default function BasePost({
                 )}
               </div>
               <div className="flex items-center space-x-2 text-sm text-gray-500 dark:text-gray-400">
-                <span>{post.author?.department || 'Unknown Department'}</span>
+                <span>{(post as any).author?.studentInfo?.department || (post as any).author?.facultyInfo?.department || post.author?.department || 'Unknown Department'}</span>
                 {post.author?.batch && (
                   <>
                     <span>•</span>

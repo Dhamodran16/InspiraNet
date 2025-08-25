@@ -249,16 +249,14 @@ export default function ProfileView({ profileUserId }: ProfileViewProps) {
 				
       </div>
 
-      <Tabs defaultValue="overview" className="space-y-6">
-				<TabsList className="grid w-full grid-cols-5">
-          <TabsTrigger value="overview">Overview</TabsTrigger>
+      <Tabs defaultValue="info" className="space-y-6">
+				<TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="info">Info</TabsTrigger>
           <TabsTrigger value="posts">Posts</TabsTrigger>
 					<TabsTrigger value="connections">Connections</TabsTrigger>
-          <TabsTrigger value="experience">Experience</TabsTrigger>
-          <TabsTrigger value="education">Education</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="overview" className="space-y-6">
+        <TabsContent value="info" className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {profile.email && (
 							<div className="space-y-2">
@@ -346,44 +344,7 @@ export default function ProfileView({ profileUserId }: ProfileViewProps) {
             </CardContent>
           </Card>
         </TabsContent>
-
-        <TabsContent value="experience" className="space-y-6">
-					{(profile.workExperience?.length || 0) > 0 ? (
-            <div className="space-y-4">
-							{profile.workExperience!.map((exp, i) => (
-								<Card key={i}>
-                  <CardContent className="p-6">
-                    <div className="flex justify-between items-start mb-4">
-                      <div>
-                        <h3 className="text-lg font-semibold">{exp.position}</h3>
-                        <p className="text-muted-foreground">{exp.company}</p>
-                      </div>
-                      <div className="text-right">
-												<p className="text-sm text-muted-foreground">{formatDate(exp.startDate)} - {exp.current ? 'Present' : exp.endDate ? formatDate(exp.endDate) : ''}</p>
-												{exp.current && (<Badge className="bg-green-100 text-green-800">Current</Badge>)}
-                      </div>
-                    </div>
-										{exp.description && (<p className="text-muted-foreground">{exp.description}</p>)}
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          ) : (
-						<Card><CardContent className="p-8 text-center text-muted-foreground"><Briefcase className="w-12 h-12 mx-auto mb-4 opacity-50" /><p>No work experience added yet.</p></CardContent></Card>
-          )}
-        </TabsContent>
-
-        <TabsContent value="education" className="space-y-6">
-					{(profile.education?.length || 0) > 0 ? (
-            <div className="space-y-4">
-							{profile.education!.map((edu, i) => (
-								<Card key={i}><CardContent className="p-6"><div className="flex justify-between items-start"><div><h3 className="text-lg font-semibold">{edu.degree}</h3><p className="text-muted-foreground">{edu.institution}</p>{edu.gpa && (<p className="text-sm text-muted-foreground">GPA: {edu.gpa}</p>)}</div><div className="text-right"><p className="text-muted-foreground">{edu.year}</p></div></div></CardContent></Card>
-              ))}
-            </div>
-          ) : (
-						<Card><CardContent className="p-8 text-center text-muted-foreground"><GraduationCap className="w-12 h-12 mx-auto mb-4 opacity-50" /><p>No education information added yet.</p></CardContent></Card>
-          )}
-        </TabsContent>
+        
       </Tabs>
     </div>
   );

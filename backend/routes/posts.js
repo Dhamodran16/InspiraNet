@@ -238,11 +238,13 @@ router.post('/', authenticateToken, upload.array('media', 5), async (req, res) =
     }
 
     // Prepare post data based on type
+    const resolvedDepartment = (user.studentInfo && user.studentInfo.department) || (user.facultyInfo && user.facultyInfo.department) || user.department;
+
     const postData = {
       author: userId,
       userType: user.type,
       batch: user.batch,
-      department: user.type === 'alumni' ? user.alumniInfo?.currentCompany : user.department,
+      department: resolvedDepartment,
       postType,
       title: title?.trim(),
       content: content.trim(),
