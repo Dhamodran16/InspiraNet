@@ -110,14 +110,14 @@ class SocketService {
     this.connectionCheckInterval = setInterval(() => {
       if (this.socket && !this.socket.connected && this.isConnected) {
         console.log('Socket connection lost, attempting to reconnect...');
-        this.setupSocket();
+    this.setupSocket();
       }
     }, 60000);
   }
 
   private setupSocket() {
     if (this.socket || this.isConnected) return;
-
+    
     try {
       const token = localStorage.getItem('authToken') || sessionStorage.getItem('authToken');
       if (!token) {

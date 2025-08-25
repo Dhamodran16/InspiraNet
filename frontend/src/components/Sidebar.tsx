@@ -168,7 +168,7 @@ export default function Sidebar({ currentSection, onSectionChange, onLogout, onC
           </div>
           {isHovered && (
             <div className="ml-3 flex flex-col animate-in slide-in-from-left-3 duration-500 ease-out">
-              <span className="text-lg font-bold leading-tight text-sidebar-primary bg-gradient-to-r from-sidebar-primary to-sidebar-accent bg-clip-text text-transparent">
+              <span className="text-lg font-bold leading-tight text-sidebar-primary">
                 KEC Alumni
               </span>
               <span className="text-xs text-sidebar-muted-foreground leading-tight">Network</span>
