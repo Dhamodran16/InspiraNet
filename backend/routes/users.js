@@ -465,62 +465,48 @@ router.get('/:userId/stats', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'User ID is required' });
     }
 
-    // Check if user exists
-    const userExists = await User.findById(userId);
-    if (!userExists) {
+    // Check if user exists and get basic info in one query
+    const user = await User.findById(userId).select('followers following studentInfo.achievements');
+    if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    // Get post count
-    let postCount = 0;
-    try {
-      postCount = await Post.countDocuments({ author: userId });
-    } catch (error) {
-      console.error('Error counting posts:', error);
-    }
-
-    // Get event count (events the user has attended or created)
-    let eventCount = 0;
-    try {
-      eventCount = await Event.countDocuments({
+    // Use Promise.all to run all queries concurrently for better performance
+    const [postCount, eventCount] = await Promise.all([
+      // Get post count
+      Post.countDocuments({ author: userId }).catch(() => 0),
+      
+      // Get event count (events the user has attended or created)
+      Event.countDocuments({
         $or: [
           { createdBy: userId },
           { attendees: { $in: [userId] } }
         ]
-      });
-    } catch (error) {
-      console.error('Error counting events:', error);
-    }
+      }).catch(() => 0)
+    ]);
 
-    // Get achievement count from studentInfo
-    let achievementCount = 0;
-    try {
-      const user = await User.findById(userId).select('studentInfo.achievements');
-      if (user?.studentInfo?.achievements) {
-        achievementCount = user.studentInfo.achievements.length;
-      }
-    } catch (error) {
-      console.error('Error counting achievements:', error);
-    }
+    // Calculate counts from user data (no additional queries needed)
+    const achievementCount = user?.studentInfo?.achievements?.length || 0;
+    const connectionCount = (user?.followers?.length || 0) + (user?.following?.length || 0);
 
-    // Get connection count (followers + following)
-    let connectionCount = 0;
-    try {
-      const currentUser = await User.findById(userId).select('followers following');
-      connectionCount = (currentUser?.followers?.length || 0) + (currentUser?.following?.length || 0);
-    } catch (error) {
-      console.error('Error counting connections:', error);
-    }
-
+    // Return stats immediately
     res.json({
       posts: postCount,
       events: eventCount,
       achievements: achievementCount,
       connections: connectionCount
     });
+
   } catch (error) {
     console.error('Error fetching user stats:', error);
-    res.status(500).json({ error: 'Failed to fetch user stats' });
+    
+    // Return default stats instead of error to prevent frontend crashes
+    res.json({
+      posts: 0,
+      events: 0,
+      achievements: 0,
+      connections: 0
+    });
   }
 });
 

@@ -155,13 +155,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         // Check session expiry first
         checkSessionExpiry();
 
-        // Add timeout to prevent hanging
+        // Add timeout to prevent hanging - reduced from 10s to 5s
         const timeoutPromise = new Promise((_, reject) => {
-          setTimeout(() => reject(new Error('Auth check timeout')), 10000); // 10 second timeout
+          setTimeout(() => reject(new Error('Auth check timeout')), 5000); // 5 second timeout
         });
 
-        // Verify token with backend
-        const authPromise = api.get('/api/auth/verify');
+        // Verify token with backend with specific timeout
+        const authPromise = api.get('/api/auth/verify', {
+          timeout: 5000 // 5 second timeout for auth check
+        });
         
         const response = await Promise.race([authPromise, timeoutPromise]) as any;
 
@@ -183,8 +185,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         // Remove invalid token
         removeAuthToken();
         
-        // Only show error toast for network errors, not for missing tokens
-        if (error.message !== 'Auth check timeout' && error.response?.status !== 401) {
+        // Only show error toast for network errors, not for missing tokens or timeouts
+        if (error.message !== 'Auth check timeout' && error.response?.status !== 401 && error.code !== 'ECONNABORTED') {
           toast({
             title: "Authentication Error",
             description: "Please log in again.",
@@ -199,8 +201,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     checkAuth();
 
-    // Set up periodic session checks
-    const sessionCheckInterval = setInterval(checkSessionExpiry, 5 * 60 * 1000); // Check every 5 minutes
+    // Set up periodic session checks - reduced frequency to reduce load
+    const sessionCheckInterval = setInterval(checkSessionExpiry, 10 * 60 * 1000); // Check every 10 minutes instead of 5
 
     return () => {
       clearInterval(sessionCheckInterval);
@@ -211,7 +213,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     try {
       setIsLoading(true);
       
-      const response = await api.post('/api/auth/login', { email, password });
+      const response = await api.post('/api/auth/login', { email, password }, {
+        timeout: 10000 // 10 second timeout for login
+      });
 
       if (response.data && response.data.token) {
         // Store token (you can add a rememberMe checkbox to your login form)
@@ -232,51 +236,67 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     } catch (error: any) {
       console.error('Login error:', error);
       
+      // Handle timeout errors specifically
+      if (error.code === 'ECONNABORTED') {
+        toast({
+          title: "Connection Timeout",
+          description: "Login request timed out. Please check your internet connection and try again.",
+          variant: "destructive",
+        });
+        return false;
+      }
+      
       // Handle specific error types
       if (error.response?.status === 503) {
         // Check if it's a database-specific error
         const responseData = error.response.data as any;
         if (responseData?.database?.readyState === 0) {
           toast({
-            title: "Database Disconnected",
-            description: "Database connection has been lost. Please try again in a few moments.",
+            title: "Service Temporarily Unavailable",
+            description: "Database is currently disconnected. Please try again in a few moments.",
             variant: "destructive",
           });
         } else if (responseData?.database?.readyState === 2) {
           toast({
-            title: "Database Connecting",
+            title: "Service Connecting",
             description: "Database is establishing connection. Please try again in a few moments.",
             variant: "destructive",
           });
         } else {
           toast({
             title: "Service Temporarily Unavailable",
-            description: "Our database is currently unavailable. Please try again in a few moments.",
+            description: "Our services are currently unavailable. Please try again in a few moments.",
             variant: "destructive",
           });
         }
+      } else if (error.response?.status === 401) {
+        toast({
+          title: "Invalid Credentials",
+          description: "Email or password is incorrect. Please try again.",
+          variant: "destructive",
+        });
+      } else if (error.response?.status === 429) {
+        toast({
+          title: "Too Many Requests",
+          description: "Too many login attempts. Please wait a moment and try again.",
+          variant: "destructive",
+        });
       } else if (error.response?.status >= 500) {
         toast({
           title: "Server Error",
           description: "Something went wrong on our end. Please try again later.",
           variant: "destructive",
         });
-      } else if (error.response?.status === 401) {
+      } else if (error.code === 'ERR_NETWORK') {
         toast({
-          title: "Login Failed",
-          description: "Invalid email or password. Please check your credentials.",
-          variant: "destructive",
-        });
-      } else if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
-        toast({
-          title: "Connection Timeout",
-          description: "The request took too long. Please check your internet connection and try again.",
+          title: "Network Error",
+          description: "Unable to connect to the server. Please check your internet connection.",
           variant: "destructive",
         });
       } else {
         toast({
-          title: "Login Error",
-          description: "Unable to connect to the server. Please try again.",
+          title: "Login Failed",
+          description: "An unexpected error occurred. Please try again.",
           variant: "destructive",
         });
       }

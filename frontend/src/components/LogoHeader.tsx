@@ -29,7 +29,7 @@ const LogoHeader = () => {
           <div className="absolute inset-0 rounded-lg sm:rounded-xl bg-gradient-to-br from-white/10 to-transparent" />
         </div>
         <div className="px-2 sm:px-4 py-1.5 sm:py-2 rounded-lg sm:rounded-xl bg-white/15 backdrop-blur-md border border-white/20 shadow-2xl">
-          <span className="text-white font-bold text-sm sm:text-lg tracking-wide">
+          <span className="text-yellow-300 font-bold text-sm sm:text-lg tracking-wide drop-shadow-lg">
             KEC Alumni Network
           </span>
         </div>

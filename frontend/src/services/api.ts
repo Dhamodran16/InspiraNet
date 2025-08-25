@@ -3,13 +3,20 @@ import { getAuthToken, removeAuthToken } from '@/contexts/AuthContext';
 import { toast } from '@/hooks/use-toast';
 import { getBackendUrl } from '../utils/urlConfig';
 
+// Extend AxiosRequestConfig to include metadata
+interface ExtendedAxiosRequestConfig extends InternalAxiosRequestConfig {
+  metadata?: {
+    startTime: Date;
+  };
+}
+
 // 🚀 Dynamic API base URL based on environment
 const API_BASE_URL = getBackendUrl();
 
 // API service configuration
 export const apiConfig = {
   baseURL: API_BASE_URL,
-  timeout: parseInt(import.meta.env.VITE_API_TIMEOUT || '30000'),
+  timeout: parseInt(import.meta.env.VITE_API_TIMEOUT || '15000'), // Reduced from 30000 to 15000
   headers: {
     'Content-Type': 'application/json',
   },
@@ -18,7 +25,7 @@ export const apiConfig = {
 // Create axios instance with base configuration
 const api: AxiosInstance = axios.create({
   baseURL: API_BASE_URL,
-  timeout: parseInt(import.meta.env.VITE_API_TIMEOUT || '60000'),
+  timeout: parseInt(import.meta.env.VITE_API_TIMEOUT || '15000'), // Reduced from 60000 to 15000
   headers: {
     'Content-Type': 'application/json',
   },
@@ -26,7 +33,7 @@ const api: AxiosInstance = axios.create({
 
 // Request interceptor to automatically add auth token
 api.interceptors.request.use(
-  (config: InternalAxiosRequestConfig) => {
+  (config: ExtendedAxiosRequestConfig) => {
     const token = getAuthToken();
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`;
@@ -46,9 +53,10 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response: AxiosResponse) => {
     // Log response time for debugging
-    if (response.config.metadata?.startTime) {
+    const config = response.config as ExtendedAxiosRequestConfig;
+    if (config.metadata?.startTime) {
       const endTime = new Date();
-      const duration = endTime.getTime() - response.config.metadata.startTime.getTime();
+      const duration = endTime.getTime() - config.metadata.startTime.getTime();
       if (duration > 1000) {
         console.warn(`Slow API response: ${response.config.url} took ${duration}ms`);
       }
@@ -239,14 +247,75 @@ export const uploadFile = async (
   }
 };
 
+// Loading state management
+let loadingStates = new Map<string, boolean>();
+
+export const setLoadingState = (key: string, loading: boolean) => {
+  loadingStates.set(key, loading);
+};
+
+export const getLoadingState = (key: string): boolean => {
+  return loadingStates.get(key) || false;
+};
+
+export const clearLoadingState = (key?: string) => {
+  if (key) {
+    loadingStates.delete(key);
+  } else {
+    loadingStates.clear();
+  }
+};
+
+// Simple cache for user stats
+const statsCache = new Map<string, { data: any; timestamp: number }>();
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
 // Helper function to fetch user stats
 export const getUserStats = async (userId: string): Promise<any> => {
+  const loadingKey = `stats_${userId}`;
+  
   try {
-    const response = await api.get(`/api/users/${userId}/stats`);
+    setLoadingState(loadingKey, true);
+    
+    // Check cache first
+    const cached = statsCache.get(userId);
+    if (cached && (Date.now() - cached.timestamp) < CACHE_DURATION) {
+      console.log('Using cached stats for user:', userId);
+      return cached.data;
+    }
+
+    const response = await api.get(`/api/users/${userId}/stats`, {
+      timeout: 10000, // 10 second timeout specifically for stats
+    });
+    
+    // Cache the result
+    statsCache.set(userId, {
+      data: response.data,
+      timestamp: Date.now()
+    });
+    
     return response.data;
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error fetching user stats:', error);
-    throw error;
+    
+    // Return default stats instead of throwing error to prevent UI crashes
+    return {
+      posts: 0,
+      events: 0,
+      achievements: 0,
+      connections: 0
+    };
+  } finally {
+    setLoadingState(loadingKey, false);
+  }
+};
+
+// Helper function to clear stats cache
+export const clearStatsCache = (userId?: string) => {
+  if (userId) {
+    statsCache.delete(userId);
+  } else {
+    statsCache.clear();
   }
 };
 

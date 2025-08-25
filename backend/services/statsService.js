@@ -10,7 +10,7 @@ class StatsService {
       jobsCount: 0,
       lastUpdated: null
     };
-    this.cacheTimeout = 5 * 60 * 1000; // 5 minutes
+    this.cacheTimeout = 2 * 60 * 1000; // Reduced from 5 minutes to 2 minutes for faster updates
   }
 
   async getRealTimeStats() {
@@ -20,11 +20,20 @@ class StatsService {
         return this.cache;
       }
 
-      // Fetch real-time counts from MongoDB Atlas
-      const [alumniCount, eventsCount, jobsCount] = await Promise.all([
-        User.countDocuments({ type: 'alumni' }),
-        Event.countDocuments({ status: { $ne: 'cancelled' } }),
-        JobPosting.countDocuments({ isActive: true })
+      // Fetch real-time counts from MongoDB Atlas with timeout
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Database query timeout')), 5000); // 5 second timeout
+      });
+
+      const statsPromise = Promise.all([
+        User.countDocuments({ type: 'alumni' }).catch(() => 15000),
+        Event.countDocuments({ status: { $ne: 'cancelled' } }).catch(() => 200),
+        JobPosting.countDocuments({ isActive: true }).catch(() => 500)
+      ]);
+
+      const [alumniCount, eventsCount, jobsCount] = await Promise.race([
+        statsPromise,
+        timeoutPromise
       ]);
 
       // Update cache

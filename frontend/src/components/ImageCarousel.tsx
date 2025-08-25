@@ -93,27 +93,42 @@ const ImageCarousel = () => {
 
   return (
     <div className="fixed inset-0 -z-10 pointer-events-none overflow-hidden">
-      {/* Background Images with overlapping cross-fade (no black in-between) */}
-      <AnimatePresence initial={false} mode="sync">
+      {/* Base background to prevent any gaps */}
+      <div 
+        className="absolute inset-0 w-full h-full bg-cover bg-center"
+        style={{
+          backgroundImage: `url(${displayImages[currentIndex]})`,
+          filter: 'brightness(1.18) contrast(1.06) saturate(1.08)',
+        }}
+      />
+      
+      {/* Smooth cross-fade overlay */}
+      <AnimatePresence mode="wait">
         <motion.div
           key={currentIndex}
           className="absolute inset-0 w-full h-full"
-          initial={{ opacity: 0.0 }}
+          initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          exit={{ opacity: 0.0 }}
-          transition={{ duration: 1.0, ease: [0.22, 1, 0.36, 1] }}
+          exit={{ opacity: 0 }}
+          transition={{ 
+            duration: 1.5, 
+            ease: [0.4, 0.0, 0.2, 1], // Custom easing for smoother transition
+            opacity: { duration: 1.2 } // Slightly faster opacity transition
+          }}
         >
-          {/* Single cover layer so the image fully fills the viewport */}
           <div
             className="absolute inset-0 w-full h-full bg-cover bg-center"
             style={{
               backgroundImage: `url(${displayImages[currentIndex]})`,
               filter: 'brightness(1.18) contrast(1.06) saturate(1.08)',
-              willChange: 'opacity' // Optimize for animations
+              willChange: 'opacity'
             }}
           />
         </motion.div>
       </AnimatePresence>
+      
+      {/* Subtle overlay to ensure consistent appearance */}
+      <div className="absolute inset-0 bg-black/10" />
     </div>
   );
 };
