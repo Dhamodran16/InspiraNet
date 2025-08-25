@@ -515,13 +515,23 @@ const PostFeed: React.FC = () => {
           <p className="text-gray-600 dark:text-gray-400 mb-6">
             Be the first to share something with your alumni network!
           </p>
-                              <Button
-            onClick={handleRefresh}
-                            className="w-full"
-                          >
-                            <Plus className="h-4 w-4 mr-2" />
-            Refresh Posts
-                          </Button>
+          <div className="space-y-3">
+            <Button
+              onClick={() => navigate('/create-post')}
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Create Post
+            </Button>
+            <Button
+              onClick={handleRefresh}
+              className="w-full"
+              variant="outline"
+            >
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Refresh Posts
+            </Button>
+          </div>
                       </div>
                     </div>
     );
