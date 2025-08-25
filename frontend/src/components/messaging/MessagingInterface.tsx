@@ -370,7 +370,7 @@ export default function MessagingInterface({ isOpen, onClose }: MessagingInterfa
                       >
                         <Avatar className="h-8 w-8">
                           <AvatarImage src={user.avatar} />
-                          <AvatarFallback>{user.name?.charAt(0)}</AvatarFallback>
+                          <AvatarFallback>{user.name?.charAt(0)?.toUpperCase() || 'U'}</AvatarFallback>
                         </Avatar>
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium truncate">{user.name}</p>

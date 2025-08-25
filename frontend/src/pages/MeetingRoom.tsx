@@ -84,7 +84,7 @@ export default function MeetingRoom() {
   // Load RTC configuration
   const loadRTCConfig = useCallback(async () => {
     try {
-      const response = await fetch('/config');
+      const response = await fetch('https://inspiranet-backend.onrender.com/config');
       if (response.ok) {
         const data = await response.json();
         if (data && data.rtcConfig && Array.isArray(data.rtcConfig.iceServers)) {
@@ -1005,7 +1005,7 @@ export default function MeetingRoom() {
 
       {/* Reactions Menu */}
       <div className="fixed bottom-24 left-1/2 transform -translate-x-1/2 flex gap-2 bg-gray-800 p-2 rounded-full border border-gray-600">
-        {['👍', '👏', '🎉', '❤️', '😂', '😮', '😢', '😡', '👀', '��', '��', '✨'].map((emoji) => (
+        {['👍', '👏', '🎉', '❤️', '😂', '😮', '😢', '😡', '👀', '🤔', '🤷', '✨'].map((emoji) => (
           <Button
             key={emoji}
             onClick={() => sendReaction(emoji)}

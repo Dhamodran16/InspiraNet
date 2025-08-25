@@ -70,7 +70,7 @@ router.get('/', authenticateToken, async (req, res) => {
     }
 
     const posts = await Post.find(query)
-      .populate('author', 'name avatar type batch department')
+      .populate('author', 'name avatar type batch department studentInfo facultyInfo')
       .populate('comments.author', 'name avatar')
       .populate('likes', 'name avatar')
       .sort({ createdAt: -1 })
@@ -102,7 +102,7 @@ router.get('/', authenticateToken, async (req, res) => {
 router.get('/:id', authenticateToken, async (req, res) => {
   try {
     const post = await Post.findById(req.params.id)
-      .populate('author', 'name avatar type batch department')
+      .populate('author', 'name avatar type batch department studentInfo facultyInfo')
       .populate('comments.author', 'name avatar')
       .populate('likes', 'name avatar');
 
@@ -420,7 +420,7 @@ router.post('/', authenticateToken, upload.array('media', 5), async (req, res) =
     }
 
     // Populate author info before sending response
-    await post.populate('author', 'name avatar type batch department');
+    await post.populate('author', 'name avatar type batch department studentInfo facultyInfo');
 
     // realtime broadcast
     const io = req.app.get('io');
@@ -470,7 +470,7 @@ router.put('/:id', authenticateToken, async (req, res) => {
       postId,
       updates,
       { new: true, runValidators: true }
-    ).populate('author', 'name avatar type batch department');
+    ).populate('author', 'name avatar type batch department studentInfo facultyInfo');
 
     res.json(updatedPost);
   } catch (error) {
@@ -765,7 +765,7 @@ router.post('/:id/poll-vote', authenticateToken, async (req, res) => {
     await post.save();
 
     // Populate the updated post
-    await post.populate('author', 'name avatar');
+    await post.populate('author', 'name avatar type batch department studentInfo facultyInfo');
 
     // Real-time broadcast poll update
     const io = req.app.get('io');

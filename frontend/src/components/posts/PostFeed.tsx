@@ -12,8 +12,22 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 // Import socket service with fallback
 let socketService: any = null;
 try {
-  const { socketService: importedSocketService } = require('@/services/socketService');
-  socketService = importedSocketService;
+  // Use dynamic import instead of require for ESM compatibility
+  import('@/services/socketService').then(module => {
+    socketService = module.socketService;
+  }).catch(error => {
+    console.warn('Socket service not available:', error);
+    // Create a mock socket service for fallback
+    socketService = {
+      onPostCommentAdded: () => {},
+      offPostCommentAdded: () => {},
+      onNewNotification: () => {},
+      offNewNotification: () => {},
+      connect: () => {},
+      disconnect: () => {},
+      getConnectionStatus: () => false
+    };
+  });
 } catch (error) {
   console.warn('Socket service not available:', error);
   // Create a mock socket service for fallback

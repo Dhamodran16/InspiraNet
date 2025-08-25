@@ -16,7 +16,7 @@ const API_BASE_URL = getBackendUrl();
 // API service configuration
 export const apiConfig = {
   baseURL: API_BASE_URL,
-  timeout: parseInt(import.meta.env.VITE_API_TIMEOUT || '20000'),
+  timeout: parseInt(import.meta.env.VITE_API_TIMEOUT || '30000'),
   headers: {
     'Content-Type': 'application/json',
   },
@@ -25,7 +25,7 @@ export const apiConfig = {
 // Create axios instance with base configuration
 const api: AxiosInstance = axios.create({
   baseURL: API_BASE_URL,
-  timeout: parseInt(import.meta.env.VITE_API_TIMEOUT || '20000'),
+  timeout: parseInt(import.meta.env.VITE_API_TIMEOUT || '30000'),
   headers: {
     'Content-Type': 'application/json',
   },
@@ -57,7 +57,7 @@ api.interceptors.response.use(
     if (config.metadata?.startTime) {
       const endTime = new Date();
       const duration = endTime.getTime() - config.metadata.startTime.getTime();
-      if (duration > 1000) {
+      if (duration > 3000) {
         console.warn(`Slow API response: ${response.config.url} took ${duration}ms`);
       }
     }
@@ -99,7 +99,7 @@ api.interceptors.response.use(
                 Authorization: `Bearer ${token}`,
                 'Content-Type': 'application/json',
               },
-              timeout: 15000, // 15 second timeout for refresh
+              timeout: 30000,
             }
           );
 

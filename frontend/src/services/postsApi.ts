@@ -9,6 +9,14 @@ export interface Post {
     type: string;
     department?: string;
     batch?: string;
+    studentInfo?: {
+      department?: string;
+      batch?: string;
+    };
+    facultyInfo?: {
+      department?: string;
+      designation?: string;
+    };
   };
   title?: string;
   content: string;

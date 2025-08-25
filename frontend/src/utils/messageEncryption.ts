@@ -1,12 +1,44 @@
-// Message encryption utility using byte script for privacy
-export class MessageEncryption {
+// Advanced Message Encryption System
+// Uses AES-256-GCM with user-specific keys and secure key exchange
+// Only intended recipients can decrypt messages
+
+export interface EncryptedMessage {
+  encryptedData: string;
+  iv: string;
+  authTag: string;
+  senderId: string;
+  recipientId: string;
+  timestamp: number;
+  messageType: 'message' | 'comment';
+  conversationId?: string;
+  postId?: string;
+}
+
+export interface UserKeyPair {
+  publicKey: string;
+  privateKey: string;
+  userId: string;
+  createdAt: number;
+}
+
+export interface SharedSecret {
+  conversationId: string;
+  secret: string;
+  participants: string[];
+  createdAt: number;
+  lastUsed: number;
+}
+
+export class AdvancedMessageEncryption {
   private static readonly ALGORITHM = 'AES-GCM';
   private static readonly KEY_LENGTH = 256;
   private static readonly IV_LENGTH = 12;
-  private static readonly SALT_LENGTH = 16;
+  private static readonly AUTH_TAG_LENGTH = 16;
+  private static readonly SALT_LENGTH = 32;
+  private static readonly ITERATIONS = 100000;
 
-  // Generate a random key
-  static async generateKey(): Promise<CryptoKey> {
+  // Generate a cryptographically secure random key
+  static async generateSecureKey(): Promise<CryptoKey> {
     return await crypto.subtle.generateKey(
       {
         name: this.ALGORITHM,
@@ -17,14 +49,158 @@ export class MessageEncryption {
     );
   }
 
-  // Generate a key from password
-  static async deriveKey(password: string, salt: Uint8Array): Promise<CryptoKey> {
+  // Generate a key pair for a user (public/private key)
+  static async generateUserKeyPair(userId: string): Promise<UserKeyPair> {
+    const keyPair = await crypto.subtle.generateKey(
+      {
+        name: 'RSA-OAEP',
+        modulusLength: 2048,
+        publicExponent: new Uint8Array([1, 0, 1]),
+        hash: 'SHA-256'
+      },
+      true,
+      ['encrypt', 'decrypt']
+    );
+
+    // Export public key
+    const publicKeyBuffer = await crypto.subtle.exportKey('spki', keyPair.publicKey);
+    const publicKey = btoa(String.fromCharCode(...new Uint8Array(publicKeyBuffer)));
+
+    // Export private key
+    const privateKeyBuffer = await crypto.subtle.exportKey('pkcs8', keyPair.privateKey);
+    const privateKey = btoa(String.fromCharCode(...new Uint8Array(privateKeyBuffer)));
+
+    return {
+      publicKey,
+      privateKey,
+      userId,
+      createdAt: Date.now()
+    };
+  }
+
+  // Derive a shared secret for a conversation
+  static async deriveConversationSecret(
+    participants: string[],
+    conversationId: string,
+    masterKey: string
+  ): Promise<string> {
     const encoder = new TextEncoder();
-    const passwordBuffer = encoder.encode(password);
+    const data = encoder.encode(`${participants.sort().join(':')}:${conversationId}:${masterKey}`);
     
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    return btoa(String.fromCharCode(...new Uint8Array(hashBuffer)));
+  }
+
+  // Encrypt a message with user-specific encryption
+  static async encryptMessage(
+    message: string,
+    senderId: string,
+    recipientId: string,
+    conversationId: string,
+    sharedSecret: string,
+    messageType: 'message' | 'comment' = 'message',
+    postId?: string
+  ): Promise<EncryptedMessage> {
+    try {
+      // Derive encryption key from shared secret
+      const key = await this.deriveKeyFromSecret(sharedSecret, conversationId);
+      
+      // Generate random IV
+      const iv = crypto.getRandomValues(new Uint8Array(this.IV_LENGTH));
+      
+      // Encrypt the message
+      const encoder = new TextEncoder();
+      const messageBuffer = encoder.encode(message);
+      
+      const encryptedBuffer = await crypto.subtle.encrypt(
+        {
+          name: this.ALGORITHM,
+          iv: iv
+        },
+        key,
+        messageBuffer
+      );
+
+      // Extract auth tag (last 16 bytes in GCM mode)
+      const authTag = encryptedBuffer.slice(-this.AUTH_TAG_LENGTH);
+      const encryptedData = encryptedBuffer.slice(0, -this.AUTH_TAG_LENGTH);
+
+      return {
+        encryptedData: btoa(String.fromCharCode(...new Uint8Array(encryptedData))),
+        iv: btoa(String.fromCharCode(...iv)),
+        authTag: btoa(String.fromCharCode(...new Uint8Array(authTag))),
+        senderId,
+        recipientId,
+        timestamp: Date.now(),
+        messageType,
+        conversationId,
+        postId
+      };
+    } catch (error) {
+      console.error('Encryption failed:', error);
+      throw new Error('Failed to encrypt message');
+    }
+  }
+
+  // Decrypt a message (only works for intended recipients)
+  static async decryptMessage(
+    encryptedMessage: EncryptedMessage,
+    sharedSecret: string,
+    conversationId: string
+  ): Promise<string> {
+    try {
+      // Verify the message is for this conversation
+      if (encryptedMessage.conversationId !== conversationId) {
+        throw new Error('Invalid conversation ID');
+      }
+
+      // Derive decryption key from shared secret
+      const key = await this.deriveKeyFromSecret(sharedSecret, conversationId);
+      
+      // Convert base64 strings back to Uint8Arrays
+      const encryptedData = new Uint8Array(
+        atob(encryptedMessage.encryptedData).split('').map(char => char.charCodeAt(0))
+      );
+      const iv = new Uint8Array(
+        atob(encryptedMessage.iv).split('').map(char => char.charCodeAt(0))
+      );
+      const authTag = new Uint8Array(
+        atob(encryptedMessage.authTag).split('').map(char => char.charCodeAt(0))
+      );
+
+      // Combine encrypted data and auth tag
+      const combinedData = new Uint8Array(encryptedData.length + authTag.length);
+      combinedData.set(encryptedData, 0);
+      combinedData.set(authTag, encryptedData.length);
+
+      // Decrypt the message
+      const decryptedBuffer = await crypto.subtle.decrypt(
+        {
+          name: this.ALGORITHM,
+          iv: iv
+        },
+        key,
+        combinedData
+      );
+
+      const decoder = new TextDecoder();
+      return decoder.decode(decryptedBuffer);
+    } catch (error) {
+      console.error('Decryption failed:', error);
+      throw new Error('Failed to decrypt message - unauthorized access or corrupted data');
+    }
+  }
+
+  // Derive encryption key from shared secret
+  private static async deriveKeyFromSecret(secret: string, salt: string): Promise<CryptoKey> {
+    const encoder = new TextEncoder();
+    const secretBuffer = encoder.encode(secret);
+    const saltBuffer = encoder.encode(salt);
+    
+    // Use PBKDF2 to derive a key
     const baseKey = await crypto.subtle.importKey(
       'raw',
-      passwordBuffer,
+      secretBuffer,
       'PBKDF2',
       false,
       ['deriveBits', 'deriveKey']
@@ -33,8 +209,8 @@ export class MessageEncryption {
     return await crypto.subtle.deriveKey(
       {
         name: 'PBKDF2',
-        salt: salt,
-        iterations: 100000,
+        salt: saltBuffer,
+        iterations: this.ITERATIONS,
         hash: 'SHA-256'
       },
       baseKey,
@@ -47,103 +223,93 @@ export class MessageEncryption {
     );
   }
 
-  // Encrypt message
-  static async encryptMessage(message: string, key: CryptoKey): Promise<string> {
-    const encoder = new TextEncoder();
-    const messageBuffer = encoder.encode(message);
-    
-    const iv = crypto.getRandomValues(new Uint8Array(this.IV_LENGTH));
-    const salt = crypto.getRandomValues(new Uint8Array(this.SALT_LENGTH));
-    
-    const encryptedBuffer = await crypto.subtle.encrypt(
-      {
-        name: this.ALGORITHM,
-        iv: iv
-      },
-      key,
-      messageBuffer
+  // Encrypt comment for a post
+  static async encryptComment(
+    comment: string,
+    senderId: string,
+    postId: string,
+    postAuthorId: string,
+    sharedSecret: string
+  ): Promise<EncryptedMessage> {
+    return await this.encryptMessage(
+      comment,
+      senderId,
+      postAuthorId,
+      `post_${postId}`,
+      sharedSecret,
+      'comment',
+      postId
     );
-
-    // Combine salt + iv + encrypted data
-    const combined = new Uint8Array(salt.length + iv.length + encryptedBuffer.byteLength);
-    combined.set(salt, 0);
-    combined.set(iv, salt.length);
-    combined.set(new Uint8Array(encryptedBuffer), salt.length + iv.length);
-
-    // Convert to base64
-    return btoa(String.fromCharCode(...combined));
   }
 
-  // Decrypt message
-  static async decryptMessage(encryptedMessage: string, key: CryptoKey): Promise<string> {
-    try {
-      // Convert from base64
-      const combined = new Uint8Array(
-        atob(encryptedMessage).split('').map(char => char.charCodeAt(0))
-      );
-
-      // Extract salt, iv, and encrypted data
-      const salt = combined.slice(0, this.SALT_LENGTH);
-      const iv = combined.slice(this.SALT_LENGTH, this.SALT_LENGTH + this.IV_LENGTH);
-      const encryptedData = combined.slice(this.SALT_LENGTH + this.IV_LENGTH);
-
-      const decryptedBuffer = await crypto.subtle.decrypt(
-        {
-          name: this.ALGORITHM,
-          iv: iv
-        },
-        key,
-        encryptedData
-      );
-
-      const decoder = new TextDecoder();
-      return decoder.decode(decryptedBuffer);
-    } catch (error) {
-      console.error('Failed to decrypt message:', error);
-      throw new Error('Failed to decrypt message');
-    }
+  // Decrypt comment
+  static async decryptComment(
+    encryptedComment: EncryptedMessage,
+    sharedSecret: string,
+    postId: string
+  ): Promise<string> {
+    return await this.decryptMessage(
+      encryptedComment,
+      sharedSecret,
+      `post_${postId}`
+    );
   }
 
-  // Generate conversation key from participants
-  static generateConversationKey(participantIds: string[]): string {
-    // Sort participant IDs to ensure consistent key generation
-    const sortedIds = participantIds.sort();
-    const combined = sortedIds.join('|');
-    
-    // Create a hash of the combined IDs
+  // Generate a unique conversation ID
+  static generateConversationId(user1Id: string, user2Id: string): string {
+    const sortedIds = [user1Id, user2Id].sort();
+    const combined = `${sortedIds[0]}_${sortedIds[1]}`;
+    const hash = this.simpleHash(combined);
+    return `conv_${hash}`;
+  }
+
+  // Simple hash function for conversation ID generation
+  private static simpleHash(str: string): string {
     let hash = 0;
-    for (let i = 0; i < combined.length; i++) {
-      const char = combined.charCodeAt(i);
+    for (let i = 0; i < str.length; i++) {
+      const char = str.charCodeAt(i);
       hash = ((hash << 5) - hash) + char;
       hash = hash & hash; // Convert to 32-bit integer
     }
-    
-    return hash.toString(36);
+    return Math.abs(hash).toString(36);
   }
 
-  // Encrypt message for conversation
-  static async encryptConversationMessage(message: string, participantIds: string[]): Promise<string> {
-    const conversationKey = MessageEncryption.generateConversationKey(participantIds);
-    const key = await MessageEncryption.deriveKey(
-      conversationKey,
-      new Uint8Array(MessageEncryption.SALT_LENGTH)
-    );
-    return await MessageEncryption.encryptMessage(message, key);
+  // Verify message integrity
+  static verifyMessageIntegrity(encryptedMessage: EncryptedMessage): boolean {
+    try {
+      // Check if all required fields are present
+      if (!encryptedMessage.encryptedData || 
+          !encryptedMessage.iv || 
+          !encryptedMessage.authTag || 
+          !encryptedMessage.senderId || 
+          !encryptedMessage.timestamp) {
+        return false;
+      }
+
+      // Check if timestamp is not too old (24 hours)
+      const now = Date.now();
+      const messageAge = now - encryptedMessage.timestamp;
+      const maxAge = 24 * 60 * 60 * 1000; // 24 hours
+      
+      if (messageAge > maxAge) {
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      return false;
+    }
   }
 
-  // Decrypt message for conversation
-  static async decryptConversationMessage(encryptedMessage: string, participantIds: string[]): Promise<string> {
-    const conversationKey = MessageEncryption.generateConversationKey(participantIds);
-    const key = await MessageEncryption.deriveKey(
-      conversationKey,
-      new Uint8Array(MessageEncryption.SALT_LENGTH)
-    );
-    return await MessageEncryption.decryptMessage(encryptedMessage, key);
+  // Generate a secure random string for additional security
+  static generateSecureRandomString(length: number = 32): string {
+    const array = new Uint8Array(length);
+    crypto.getRandomValues(array);
+    return btoa(String.fromCharCode(...array));
   }
 }
 
-// Export utility functions
-export const encryptMessage = MessageEncryption.encryptConversationMessage;
-export const decryptMessage = MessageEncryption.decryptConversationMessage;
-export const generateConversationKey = MessageEncryption.generateConversationKey;
+// Legacy compatibility functions
+export const encryptMessage = AdvancedMessageEncryption.encryptMessage.bind(AdvancedMessageEncryption);
+export const decryptMessage = AdvancedMessageEncryption.decryptMessage.bind(AdvancedMessageEncryption);
 

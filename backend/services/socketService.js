@@ -240,7 +240,7 @@ class SocketService {
           const { postId } = data;
           
           // Broadcast new post to relevant users based on user type and department
-          const post = await Post.findById(postId).populate('author', 'name type department batch');
+          const post = await Post.findById(postId).populate('author', 'name type department batch studentInfo facultyInfo');
           
           if (post) {
             // Broadcast to all users (general posts) and typed channels for filtering on client

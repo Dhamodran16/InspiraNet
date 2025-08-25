@@ -3,10 +3,12 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Heart, MessageCircle, Edit, Trash2 } from 'lucide-react';
+import { Heart, MessageCircle, Edit, Trash2, Shield, Lock } from 'lucide-react';
 import { Post } from '@/services/postsApi';
 import { useAuth } from '@/contexts/AuthContext';
 import { Input } from '@/components/ui/input';
+import { AdvancedMessageEncryption } from '@/utils/messageEncryption';
+import SecureKeyService from '@/services/secureKeyService';
 
 type User = {
   _id: string;
@@ -21,7 +23,7 @@ interface BasePostProps {
   post: Post;
   user: User | null;
   onLike: (postId: string) => void;
-  onComment: (postId: string, commentContent: string) => void;
+  onComment: (postId: string, commentContent: string, encryptedComment?: any) => void;
   onEdit?: (postId: string) => void;
   onDelete: (postId: string) => void;
   showComments: boolean;
@@ -51,6 +53,7 @@ export default function BasePost({
   children
 }: BasePostProps) {
   const [commentText, setCommentText] = useState('');
+  const [isEncrypting, setIsEncrypting] = useState(false);
   
   // Local like state management - rely on server state
   const [isLiked, setIsLiked] = useState(initialIsLiked);
@@ -92,6 +95,43 @@ export default function BasePost({
     }
   };
 
+  const handleComment = async () => {
+    if (!commentText.trim() || !user || isEncrypting) return;
+    
+    setIsEncrypting(true);
+    
+    try {
+      // Encrypt the comment
+      const secureKeyService = SecureKeyService.getInstance();
+      const sharedSecret = await secureKeyService.getPostSharedSecret(
+        post._id,
+        post.author._id,
+        user._id
+      );
+      
+      const encryptedComment = await AdvancedMessageEncryption.encryptComment(
+        commentText.trim(),
+        user._id,
+        post._id,
+        post.author._id,
+        sharedSecret
+      );
+      
+      // Call parent handler with encrypted comment
+      await onComment(post._id, commentText.trim(), encryptedComment);
+      setCommentText('');
+      
+      console.log('✅ Comment encrypted and sent successfully');
+    } catch (error) {
+      console.error('❌ Error encrypting comment:', error);
+      // Fallback to unencrypted comment if encryption fails
+      await onComment(post._id, commentText.trim());
+      setCommentText('');
+    } finally {
+      setIsEncrypting(false);
+    }
+  };
+
   const formatTimeAgo = (dateString: string) => {
     const date = new Date(dateString);
     const now = new Date();
@@ -112,8 +152,8 @@ export default function BasePost({
           <div className="flex items-center space-x-3">
             <Avatar className="h-10 w-10">
               <AvatarImage src={post.author?.avatar} />
-              <AvatarFallback className="bg-primary text-primary-foreground font-semibold">
-                {post.author?.name?.charAt(0) || 'U'}
+              <AvatarFallback className="bg-primary text-primary-foreground font-semibold text-lg">
+                {post.author?.name?.charAt(0)?.toUpperCase() || 'U'}
               </AvatarFallback>
             </Avatar>
             <div className="flex-1 min-w-0">
@@ -126,9 +166,14 @@ export default function BasePost({
                     {post.author.type}
                   </Badge>
                 )}
+                {/* Encryption indicator */}
+                <Badge variant="outline" className="text-xs flex items-center gap-1">
+                  <Shield className="h-3 w-3" />
+                  Encrypted
+                </Badge>
               </div>
               <div className="flex items-center space-x-2 text-sm text-gray-500 dark:text-gray-400">
-                <span>{(post as any).author?.studentInfo?.department || (post as any).author?.facultyInfo?.department || post.author?.department || 'Unknown Department'}</span>
+                <span>{post.author?.studentInfo?.department || post.author?.facultyInfo?.department || post.author?.department || ''}</span>
                 {post.author?.batch && (
                   <>
                     <span>•</span>
@@ -203,7 +248,7 @@ export default function BasePost({
                   <Avatar className="h-6 w-6">
                     <AvatarImage src={comment.author?.avatar} />
                     <AvatarFallback className="bg-gray-300 dark:bg-gray-600 text-gray-700 dark:text-gray-300 text-xs font-medium">
-                      {comment.author?.name?.charAt(0) || 'U'}
+                      {comment.author?.name?.charAt(0)?.toUpperCase() || 'U'}
                     </AvatarFallback>
                   </Avatar>
                   <div className="flex-1 min-w-0">
@@ -214,6 +259,10 @@ export default function BasePost({
                         </span>
                         <span className="text-gray-700 dark:text-gray-300 ml-2">
                           {comment.content}
+                        </span>
+                        {/* Encryption indicator for comments */}
+                        <span className="ml-2 text-xs text-gray-500">
+                          <Lock className="h-3 w-3 inline" />
                         </span>
                       </p>
                     </div>
@@ -236,7 +285,7 @@ export default function BasePost({
                 <Avatar className="h-6 w-6">
                   <AvatarImage src={user?.avatar} />
                   <AvatarFallback className="bg-gray-300 dark:bg-gray-600 text-gray-700 dark:text-gray-300 text-xs font-medium">
-                    {user?.name?.charAt(0) || 'U'}
+                    {user?.name?.charAt(0)?.toUpperCase() || 'U'}
                   </AvatarFallback>
                 </Avatar>
                 <div className="flex-1">
@@ -245,14 +294,32 @@ export default function BasePost({
                     value={commentText}
                     onChange={(e) => setCommentText(e.target.value)}
                     onKeyPress={(e) => {
-                      if (e.key === 'Enter' && commentText.trim()) {
-                        onComment?.(post._id, commentText.trim());
-                        setCommentText('');
+                      if (e.key === 'Enter' && commentText.trim() && !isEncrypting) {
+                        handleComment();
                       }
                     }}
                     className="text-sm"
+                    disabled={isEncrypting}
                   />
                 </div>
+                <Button
+                  onClick={handleComment}
+                  disabled={!commentText.trim() || isEncrypting}
+                  size="sm"
+                  className="text-xs"
+                >
+                  {isEncrypting ? (
+                    <>
+                      <Lock className="h-3 w-3 mr-1 animate-pulse" />
+                      Encrypting...
+                    </>
+                  ) : (
+                    <>
+                      <Shield className="h-3 w-3 mr-1" />
+                      Send
+                    </>
+                  )}
+                </Button>
               </div>
             </div>
           </div>

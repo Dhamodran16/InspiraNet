@@ -307,10 +307,10 @@ router.post('/:id/messages', authenticateToken, async (req, res) => {
   try {
     const conversationId = req.params.id;
     const userId = req.user._id;
-    const { content, mediaUrl, fileName, fileSize } = req.body;
+    const { content, mediaUrl, fileName, fileSize, encryptedData, iv, authTag, messageType } = req.body;
 
-    if (!content && !mediaUrl) {
-      return res.status(400).json({ error: 'Message content or media is required' });
+    if (!content && !mediaUrl && !encryptedData) {
+      return res.status(400).json({ error: 'Message content, media, or encrypted data is required' });
     }
 
     // Verify user is part of the conversation
@@ -324,16 +324,36 @@ router.post('/:id/messages', authenticateToken, async (req, res) => {
       return res.status(404).json({ error: 'Conversation not found' });
     }
 
+    // Handle encrypted messages
+    let messageContent = content || '';
+    let isEncrypted = false;
+    
+    if (encryptedData && iv && authTag) {
+      isEncrypted = true;
+      // Store encrypted data instead of plain content
+      messageContent = JSON.stringify({
+        encryptedData,
+        iv,
+        authTag,
+        messageType: messageType || 'message'
+      });
+    }
+
     // Create new message
     const message = new Message({
       conversationId: conversationId,
       senderId: userId,
       senderName: req.user.name,
-      content: content || '',
+      content: messageContent,
       mediaUrl,
       fileName,
       fileSize,
-      status: 'sent'
+      status: 'sent',
+      isEncrypted: isEncrypted,
+      encryptedData: encryptedData || null,
+      iv: iv || null,
+      authTag: authTag || null,
+      messageType: messageType || 'message'
     });
 
     await message.save();

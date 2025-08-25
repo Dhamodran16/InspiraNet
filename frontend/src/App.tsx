@@ -14,6 +14,8 @@ const SignUpPage = React.lazy(() => import('@/pages/SignUpPage'));
 const DashboardPage = React.lazy(() => import('@/pages/DashboardPage'));
 const Profile = React.lazy(() => import('@/pages/Profile'));
 const EditProfile = React.lazy(() => import('@/pages/EditProfile'));
+const ProfileView = React.lazy(() => import('@/components/profile/ProfileView'));
+const Settings = React.lazy(() => import('@/components/Settings'));
 const MessagesPage = React.lazy(() => import('@/pages/MessagesPage'));
 const NotificationsPage = React.lazy(() => import('@/pages/NotificationsPage'));
 const CreatePostPage = React.lazy(() => import('@/pages/CreatePostPage'));
@@ -101,6 +103,8 @@ function App() {
                 <Route path="/dashboard" element={<DashboardPage />} />
                 <Route path="/profile" element={<Profile />} />
                 <Route path="/profile/edit" element={<EditProfile />} />
+                <Route path="/profile/:userId" element={<ProfileView />} />
+                <Route path="/settings" element={<Settings />} />
                 <Route path="/messages" element={<MessagesPage />} />
                 <Route path="/notifications" element={<NotificationsPage />} />
                 <Route path="/create-post" element={<CreatePostPage />} />

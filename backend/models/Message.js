@@ -32,9 +32,22 @@ const messageSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
+  // New encryption fields for advanced system
+  encryptedData: {
+    type: String,
+    default: null
+  },
+  iv: {
+    type: String,
+    default: null
+  },
+  authTag: {
+    type: String,
+    default: null
+  },
   messageType: {
     type: String,
-    enum: ['text', 'image', 'file', 'system'],
+    enum: ['text', 'image', 'file', 'system', 'message', 'comment'],
     default: 'text'
   },
   mediaUrl: {
