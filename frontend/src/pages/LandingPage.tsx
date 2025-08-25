@@ -34,7 +34,7 @@ export default function LandingPage() {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary" />
+        <div className="animate-spin rounded-full h-16 w-16 sm:h-32 sm:w-32 border-b-2 border-primary" />
       </div>
     );
   }
@@ -45,11 +45,11 @@ export default function LandingPage() {
   }
 
   return (
-    <div className="min-h-screen bg-transparent flex flex-col">
+    <div className="min-h-screen bg-transparent flex flex-col overflow-x-hidden">
       <ImageCarousel />
       <LogoHeader />
 
-      <main className="flex-1">
+      <main className="flex-1 w-full">
         <LandingHero />
         <EnhancedFeatureShowcase />
       </main>

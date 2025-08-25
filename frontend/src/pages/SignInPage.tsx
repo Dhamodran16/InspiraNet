@@ -138,55 +138,55 @@ const SignInPage = () => {
       </div>
 
       {/* Content Container */}
-      <div className="relative z-10 min-h-screen w-full flex">
-        {/* Left Side - Empty for background visibility */}
-        <div className="flex-1"></div>
+      <div className="relative z-10 min-h-screen w-full flex flex-col lg:flex-row">
+        {/* Left Side - Empty for background visibility on desktop, hidden on mobile */}
+        <div className="hidden lg:flex lg:flex-1"></div>
 
         {/* Right Panel - Sign In Form */}
-        <div ref={formRef} className="w-full max-w-md bg-white/10 backdrop-blur-md border border-white/20 flex flex-col shadow-2xl min-h-screen">
-          <div className="flex-1 flex flex-col justify-center p-8 overflow-hidden">
+        <div ref={formRef} className="w-full lg:w-auto lg:max-w-md bg-white/10 backdrop-blur-md border border-white/20 flex flex-col shadow-2xl min-h-screen">
+          <div className="flex-1 flex flex-col justify-center p-4 sm:p-6 lg:p-8 overflow-hidden">
             {/* Header */}
-            <div ref={headerRef} className="text-center mb-6">
-              <div className="flex items-center justify-center gap-3 mb-3">
+            <div ref={headerRef} className="text-center mb-4 sm:mb-6">
+              <div className="flex items-center justify-center gap-2 sm:gap-3 mb-2 sm:mb-3">
                 <img
                   src="/logo.png"
                   alt="KEC Alumni Network Logo"
-                  className="h-10 w-10"
+                  className="h-8 w-8 sm:h-10 sm:w-10"
                 />
-                <h2 className="text-2xl font-bold text-white">KEC Alumni Network</h2>
+                <h2 className="text-xl sm:text-2xl font-bold text-white">KEC Alumni Network</h2>
               </div>
             </div>
 
             {/* Navigation Tabs */}
-            <div className="flex bg-white/10 backdrop-blur-sm rounded-lg p-1 mb-6">
-              <button className="flex-1 bg-gradient-to-r from-cyan-500/90 to-blue-500/90 text-white py-3 px-4 rounded-md text-sm font-medium shadow-lg backdrop-blur-sm">
+            <div className="flex bg-white/10 backdrop-blur-sm rounded-lg p-1 mb-4 sm:mb-6">
+              <button className="flex-1 bg-gradient-to-r from-cyan-500/90 to-blue-500/90 text-white py-2.5 sm:py-3 px-3 sm:px-4 rounded-md text-xs sm:text-sm font-medium shadow-lg backdrop-blur-sm">
                 Sign In
               </button>
               <button 
                 onClick={() => navigate('/signup')}
-                className="flex-1 py-3 px-4 rounded-md text-sm font-medium text-white hover:bg-white/10 transition-colors"
+                className="flex-1 py-2.5 sm:py-3 px-3 sm:px-4 rounded-md text-xs sm:text-sm font-medium text-white hover:bg-white/10 transition-colors"
               >
                 Sign Up
               </button>
             </div>
 
             {/* Welcome Message */}
-            <div className="text-center mb-6">
-              <h3 className="text-xl font-semibold text-white mb-2">Welcome back</h3>
-              <p className="text-white/90">Sign in to access your alumni dashboard</p>
+            <div className="text-center mb-4 sm:mb-6">
+              <h3 className="text-lg sm:text-xl font-semibold text-white mb-1 sm:mb-2">Welcome back</h3>
+              <p className="text-sm sm:text-base text-white/90">Sign in to access your alumni dashboard</p>
             </div>
 
             {/* Quote */}
-            <div className="bg-gradient-to-r from-cyan-500/10 to-blue-500/10 border border-cyan-400/20 rounded-lg p-4 mb-6 backdrop-blur-sm">
-              <p className="text-white text-sm italic">"Success is not final, failure is not fatal."</p>
+            <div className="bg-gradient-to-r from-cyan-500/10 to-blue-500/10 border border-cyan-400/20 rounded-lg p-3 sm:p-4 mb-4 sm:mb-6 backdrop-blur-sm">
+              <p className="text-white text-xs sm:text-sm italic">"Success is not final, failure is not fatal."</p>
             </div>
 
             {/* Form */}
-            <form ref={formElementsRef} onSubmit={handleAuth} className="space-y-5">
+            <form ref={formElementsRef} onSubmit={handleAuth} className="space-y-4 sm:space-y-5">
               {/* Email */}
               <div>
-                <Label htmlFor="email" className="text-white text-sm font-medium">Email</Label>
-                <div className="relative mt-2">
+                <Label htmlFor="email" className="text-white text-xs sm:text-sm font-medium">Email</Label>
+                <div className="relative mt-1 sm:mt-2">
                   <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-white/70" />
                   <Input 
                     id="email"
@@ -195,15 +195,15 @@ const SignInPage = () => {
                     onChange={(e) => handleLoginInputChange('email', e.target.value)}
                     placeholder="Enter your email address"
                     required
-                    className="pl-10 bg-white/20 border-white/30 text-white placeholder-white/90 focus:border-cyan-400 focus:ring-cyan-400 backdrop-blur-sm"
+                    className="pl-10 bg-white/20 border-white/30 text-white placeholder-white/90 focus:border-cyan-400 focus:ring-cyan-400 backdrop-blur-sm text-sm sm:text-base"
                   />
                 </div>
               </div>
 
               {/* Password */}
               <div>
-                <Label htmlFor="password" className="text-white text-sm font-medium">Password</Label>
-                <div className="relative mt-2">
+                <Label htmlFor="password" className="text-white text-xs sm:text-sm font-medium">Password</Label>
+                <div className="relative mt-1 sm:mt-2">
                   <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-white/70" />
                   <Input 
                     id="password"
@@ -212,7 +212,7 @@ const SignInPage = () => {
                     onChange={(e) => handleLoginInputChange('password', e.target.value)}
                     placeholder="Enter your password"
                     required
-                    className="pl-10 pr-10 bg-white/20 border-white/30 text-white placeholder-white/90 focus:border-cyan-400 focus:ring-cyan-400 backdrop-blur-sm"
+                    className="pl-10 pr-10 bg-white/20 border-white/30 text-white placeholder-white/90 focus:border-cyan-400 focus:ring-cyan-400 backdrop-blur-sm text-sm sm:text-base"
                   />
                   <Button
                     type="button"
@@ -226,7 +226,7 @@ const SignInPage = () => {
                 </div>
               </div>
 
-              <Button type="submit" className="w-full bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white py-3 font-medium shadow-lg" disabled={isLoadingAuth}>
+              <Button type="submit" className="w-full bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white py-2.5 sm:py-3 font-medium shadow-lg text-sm sm:text-base" disabled={isLoadingAuth}>
                 {isLoadingAuth ? "Signing In..." : "Sign In"}
               </Button>
             </form>

@@ -6,13 +6,13 @@ const LogoHeader = () => {
 
   return (
     <motion.header
-      className="fixed top-4 left-4 z-50"
+      className="fixed top-2 sm:top-4 left-2 sm:left-4 z-50"
       initial={{ y: -100, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
       transition={{ duration: 0.6, ease: "easeOut" }}
     >
       <motion.div
-        className="flex items-center gap-3 cursor-pointer group"
+        className="flex items-center gap-2 sm:gap-3 cursor-pointer group"
         onClick={() => navigate("/")}
         role="button"
         tabIndex={0}
@@ -24,12 +24,12 @@ const LogoHeader = () => {
           <img
             src="/favicon.png"
             alt="KEC Alumni Network Logo"
-            className="w-12 h-12 rounded-xl shadow-2xl ring-2 ring-white/20"
+            className="w-8 h-8 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl shadow-2xl ring-2 ring-white/20"
           />
-          <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-white/10 to-transparent" />
+          <div className="absolute inset-0 rounded-lg sm:rounded-xl bg-gradient-to-br from-white/10 to-transparent" />
         </div>
-        <div className="px-4 py-2 rounded-xl bg-white/15 backdrop-blur-md border border-white/20 shadow-2xl">
-          <span className="text-white font-bold text-lg tracking-wide">
+        <div className="px-2 sm:px-4 py-1.5 sm:py-2 rounded-lg sm:rounded-xl bg-white/15 backdrop-blur-md border border-white/20 shadow-2xl">
+          <span className="text-white font-bold text-sm sm:text-lg tracking-wide">
             KEC Alumni Network
           </span>
         </div>

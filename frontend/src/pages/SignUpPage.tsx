@@ -206,52 +206,52 @@ const SignUpPage = () => {
       </div>
 
       {/* Content Container */}
-      <div className="relative z-10 min-h-screen w-full flex">
-        {/* Left Side - Empty for background visibility */}
-        <div className="flex-1"></div>
+      <div className="relative z-10 min-h-screen w-full flex flex-col lg:flex-row">
+        {/* Left Side - Empty for background visibility on desktop, hidden on mobile */}
+        <div className="hidden lg:flex lg:flex-1"></div>
 
         {/* Right Panel - Sign Up Form */}
-        <div ref={formRef} className="w-full max-w-md bg-white/10 backdrop-blur-md border border-white/20 flex flex-col shadow-2xl min-h-screen">
-          <div className="flex-1 flex flex-col justify-center p-8 overflow-hidden">
+        <div ref={formRef} className="w-full lg:w-auto lg:max-w-md bg-white/10 backdrop-blur-md border border-white/20 flex flex-col shadow-2xl min-h-screen">
+          <div className="flex-1 flex flex-col justify-center p-4 sm:p-6 lg:p-8 overflow-hidden">
                      {/* Header */}
-            <div ref={headerRef} className="text-center mb-6">
-              <div className="flex items-center justify-center gap-3 mb-3">
+            <div ref={headerRef} className="text-center mb-4 sm:mb-6">
+              <div className="flex items-center justify-center gap-2 sm:gap-3 mb-2 sm:mb-3">
                <img
                  src="/logo.png"
                  alt="KEC Alumni Network Logo"
-                  className="h-10 w-10"
+                  className="h-8 w-8 sm:h-10 sm:w-10"
                />
-               <h2 className="text-2xl font-bold text-white">KEC Alumni Network</h2>
+               <h2 className="text-xl sm:text-2xl font-bold text-white">KEC Alumni Network</h2>
              </div>
            </div>
 
                        {/* Navigation Tabs */}
-            <div className="flex bg-white/10 backdrop-blur-sm rounded-lg p-1 mb-6">
+            <div className="flex bg-white/10 backdrop-blur-sm rounded-lg p-1 mb-4 sm:mb-6">
               <button 
                 onClick={() => navigate('/signin')}
-                className="flex-1 py-3 px-4 rounded-md text-sm font-medium text-white hover:bg-white/10 transition-colors"
+                className="flex-1 py-2.5 sm:py-3 px-3 sm:px-4 rounded-md text-xs sm:text-sm font-medium text-white hover:bg-white/10 transition-colors"
               >
                 Sign In
               </button>
-              <button className="flex-1 bg-gradient-to-r from-cyan-500/90 to-blue-500/90 text-white py-3 px-4 rounded-md text-sm font-medium shadow-lg backdrop-blur-sm">
+              <button className="flex-1 bg-gradient-to-r from-cyan-500/90 to-blue-500/90 text-white py-2.5 sm:py-3 px-3 sm:px-4 rounded-md text-xs sm:text-sm font-medium shadow-lg backdrop-blur-sm">
                 Sign Up
               </button>
             </div>
 
            {/* Welcome Message */}
-            <div className="text-center mb-4">
-              <h3 className="text-xl font-semibold text-white mb-2">Create your account</h3>
-              <p className="text-white/90">Join our platform for advanced alumni networking</p>
+            <div className="text-center mb-3 sm:mb-4">
+              <h3 className="text-lg sm:text-xl font-semibold text-white mb-1 sm:mb-2">Create your account</h3>
+              <p className="text-sm sm:text-base text-white/90">Join our platform for advanced alumni networking</p>
            </div>
 
                        {/* Quote */}
             {/* Removed quote to reduce vertical space */}
 
                        {/* Form */}
-            <form ref={formElementsRef} onSubmit={handleAuth} className="space-y-3 pr-2">
+            <form ref={formElementsRef} onSubmit={handleAuth} className="space-y-3 sm:space-y-4 pr-1 sm:pr-2">
                          {/* User Type Selection */}
               <div>
-                <Label className="text-white text-sm font-medium mb-2 block">I am a *</Label>
+                <Label className="text-white text-xs sm:text-sm font-medium mb-2 block">I am a *</Label>
                 <div className="grid grid-cols-3 gap-2">
                                                     <Card 
                     className={`cursor-pointer transition-all duration-200 ${
@@ -259,8 +259,8 @@ const SignUpPage = () => {
                      }`}
                     onClick={() => handleUserTypeChange('alumni')}
                  >
-                    <CardContent className="p-3 text-center">
-                      <Users className="h-4 w-4 mx-auto mb-1 text-blue-400" />
+                    <CardContent className="p-2 sm:p-3 text-center">
+                      <Users className="h-3 w-3 sm:h-4 sm:w-4 mx-auto mb-1 text-blue-400" />
                      <div className="font-medium text-white text-xs">Alumni</div>
                       <div className="text-xs text-white/80">Graduated</div>
                    </CardContent>
@@ -271,8 +271,8 @@ const SignUpPage = () => {
                      }`}
                     onClick={() => handleUserTypeChange('student')}
                  >
-                    <CardContent className="p-3 text-center">
-                      <GraduationCap className="h-4 w-4 mx-auto mb-1 text-green-400" />
+                    <CardContent className="p-2 sm:p-3 text-center">
+                      <GraduationCap className="h-3 w-3 sm:h-4 sm:w-4 mx-auto mb-1 text-green-400" />
                      <div className="font-medium text-white text-xs">Student</div>
                       <div className="text-xs text-white/80">Current</div>
                    </CardContent>
@@ -283,8 +283,8 @@ const SignUpPage = () => {
                      }`}
                     onClick={() => handleUserTypeChange('faculty')}
                  >
-                    <CardContent className="p-3 text-center">
-                      <BookOpen className="h-4 w-4 mx-auto mb-1 text-purple-400" />
+                    <CardContent className="p-2 sm:p-3 text-center">
+                      <BookOpen className="h-3 w-3 sm:h-4 sm:w-4 mx-auto mb-1 text-purple-400" />
                      <div className="font-medium text-white text-xs">Faculty</div>
                       <div className="text-xs text-white/80">Teaching</div>
                    </CardContent>
@@ -293,10 +293,10 @@ const SignUpPage = () => {
             </div>
 
               {/* Name Fields */}
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <Label htmlFor="firstName" className="text-white text-sm font-medium">First Name *</Label>
-                  <div className="relative mt-2">
+                  <Label htmlFor="firstName" className="text-white text-xs sm:text-sm font-medium">First Name *</Label>
+                  <div className="relative mt-1 sm:mt-2">
                     <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-white/70" />
                   <Input 
                     id="firstName"
@@ -305,7 +305,7 @@ const SignUpPage = () => {
                     onChange={(e) => handleSignupInputChange('firstName', e.target.value)}
                     placeholder="John"
                     required 
-                    className="pl-10 bg-white/20 border-white/30 text-white placeholder-white/90 focus:border-blue-400 focus:ring-blue-400 backdrop-blur-sm"
+                    className="pl-10 bg-white/20 border-white/30 text-white placeholder-white/90 focus:border-blue-400 focus:ring-blue-400 backdrop-blur-sm text-sm sm:text-base"
                   />
                 </div>
                 {fieldErrors.firstName && (
@@ -313,8 +313,8 @@ const SignUpPage = () => {
                 )}
                 </div>
                 <div>
-                  <Label htmlFor="lastName" className="text-white text-sm font-medium">Last Name *</Label>
-                  <div className="relative mt-2">
+                  <Label htmlFor="lastName" className="text-white text-xs sm:text-sm font-medium">Last Name *</Label>
+                  <div className="relative mt-1 sm:mt-2">
                     <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-white/70" />
                   <Input 
                       id="lastName"
@@ -323,7 +323,7 @@ const SignUpPage = () => {
                       onChange={(e) => handleSignupInputChange('lastName', e.target.value)}
                       placeholder="Doe"
                       required 
-                      className="pl-10 bg-white/20 border-white/30 text-white placeholder-white/90 focus:border-blue-400 focus:ring-blue-400 backdrop-blur-sm"
+                      className="pl-10 bg-white/20 border-white/30 text-white placeholder-white/90 focus:border-blue-400 focus:ring-blue-400 backdrop-blur-sm text-sm sm:text-base"
                   />
                 </div>
                 {fieldErrors.lastName && (
@@ -333,14 +333,14 @@ const SignUpPage = () => {
               </div>
 
               {/* Email */}
-              <div className="grid grid-cols-2 gap-3">
-              <div className="col-span-2">
-                  <Label htmlFor="email" className="text-white text-sm font-medium">
+              <div className="grid grid-cols-1 gap-3">
+              <div className="col-span-1">
+                  <Label htmlFor="email" className="text-white text-xs sm:text-sm font-medium">
                     {signupData.userType === 'student' ? 'College Email (@kongu.edu) *' : 
                      signupData.userType === 'faculty' ? 'College Email (@kongu.edu) *' : 
                      'Email *'}
                   </Label>
-                  <div className="relative mt-2">
+                  <div className="relative mt-1 sm:mt-2">
                     <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-white/70" />
                 <Input 
                       id="email"
@@ -353,7 +353,7 @@ const SignUpPage = () => {
                         'alumni@example.com'
                       }
                   required 
-                      className="pl-10 bg-white/20 border-white/30 text-white placeholder-white/90 focus:border-blue-400 focus:ring-blue-400 backdrop-blur-sm"
+                      className="pl-10 bg-white/20 border-white/30 text-white placeholder-white/90 focus:border-blue-400 focus:ring-blue-400 backdrop-blur-sm text-sm sm:text-base"
                  />
                </div>
                {fieldErrors.email && (
@@ -365,15 +365,15 @@ const SignUpPage = () => {
               {/* Current Year Field - Only for Students, right after email */}
               {signupData.userType === 'student' && (
                 <div>
-                  <Label htmlFor="currentYear" className="text-white text-sm font-medium">Current Year *</Label>
-                  <div className="relative mt-2">
+                  <Label htmlFor="currentYear" className="text-white text-xs sm:text-sm font-medium">Current Year *</Label>
+                  <div className="relative mt-1 sm:mt-2">
                     <GraduationCap className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-white/70" />
                     <select
                       id="currentYear"
                       value={signupData.currentYear || ''}
                       onChange={(e) => handleSignupInputChange('currentYear', e.target.value)}
                       required
-                      className="w-full pl-10 pr-4 py-2 bg-white/20 border border-white/30 text-white focus:border-blue-400 focus:ring-blue-400 backdrop-blur-sm rounded-md"
+                      className="w-full pl-10 pr-4 py-2 bg-white/20 border border-white/30 text-white focus:border-blue-400 focus:ring-blue-400 backdrop-blur-sm rounded-md text-sm sm:text-base"
                     >
                       <option value="" className="bg-white text-gray-900">Select current year</option>
                       <option value="1" className="bg-white text-gray-900">1st Year</option>
@@ -391,10 +391,10 @@ const SignUpPage = () => {
               {/* Removed: phone, department/current year, company, designation */}
 
               {/* Password Fields */}
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <Label htmlFor="signupPassword" className="text-white text-sm font-medium">Password *</Label>
-                  <div className="relative mt-2">
+                  <Label htmlFor="signupPassword" className="text-white text-xs sm:text-sm font-medium">Password *</Label>
+                  <div className="relative mt-1 sm:mt-2">
                     <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-white/70" />
                   <Input 
                     id="signupPassword"
@@ -403,7 +403,7 @@ const SignUpPage = () => {
                     onChange={(e) => handleSignupInputChange('password', e.target.value)}
                       placeholder="Create password"
                     required
-                      className="pl-10 pr-10 bg-white/20 border-white/30 text-white placeholder-white/90 focus:border-blue-400 focus:ring-blue-400 backdrop-blur-sm"
+                      className="pl-10 pr-10 bg-white/20 border-white/30 text-white placeholder-white/90 focus:border-blue-400 focus:ring-blue-400 backdrop-blur-sm text-sm sm:text-base"
                   />
                   <Button
                     type="button"
@@ -420,8 +420,8 @@ const SignUpPage = () => {
                 )}
               </div>
                 <div>
-                  <Label htmlFor="confirmPassword" className="text-white text-sm font-medium">Confirm Password *</Label>
-                  <div className="relative mt-2">
+                  <Label htmlFor="confirmPassword" className="text-white text-xs sm:text-sm font-medium">Confirm Password *</Label>
+                  <div className="relative mt-1 sm:mt-2">
                     <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-white/70" />
                   <Input 
                     id="confirmPassword"
@@ -430,7 +430,7 @@ const SignUpPage = () => {
                     onChange={(e) => handleSignupInputChange('confirmPassword', e.target.value)}
                       placeholder="Confirm password"
                     required
-                      className="pl-10 pr-10 bg-white/20 border-white/30 text-white placeholder-white/90 focus:border-blue-400 focus:ring-blue-400 backdrop-blur-sm"
+                      className="pl-10 pr-10 bg-white/20 border-white/30 text-white placeholder-white/90 focus:border-blue-400 focus:ring-blue-400 backdrop-blur-sm text-sm sm:text-base"
                   />
                   <Button
                     type="button"
@@ -487,7 +487,7 @@ const SignUpPage = () => {
                 </p>
               </div>
 
-              <Button type="submit" className="w-full bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white py-2.5 font-medium shadow-lg" disabled={isLoadingAuth}>
+              <Button type="submit" className="w-full bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white py-2.5 sm:py-3 font-medium shadow-lg text-sm sm:text-base" disabled={isLoadingAuth}>
                 {isLoadingAuth ? "Creating Account..." : "Create Account"}
               </Button>
             </form>

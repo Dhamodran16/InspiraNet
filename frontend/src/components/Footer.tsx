@@ -42,85 +42,85 @@ const Footer: React.FC<FooterProps> = ({ transparent = true }) => {
 
   return (
     <footer className={rootClasses}>
-      <div className="container mx-auto px-4 py-12">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
         {/* Main Footer Content */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
           {/* Company Info */}
-          <div className="space-y-4">
-            <h3 className={`text-xl font-bold ${isDark ? 'text-yellow-400' : 'text-yellow-300'}`}>KEC Alumni Network</h3>
-            <p className={isDark ? 'text-gray-300' : 'text-white/80'}>
+          <div className="space-y-3 sm:space-y-4">
+            <h3 className={`text-lg sm:text-xl font-bold ${isDark ? 'text-yellow-400' : 'text-yellow-300'}`}>KEC Alumni Network</h3>
+            <p className={`text-sm sm:text-base ${isDark ? 'text-gray-300' : 'text-white/80'}`}>
               Connecting Kongu Engineering College alumni worldwide through networking, 
               mentorship, and career opportunities.
             </p>
-            <div className="flex space-x-4">
+            <div className="flex space-x-3 sm:space-x-4">
               <button
                 onClick={() => handleSocialMediaClick('linkedin')}
                 className={`transition-colors ${isDark ? 'text-gray-400 hover:text-yellow-400' : 'text-white/60 hover:text-yellow-300'}`}
                 aria-label="LinkedIn"
               >
-                <Linkedin className="h-5 w-5" />
+                <Linkedin className="h-4 w-4 sm:h-5 sm:w-5" />
               </button>
               <button
                 onClick={() => handleSocialMediaClick('twitter')}
                 className={`transition-colors ${isDark ? 'text-gray-400 hover:text-yellow-400' : 'text-white/60 hover:text-yellow-300'}`}
                 aria-label="Twitter"
               >
-                <Twitter className="h-5 w-5" />
+                <Twitter className="h-4 w-4 sm:h-5 sm:w-5" />
               </button>
               <button
                 onClick={() => handleSocialMediaClick('facebook')}
                 className={`transition-colors ${isDark ? 'text-gray-400 hover:text-yellow-400' : 'text-white/60 hover:text-yellow-300'}`}
                 aria-label="Facebook"
               >
-                <Facebook className="h-5 w-5" />
+                <Facebook className="h-4 w-4 sm:h-5 sm:w-5" />
               </button>
             </div>
           </div>
 
           {/* Quick Links */}
-          <div className="space-y-4">
-            <h4 className={`text-lg font-semibold ${isDark ? 'text-yellow-400' : 'text-yellow-300'}`}>Quick Links</h4>
-            <div className="space-y-2">
+          <div className="space-y-3 sm:space-y-4">
+            <h4 className={`text-base sm:text-lg font-semibold ${isDark ? 'text-yellow-400' : 'text-yellow-300'}`}>Quick Links</h4>
+            <div className="space-y-1.5 sm:space-y-2">
               <button
                 onClick={() => handleQuickLinkClick('directory')}
-                className={`block text-sm transition-colors flex items-center gap-2 ${isDark ? 'text-gray-300 hover:text-yellow-400' : 'text-white/80 hover:text-yellow-300'}`}
+                className={`block text-xs sm:text-sm transition-colors flex items-center gap-2 ${isDark ? 'text-gray-300 hover:text-yellow-400' : 'text-white/80 hover:text-yellow-300'}`}
               >
-                <Users className="h-4 w-4" />
+                <Users className="h-3 w-3 sm:h-4 sm:w-4" />
                 Alumni Directory
               </button>
               <button
                 onClick={() => handleQuickLinkClick('events')}
-                className={`block text-sm transition-colors flex items-center gap-2 ${isDark ? 'text-gray-300 hover:text-yellow-400' : 'text-white/80 hover:text-yellow-300'}`}
+                className={`block text-xs sm:text-sm transition-colors flex items-center gap-2 ${isDark ? 'text-gray-300 hover:text-yellow-400' : 'text-white/80 hover:text-yellow-300'}`}
               >
-                <Calendar className="h-4 w-4" />
+                <Calendar className="h-3 w-3 sm:h-4 sm:w-4" />
                 Events & Meetups
               </button>
               <button
                 onClick={() => handleQuickLinkClick('career')}
-                className={`block text-sm transition-colors flex items-center gap-2 ${isDark ? 'text-gray-300 hover:text-yellow-400' : 'text-white/80 hover:text-yellow-300'}`}
+                className={`block text-xs sm:text-sm transition-colors flex items-center gap-2 ${isDark ? 'text-gray-300 hover:text-yellow-400' : 'text-white/80 hover:text-yellow-300'}`}
               >
-                <Briefcase className="h-4 w-4" />
+                <Briefcase className="h-3 w-3 sm:h-4 sm:w-4" />
                 Career Opportunities
               </button>
               <button
                 onClick={() => handleQuickLinkClick('mentorship')}
-                className={`block text-sm transition-colors flex items-center gap-2 ${isDark ? 'text-gray-300 hover:text-yellow-400' : 'text-white/80 hover:text-yellow-300'}`}
+                className={`block text-xs sm:text-sm transition-colors flex items-center gap-2 ${isDark ? 'text-gray-300 hover:text-yellow-400' : 'text-white/80 hover:text-yellow-300'}`}
               >
-                <Heart className="h-4 w-4" />
+                <Heart className="h-3 w-3 sm:h-4 sm:w-4" />
                 Mentorship Program
               </button>
             </div>
           </div>
 
           {/* Contact Info */}
-          <div className="space-y-4">
-            <h4 className={`text-lg font-semibold ${isDark ? 'text-yellow-400' : 'text-yellow-300'}`}>Contact Us</h4>
-            <div className={`space-y-2 text-sm ${isDark ? 'text-gray-300' : 'text-white/80'}`}>
+          <div className="space-y-3 sm:space-y-4">
+            <h4 className={`text-base sm:text-lg font-semibold ${isDark ? 'text-yellow-400' : 'text-yellow-300'}`}>Contact Us</h4>
+            <div className={`space-y-1.5 sm:space-y-2 text-xs sm:text-sm ${isDark ? 'text-gray-300' : 'text-white/80'}`}>
               <p>Kongu Engineering College</p>
               <p>Perundurai, Erode - 638060</p>
               <p>Tamil Nadu, India</p>
               <div className="flex items-center gap-2 mt-2">
-                <Mail className="h-4 w-4" />
+                <Mail className="h-3 w-3 sm:h-4 sm:w-4" />
                 <button
                   onClick={() => window.open("mailto:alumni@kec.edu", "_blank")}
                   className={`transition-colors ${isDark ? 'hover:text-yellow-400' : 'hover:text-yellow-300'}`}
@@ -133,24 +133,24 @@ const Footer: React.FC<FooterProps> = ({ transparent = true }) => {
         </div>
 
         {/* Bottom Footer */}
-        <div className={`border-t mt-12 pt-8 flex flex-col md:flex-row justify-between items-center ${isDark ? 'border-gray-700' : 'border-white/20'}`}>
-          <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-white/80'}`}>© 2025 KEC Alumni Network. All rights reserved.</p>
-          <div className="flex space-x-6 mt-4 md:mt-0">
+        <div className={`border-t mt-8 sm:mt-12 pt-6 sm:pt-8 flex flex-col sm:flex-row justify-between items-center space-y-4 sm:space-y-0 ${isDark ? 'border-gray-700' : 'border-white/20'}`}>
+          <p className={`text-xs sm:text-sm ${isDark ? 'text-gray-400' : 'text-white/80'}`}>© 2025 KEC Alumni Network. All rights reserved.</p>
+          <div className="flex flex-wrap justify-center sm:justify-end gap-4 sm:gap-6">
             <button 
               onClick={() => navigate('/privacy-policy')} 
-              className={`text-sm transition-colors ${isDark ? 'text-gray-400 hover:text-yellow-400' : 'text-white/80 hover:text-yellow-300'}`}
+              className={`text-xs sm:text-sm transition-colors ${isDark ? 'text-gray-400 hover:text-yellow-400' : 'text-white/80 hover:text-yellow-300'}`}
             >
               Privacy Policy
             </button>
             <button 
               onClick={() => navigate('/terms')} 
-              className={`text-sm transition-colors ${isDark ? 'text-gray-400 hover:text-yellow-400' : 'text-white/80 hover:text-yellow-300'}`}
+              className={`text-xs sm:text-sm transition-colors ${isDark ? 'text-gray-400 hover:text-yellow-400' : 'text-white/80 hover:text-yellow-300'}`}
             >
               Terms of Service
             </button>
             <button 
               onClick={() => navigate('/team')} 
-              className="text-sm transition-transform duration-200 hover:scale-105"
+              className="text-xs sm:text-sm transition-transform duration-200 hover:scale-105"
             >
               <span className="font-serif font-extrabold tracking-wide text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-orange-400 to-pink-500 drop-shadow">
                 Developed by Beyond Bonds
@@ -158,7 +158,7 @@ const Footer: React.FC<FooterProps> = ({ transparent = true }) => {
             </button>
             <button 
               onClick={() => navigate('/cookie-policy')} 
-              className={`text-sm transition-colors ${isDark ? 'text-gray-400 hover:text-yellow-400' : 'text-white/80 hover:text-yellow-300'}`}
+              className={`text-xs sm:text-sm transition-colors ${isDark ? 'text-gray-400 hover:text-yellow-400' : 'text-white/80 hover:text-yellow-300'}`}
             >
               Cookie Policy
             </button>

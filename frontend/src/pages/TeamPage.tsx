@@ -45,35 +45,35 @@ const TeamPage = () => {
       <CollegeHeader showNav={false} />
       
       {/* Main Content */}
-      <div className="container mx-auto px-4 py-12">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
         {/* Page Title */}
-        <div className="text-center mb-16">
-          <h1 className="text-4xl font-bold text-blue-800 mb-2">Beyond Bonds</h1>
-          <p className="text-lg text-gray-600">Development Team</p>
+        <div className="text-center mb-12 sm:mb-16">
+          <h1 className="text-3xl sm:text-4xl font-bold text-blue-800 mb-2">Beyond Bonds</h1>
+          <p className="text-base sm:text-lg text-gray-600">Development Team</p>
         </div>
 
         {/* Staff Members Section */}
-        <div className="mb-16">
-          <h2 className="text-3xl font-bold text-blue-800 text-center mb-8">STAFF MEMBERS</h2>
+        <div className="mb-12 sm:mb-16">
+          <h2 className="text-2xl sm:text-3xl font-bold text-blue-800 text-center mb-6 sm:mb-8">STAFF MEMBERS</h2>
           <div className="flex justify-center">
             {staffMembers.map((member, index) => (
-              <Card key={index} className="hover:shadow-lg transition-all duration-300 border border-gray-200">
+              <Card key={index} className="hover:shadow-lg transition-all duration-300 border border-gray-200 w-full max-w-sm">
                 <CardHeader className="text-center pb-3">
-                  <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                    <Users className="w-8 h-8 text-blue-600" />
+                  <div className="w-12 h-12 sm:w-16 sm:h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <Users className="w-6 h-6 sm:w-8 sm:h-8 text-blue-600" />
                   </div>
-                  <CardTitle className="text-lg font-bold text-blue-800">{member.name}</CardTitle>
-                  <p className="text-sm text-gray-700">{member.role}</p>
+                  <CardTitle className="text-base sm:text-lg font-bold text-blue-800">{member.name}</CardTitle>
+                  <p className="text-xs sm:text-sm text-gray-700">{member.role}</p>
                 </CardHeader>
-                <CardContent className="space-y-2 text-left px-6 pb-6">
+                <CardContent className="space-y-2 text-left px-4 sm:px-6 pb-4 sm:pb-6">
                   {member.subRole && (
-                    <p className="text-sm text-green-700 font-semibold">{member.subRole}</p>
+                    <p className="text-xs sm:text-sm text-green-700 font-semibold">{member.subRole}</p>
                   )}
                   {member.phone && (
-                    <p className="text-sm text-gray-700">{member.phone}</p>
+                    <p className="text-xs sm:text-sm text-gray-700">{member.phone}</p>
                   )}
                   {member.email && (
-                    <p className="text-sm text-gray-700">{member.email}</p>
+                    <p className="text-xs sm:text-sm text-gray-700 break-all">{member.email}</p>
                   )}
                 </CardContent>
               </Card>
@@ -82,30 +82,45 @@ const TeamPage = () => {
         </div>
 
         {/* Student Members Section */}
-        <div className="mb-16">
-          <h2 className="text-3xl font-bold text-blue-800 text-center mb-8">STUDENT MEMBERS</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="mb-12 sm:mb-16">
+          <h2 className="text-2xl sm:text-3xl font-bold text-blue-800 text-center mb-6 sm:mb-8">STUDENT MEMBERS</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
             {studentMembers.map((member, index) => (
               <Card key={index} className="transition-all duration-300 border border-gray-200 hover:border-blue-300 hover:shadow-xl hover:shadow-blue-100 hover:-translate-y-1">
                 <CardHeader className="text-center pb-3">
-                  <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                    <GraduationCap className="w-8 h-8 text-green-600" />
+                  <div className="w-12 h-12 sm:w-16 sm:h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <GraduationCap className="w-6 h-6 sm:w-8 sm:h-8 text-green-600" />
                   </div>
-                  <CardTitle className="text-lg font-bold text-blue-800">{member.name}</CardTitle>
-                  <p className="text-sm text-gray-700">Roll No: {member.rollNumber}</p>
+                  <CardTitle className="text-base sm:text-lg font-bold text-blue-800">{member.name}</CardTitle>
+                  <p className="text-xs sm:text-sm text-gray-700">Roll No: {member.rollNumber}</p>
                 </CardHeader>
-                <CardContent className="space-y-2 text-left px-6 pb-6">
-                  <p className="text-sm text-green-700 font-semibold">{member.role}</p>
+                <CardContent className="space-y-2 text-left px-4 sm:px-6 pb-4 sm:pb-6">
+                  <p className="text-xs sm:text-sm text-green-700 font-semibold">{member.role}</p>
                   {member.phone && (
-                    <p className="text-sm text-gray-700">{member.phone}</p>
+                    <p className="text-xs sm:text-sm text-gray-700">{member.phone}</p>
                   )}
                   {member.email && (
-                    <p className="text-sm text-gray-700">{member.email}</p>
+                    <p className="text-xs sm:text-sm text-gray-700 break-all">{member.email}</p>
                   )}
                 </CardContent>
               </Card>
             ))}
           </div>
+        </div>
+
+        {/* Contact Section */}
+        <div className="text-center">
+          <h3 className="text-xl sm:text-2xl font-bold text-blue-800 mb-4">Get in Touch</h3>
+          <p className="text-sm sm:text-base text-gray-600 mb-6 max-w-2xl mx-auto">
+            Have questions about our development team or want to contribute to the project? 
+            Feel free to reach out to us.
+          </p>
+          <Button 
+            onClick={() => window.open('mailto:alumni@kec.edu', '_blank')}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-6 sm:px-8 py-2 sm:py-3 text-sm sm:text-base"
+          >
+            Contact Us
+          </Button>
         </div>
       </div>
 

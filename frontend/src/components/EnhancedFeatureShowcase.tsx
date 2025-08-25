@@ -24,39 +24,39 @@ const EnhancedFeatureShowcase = () => {
   };
 
   return (
-    <section className="py-20 px-5 bg-transparent relative" data-section="features">
+    <section className="py-12 sm:py-16 lg:py-20 px-4 sm:px-5 lg:px-8 bg-transparent relative" data-section="features">
       <div className="absolute inset-0 bg-black/10 pointer-events-none" />
       <div className="max-w-7xl mx-auto relative z-10">
-        <motion.div className="text-center mb-16" initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} transition={{ duration: 0.8 }} viewport={{ once: true }}>
-          <h2 className="text-5xl md:text-6xl font-bold text-white mb-6">Why Choose KEC Alumni Platform?</h2>
-          <p className="text-xl md:text-2xl text-white/80 max-w-3xl mx-auto leading-relaxed">Your gateway to a thriving community of engineers, innovators, and leaders</p>
+        <motion.div className="text-center mb-12 sm:mb-16" initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} transition={{ duration: 0.8 }} viewport={{ once: true }}>
+          <h2 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-4 sm:mb-6 px-2">Why Choose KEC Alumni Platform?</h2>
+          <p className="text-lg sm:text-xl md:text-2xl text-white/80 max-w-2xl sm:max-w-3xl mx-auto leading-relaxed px-4">Your gateway to a thriving community of engineers, innovators, and leaders</p>
         </motion.div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-16">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 lg:gap-8 mb-12 sm:mb-16">
           {features.map((f) => {
             const Icon = f.icon;
             return (
-              <div key={f.title} className="bg-black/30 backdrop-blur-md p-8 rounded-2xl shadow-xl border border-white/15 cursor-pointer relative overflow-hidden text-white" onClick={() => navigate(`/dashboard?section=${sectionMap[f.title]}`)}>
+              <div key={f.title} className="bg-black/30 backdrop-blur-md p-6 sm:p-8 rounded-2xl shadow-xl border border-white/15 cursor-pointer relative overflow-hidden text-white hover:scale-105 transition-transform duration-300" onClick={() => navigate(`/dashboard?section=${sectionMap[f.title]}`)}>
                 <div className={`absolute inset-0 bg-gradient-to-br ${f.gradient} opacity-0 hover:opacity-10 transition-opacity duration-300`} />
-                <div className="flex items-center mb-6 relative">
-                  <div className="w-16 h-16 rounded-2xl flex items-center justify-center mr-4 shadow-lg" style={{ background: `linear-gradient(135deg, ${f.color}, ${f.color}dd)` }}>
-                    <Icon className="text-white text-2xl" />
+                <div className="flex items-center mb-4 sm:mb-6 relative">
+                  <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-2xl flex items-center justify-center mr-3 sm:mr-4 shadow-lg" style={{ background: `linear-gradient(135deg, ${f.color}, ${f.color}dd)` }}>
+                    <Icon className="text-white text-xl sm:text-2xl" />
                   </div>
                   <div>
-                    <h3 className="text-2xl font-bold text-white">{f.title}</h3>
+                    <h3 className="text-lg sm:text-xl lg:text-2xl font-bold text-white">{f.title}</h3>
                   </div>
                 </div>
-                <p className="text-white/85 leading-relaxed">{f.description}</p>
+                <p className="text-sm sm:text-base text-white/85 leading-relaxed">{f.description}</p>
                 <div className="absolute inset-0 rounded-2xl border-2 border-transparent hover:border-white/20 transition-all duration-300" />
               </div>
             );
           })}
         </div>
 
-        <div className="text-center">
+        <div className="text-center px-4">
           <button
             onClick={() => navigate('/signup')}
-            className="text-xl px-10 py-5 rounded-xl font-bold shadow-[0_14px_36px_rgba(0,0,0,0.5)] bg-gradient-to-r from-cyan-400 to-blue-600 text-white hover:from-cyan-300 hover:to-blue-500 border border-white/20"
+            className="text-lg sm:text-xl px-8 sm:px-10 py-4 sm:py-5 rounded-xl font-bold shadow-[0_14px_36px_rgba(0,0,0,0.5)] bg-gradient-to-r from-cyan-400 to-blue-600 text-white hover:from-cyan-300 hover:to-blue-500 border border-white/20 transition-all duration-300 hover:scale-105"
           >
             Join Our Community Today
           </button>
