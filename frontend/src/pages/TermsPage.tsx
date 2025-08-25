@@ -6,25 +6,25 @@ import Footer from '@/components/Footer';
 
 const TermsPage = () => {
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-background">
       <CollegeHeader showNav={false} />
 
       {/* Main Content */}
       <div className="container mx-auto px-4 py-12">
         <div className="max-w-4xl mx-auto space-y-8">
           {/* Introduction */}
-          <Card className="border border-gray-200 bg-white shadow-sm">
-            <CardHeader className="bg-white">
-              <CardTitle className="flex items-center gap-2 text-2xl text-blue-800">
-                <FileText className="h-6 w-6 text-blue-600" />
+          <Card className="border-border bg-card shadow-sm">
+            <CardHeader className="bg-card">
+              <CardTitle className="flex items-center gap-2 text-2xl text-blue-800 dark:text-blue-400">
+                <FileText className="h-6 w-6 text-blue-600 dark:text-blue-400" />
                 Terms and Conditions
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4 bg-white">
-              <p className="text-gray-600">
+            <CardContent className="space-y-4 bg-card">
+              <p className="text-muted-foreground">
                 Last updated: {new Date().toLocaleDateString()}
               </p>
-              <p className="text-gray-600">
+              <p className="text-muted-foreground">
                 Welcome to the KEC Alumni Network. These Terms and Conditions govern your use of our alumni network platform 
                 and the services we provide. By accessing or using our platform, you agree to be bound by these terms.
               </p>

@@ -6,25 +6,25 @@ import Footer from '@/components/Footer';
 
 const PrivacyPolicyPage = () => {
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-background">
       <CollegeHeader showNav={false} />
 
       {/* Main Content */}
       <div className="container mx-auto px-4 py-12">
         <div className="max-w-4xl mx-auto space-y-8">
           {/* Introduction */}
-          <Card className="border border-gray-200 bg-white shadow-sm">
-            <CardHeader className="bg-white">
-              <CardTitle className="flex items-center gap-2 text-2xl text-blue-800">
-                <Shield className="h-6 w-6 text-blue-600" />
+          <Card className="border-border bg-card shadow-sm">
+            <CardHeader className="bg-card">
+              <CardTitle className="flex items-center gap-2 text-2xl text-blue-800 dark:text-blue-400">
+                <Shield className="h-6 w-6 text-blue-600 dark:text-blue-400" />
                 Privacy Policy
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4 bg-white">
-              <p className="text-gray-600">
+            <CardContent className="space-y-4 bg-card">
+              <p className="text-muted-foreground">
                 Last updated: {new Date().toLocaleDateString()}
               </p>
-              <p className="text-gray-600">
+              <p className="text-muted-foreground">
                 At KEC Alumni Network, we are committed to protecting your privacy and ensuring the security of your personal information. 
                 This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our alumni network platform.
               </p>
@@ -32,17 +32,17 @@ const PrivacyPolicyPage = () => {
           </Card>
 
           {/* Information We Collect */}
-          <Card className="border border-gray-200 bg-white shadow-sm">
-            <CardHeader className="bg-white">
-              <CardTitle className="flex items-center gap-2 text-blue-800">
-                <Database className="h-5 w-5 text-blue-600" />
+          <Card className="border-border bg-card shadow-sm">
+            <CardHeader className="bg-card">
+              <CardTitle className="flex items-center gap-2 text-blue-800 dark:text-blue-400">
+                <Database className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                 Information We Collect
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4 bg-white">
+            <CardContent className="space-y-4 bg-card">
               <div>
-                <h4 className="font-semibold text-gray-900 mb-2">Personal Information</h4>
-                <ul className="list-disc list-inside text-gray-600 space-y-1 ml-4">
+                <h4 className="font-semibold text-foreground mb-2">Personal Information</h4>
+                <ul className="list-disc list-inside text-muted-foreground space-y-1 ml-4">
                   <li>Name, email address, and contact information</li>
                   <li>Academic information (department, batch, graduation year)</li>
                   <li>Professional information (company, designation, experience)</li>
@@ -51,8 +51,8 @@ const PrivacyPolicyPage = () => {
                 </ul>
               </div>
               <div>
-                <h4 className="font-semibold text-gray-900 mb-2">Usage Information</h4>
-                <ul className="list-disc list-inside text-gray-600 space-y-1 ml-4">
+                <h4 className="font-semibold text-foreground mb-2">Usage Information</h4>
+                <ul className="list-disc list-inside text-muted-foreground space-y-1 ml-4">
                   <li>Login times and session duration</li>
                   <li>Pages visited and features used</li>
                   <li>Messages sent and received</li>
@@ -64,14 +64,14 @@ const PrivacyPolicyPage = () => {
           </Card>
 
           {/* How We Use Information */}
-          <Card className="border border-gray-200 bg-white shadow-sm">
-            <CardHeader className="bg-white">
-              <CardTitle className="flex items-center gap-2 text-blue-800">
-                <Eye className="h-5 w-5 text-blue-600" />
+          <Card className="border-border bg-card shadow-sm">
+            <CardHeader className="bg-card">
+              <CardTitle className="flex items-center gap-2 text-blue-800 dark:text-blue-400">
+                <Eye className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                 How We Use Your Information
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4 bg-white">
+            <CardContent className="space-y-4 bg-card">
               <ul className="list-disc list-inside text-gray-600 space-y-2 ml-4">
                 <li>To provide and maintain our alumni network platform</li>
                 <li>To facilitate connections between alumni members</li>
@@ -84,18 +84,18 @@ const PrivacyPolicyPage = () => {
           </Card>
 
           {/* Information Sharing */}
-          <Card className="border border-gray-200 bg-white shadow-sm">
-            <CardHeader className="bg-white">
-              <CardTitle className="flex items-center gap-2 text-blue-800">
-                <Users className="h-5 w-5 text-blue-600" />
+          <Card className="border-border bg-card shadow-sm">
+            <CardHeader className="bg-card">
+              <CardTitle className="flex items-center gap-2 text-blue-800 dark:text-blue-400">
+                <Users className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                 Information Sharing and Disclosure
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4 bg-white">
-              <p className="text-gray-600">
+            <CardContent className="space-y-4 bg-card">
+              <p className="text-muted-foreground">
                 We do not sell, trade, or rent your personal information to third parties. We may share your information in the following circumstances:
               </p>
-              <ul className="list-disc list-inside text-gray-600 space-y-2 ml-4">
+              <ul className="list-disc list-inside text-muted-foreground space-y-2 ml-4">
                 <li><strong>With other alumni members:</strong> Your profile information is visible to other registered alumni based on your privacy settings</li>
                 <li><strong>Service providers:</strong> We may share information with trusted third-party service providers who assist us in operating our platform</li>
                 <li><strong>Legal requirements:</strong> We may disclose information if required by law or to protect our rights and safety</li>
@@ -105,18 +105,18 @@ const PrivacyPolicyPage = () => {
           </Card>
 
           {/* Data Security */}
-          <Card className="border border-gray-200 bg-white shadow-sm">
-            <CardHeader className="bg-white">
-              <CardTitle className="flex items-center gap-2 text-blue-800">
-                <Lock className="h-5 w-5 text-blue-600" />
+          <Card className="border-border bg-card shadow-sm">
+            <CardHeader className="bg-card">
+              <CardTitle className="flex items-center gap-2 text-blue-800 dark:text-blue-400">
+                <Lock className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                 Data Security
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4 bg-white">
-              <p className="text-gray-600">
+            <CardContent className="space-y-4 bg-card">
+              <p className="text-muted-foreground">
                 We implement appropriate technical and organizational measures to protect your personal information:
               </p>
-              <ul className="list-disc list-inside text-gray-600 space-y-2 ml-4">
+              <ul className="list-disc list-inside text-muted-foreground space-y-2 ml-4">
                 <li>Encryption of data in transit and at rest</li>
                 <li>Regular security assessments and updates</li>
                 <li>Access controls and authentication measures</li>
@@ -127,18 +127,18 @@ const PrivacyPolicyPage = () => {
           </Card>
 
           {/* Your Rights */}
-          <Card className="border border-gray-200 bg-white shadow-sm">
-            <CardHeader className="bg-white">
-              <CardTitle className="flex items-center gap-2 text-blue-800">
-                <Shield className="h-5 w-5 text-blue-600" />
+          <Card className="border-border bg-card shadow-sm">
+            <CardHeader className="bg-card">
+              <CardTitle className="flex items-center gap-2 text-blue-800 dark:text-blue-400">
+                <Shield className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                 Your Rights and Choices
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4 bg-white">
-              <p className="text-gray-600">
+            <CardContent className="space-y-4 bg-card">
+              <p className="text-muted-foreground">
                 You have the following rights regarding your personal information:
               </p>
-              <ul className="list-disc list-inside text-gray-600 space-y-2 ml-4">
+              <ul className="list-disc list-inside text-muted-foreground space-y-2 ml-4">
                 <li><strong>Access:</strong> Request a copy of your personal information</li>
                 <li><strong>Correction:</strong> Update or correct your information</li>
                 <li><strong>Deletion:</strong> Request deletion of your account and data</li>
@@ -150,24 +150,24 @@ const PrivacyPolicyPage = () => {
           </Card>
 
           {/* Cookies */}
-          <Card className="border border-gray-200 bg-white shadow-sm">
-            <CardHeader className="bg-white">
-              <CardTitle className="flex items-center gap-2 text-blue-800">
-                <Lock className="h-5 w-5 text-blue-600" />
+          <Card className="border-border bg-card shadow-sm">
+            <CardHeader className="bg-card">
+              <CardTitle className="flex items-center gap-2 text-blue-800 dark:text-blue-400">
+                <Lock className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                 Cookies and Tracking
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4 bg-white">
-              <p className="text-gray-600">
+            <CardContent className="space-y-4 bg-card">
+              <p className="text-muted-foreground">
                 We use cookies and similar technologies to enhance your experience:
               </p>
-              <ul className="list-disc list-inside text-gray-600 space-y-2 ml-4">
+              <ul className="list-disc list-inside text-muted-foreground space-y-2 ml-4">
                 <li><strong>Essential cookies:</strong> Required for basic platform functionality</li>
                 <li><strong>Analytics cookies:</strong> Help us understand how users interact with our platform</li>
                 <li><strong>Preference cookies:</strong> Remember your settings and preferences</li>
                 <li><strong>Security cookies:</strong> Help protect against fraud and unauthorized access</li>
               </ul>
-              <p className="text-gray-600">
+              <p className="text-muted-foreground">
                 You can control cookie settings through your browser preferences.
               </p>
             </CardContent>
