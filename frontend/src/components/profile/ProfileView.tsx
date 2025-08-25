@@ -32,7 +32,6 @@ interface UserProfile {
 	skills?: string[];
 	interests?: string[];
 	
-	education?: Array<{ degree: string; institution: string; year: string; gpa?: string }>;
 	workExperience?: Array<{ company: string; position: string; startDate: string; endDate?: string; current: boolean; description?: string }>;
 	createdAt?: string;
 }

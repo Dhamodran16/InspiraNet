@@ -524,12 +524,10 @@ router.patch('/:userId', authenticateToken, async (req, res) => {
       company,
       designation,
       location,
-      experience,
       professionalEmail,
       socialLinks,
       skills,
       interests,
-      education,
       workExperience
     } = req.body;
 
@@ -548,12 +546,10 @@ router.patch('/:userId', authenticateToken, async (req, res) => {
           ...(company && { company: company.trim() }),
           ...(designation && { designation: designation.trim() }),
           ...(location && { location: location.trim() }),
-          ...(experience && { experience: experience.trim() }),
           ...(professionalEmail && { professionalEmail: professionalEmail.trim() }),
           ...(socialLinks && { socialLinks }),
           ...(skills && { skills }),
           ...(interests && { interests }),
-          ...(education && { education }),
           ...(workExperience && { workExperience })
         }
       },

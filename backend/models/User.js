@@ -125,7 +125,6 @@ const userSchema = new mongoose.Schema({
   alumniInfo: {
     currentCompany: String,
     jobTitle: String,
-    experience: String,
     salary: String,
     workLocation: String,
     industry: String,

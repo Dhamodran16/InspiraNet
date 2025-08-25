@@ -180,42 +180,42 @@ export function NotificationList({ onNotificationClick, onMarkAllRead }: Notific
   const getNotificationIcon = (type: string) => {
     switch (type) {
       case 'follow_request':
-        return <UserPlus className="h-5 w-5 text-blue-500" />;
+        return <UserPlus className="h-5 w-5 text-blue-500 dark:text-blue-400" />;
       case 'follow_accepted':
-        return <CheckCircle className="h-5 w-5 text-green-500" />;
+        return <CheckCircle className="h-5 w-5 text-green-500 dark:text-green-400" />;
       case 'follow_rejected':
-        return <XCircle className="h-5 w-5 text-red-500" />;
+        return <XCircle className="h-5 w-5 text-red-500 dark:text-red-400" />;
       case 'post_like':
-        return <Heart className="h-5 w-5 text-red-500" />;
+        return <Heart className="h-5 w-5 text-red-500 dark:text-red-400" />;
       case 'post_comment':
-        return <MessageSquare className="h-5 w-5 text-blue-500" />;
+        return <MessageSquare className="h-5 w-5 text-blue-500 dark:text-blue-400" />;
       case 'post_share':
-        return <Share2 className="h-5 w-5 text-purple-500" />;
+        return <Share2 className="h-5 w-5 text-purple-500 dark:text-purple-400" />;
       case 'message':
-        return <MessageSquare className="h-5 w-5 text-green-500" />;
+        return <MessageSquare className="h-5 w-5 text-green-500 dark:text-green-400" />;
       default:
-        return <Bell className="h-5 w-5 text-gray-500" />;
+        return <Bell className="h-5 w-5 text-gray-500 dark:text-gray-400" />;
     }
   };
 
   const getNotificationColor = (type: string) => {
     switch (type) {
       case 'follow_request':
-        return 'border-l-blue-500 bg-blue-50';
+        return 'border-l-blue-500 bg-blue-50 dark:bg-blue-950/20';
       case 'follow_accepted':
-        return 'border-l-green-500 bg-green-50';
+        return 'border-l-green-500 bg-green-50 dark:bg-green-950/20';
       case 'follow_rejected':
-        return 'border-l-red-500 bg-red-50';
+        return 'border-l-red-500 bg-red-50 dark:bg-red-950/20';
       case 'post_like':
-        return 'border-l-red-500 bg-red-50';
+        return 'border-l-red-500 bg-red-50 dark:bg-red-950/20';
       case 'post_comment':
-        return 'border-l-blue-500 bg-blue-50';
+        return 'border-l-blue-500 bg-blue-50 dark:bg-blue-950/20';
       case 'post_share':
-        return 'border-l-purple-500 bg-purple-50';
+        return 'border-l-purple-500 bg-purple-50 dark:bg-purple-950/20';
       case 'message':
-        return 'border-l-green-500 bg-green-50';
+        return 'border-l-green-500 bg-green-50 dark:bg-green-950/20';
       default:
-        return 'border-l-gray-500 bg-gray-50';
+        return 'border-l-gray-500 bg-gray-50 dark:bg-gray-950/20';
     }
   };
 
@@ -307,7 +307,7 @@ export function NotificationList({ onNotificationClick, onMarkAllRead }: Notific
           <Card 
             key={notification._id} 
             className={`border-l-4 ${getNotificationColor(notification.type)} ${
-              !notification.isRead ? 'ring-2 ring-blue-200' : ''
+              !notification.isRead ? 'ring-2 ring-blue-200 dark:ring-blue-800' : ''
             }`}
           >
             <CardContent className="p-4">
@@ -318,7 +318,7 @@ export function NotificationList({ onNotificationClick, onMarkAllRead }: Notific
                 
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center space-x-2 mb-1">
-                    <h4 className="font-medium text-sm">{notification.title}</h4>
+                    <h4 className="font-medium text-sm text-foreground">{notification.title}</h4>
                     {!notification.isRead && (
                       <Badge variant="secondary" className="text-xs">
                         New

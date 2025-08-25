@@ -26,7 +26,6 @@ interface ProfileFormData {
   company: string;
   designation: string;
   location: string;
-  experience: string;
   bio: string;
   professionalEmail: string;
 }
@@ -59,7 +58,6 @@ export default function UserProfile() {
     company: '',
     designation: '',
     location: '',
-    experience: '',
     bio: '',
     professionalEmail: ''
   });
@@ -85,7 +83,6 @@ export default function UserProfile() {
         company: user.company || '',
         designation: user.designation || '',
         location: user.location || '',
-        experience: user.experience || '',
         bio: user.bio || '',
         professionalEmail: user.professionalEmail || ''
       });
@@ -141,7 +138,6 @@ export default function UserProfile() {
         company: profileData.company,
         designation: profileData.designation,
         location: profileData.location,
-        experience: profileData.experience,
         bio: profileData.bio,
         professionalEmail: profileData.professionalEmail,
         avatar: avatarUrl
@@ -402,28 +398,15 @@ export default function UserProfile() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="location">Location</Label>
-                  <Input
-                    id="location"
-                    value={profileData.location}
-                    onChange={(e) => handleProfileChange('location', e.target.value)}
-                    placeholder="e.g., San Francisco, CA"
-                    disabled={!isEditing}
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="experience">Experience</Label>
-                  <Input
-                    id="experience"
-                    value={profileData.experience}
-                    onChange={(e) => handleProfileChange('experience', e.target.value)}
-                    placeholder="e.g., 5 years"
-                    disabled={!isEditing}
-                  />
-                </div>
+              <div className="space-y-2">
+                <Label htmlFor="location">Location</Label>
+                <Input
+                  id="location"
+                  value={profileData.location}
+                  onChange={(e) => handleProfileChange('location', e.target.value)}
+                  placeholder="e.g., San Francisco, CA"
+                  disabled={!isEditing}
+                />
               </div>
 
               <div className="space-y-2">

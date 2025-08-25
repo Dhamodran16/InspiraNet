@@ -23,7 +23,6 @@ export interface User {
   company?: string;
   bio?: string;
   professionalEmail?: string;
-  experience?: string;
   skills?: string[];
   languages?: string[];
   interests?: string[];
@@ -55,7 +54,6 @@ export interface User {
   alumniInfo?: {
     currentCompany?: string;
     jobTitle?: string;
-    experience?: string;
     salary?: string;
     workLocation?: string;
     industry?: string;
