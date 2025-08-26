@@ -151,7 +151,22 @@ const placementExperienceSchema = new mongoose.Schema({
   resume: {
     type: String,
     default: null
-  }
+  },
+  
+  // Images support for placement experience
+  images: [{
+    url: {
+      type: String,
+      required: true
+    },
+    filename: String,
+    size: Number,
+    mimeType: String,
+    uploadedAt: {
+      type: Date,
+      default: Date.now
+    }
+  }]
 }, {
   timestamps: true
 });

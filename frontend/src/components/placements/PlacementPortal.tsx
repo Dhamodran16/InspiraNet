@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Building, Calendar, MapPin, DollarSign, Users, Star, Clock, CheckCircle, Plus, Loader2, Search, Filter, FileText } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
-import { uploadResumeToCloudinary } from "@/services/cloudinary";
+import { uploadResumeToCloudinary, uploadImageToCloudinary } from "@/services/cloudinary";
 import api from "@/services/api";
 
 interface PlacementExperience {
@@ -24,6 +24,13 @@ interface PlacementExperience {
   feedback: string;
   skills: string;
   resume?: string;
+  images?: Array<{
+    url: string;
+    filename?: string;
+    size?: number;
+    mimeType?: string;
+    uploadedAt?: string;
+  }>;
   batch: string;
   department?: string;
   createdAt?: string;
@@ -51,6 +58,7 @@ export default function PlacementPortal() {
   const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [isImageUploading, setIsImageUploading] = useState(false);
   const [showAddExperience, setShowAddExperience] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterCompany, setFilterCompany] = useState("");
@@ -72,6 +80,7 @@ export default function PlacementPortal() {
     feedback: "",
     skills: "",
     resume: undefined,
+    images: [],
     batch: user?.batch || "",
     department: user?.department || user?.studentInfo?.department || "",
     // Enhanced fields
@@ -176,8 +185,26 @@ export default function PlacementPortal() {
         feedback: "",
         skills: "",
         resume: undefined,
+        images: [],
         batch: user.batch || "",
-        department: user.department || user.studentInfo?.department || ""
+        department: user.department || user.studentInfo?.department || "",
+        // Enhanced fields
+        companyType: "enterprise",
+        companySize: "1000+",
+        workMode: "on-site",
+        location: "",
+        experienceRequired: "",
+        interviewDifficulty: "medium",
+        preparationTime: "",
+        interviewDuration: "",
+        totalCandidates: 0,
+        selectedCandidates: 0,
+        selectionRate: 0,
+        benefits: [],
+        workCulture: "",
+        growthOpportunities: "",
+        challenges: "",
+        tips: ""
       });
       
       toast({
@@ -222,6 +249,77 @@ export default function PlacementPortal() {
     } finally {
       setIsUploading(false);
     }
+  };
+
+  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+
+    try {
+      setIsImageUploading(true);
+      const uploadedImages = [];
+
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        
+        // Validate file type
+        if (!file.type.startsWith('image/')) {
+          toast({
+            title: "Invalid file type",
+            description: `${file.name} is not an image file. Only images are allowed.`,
+            variant: "destructive",
+          });
+          continue;
+        }
+
+        // Validate file size (max 5MB per image)
+        if (file.size > 5 * 1024 * 1024) {
+          toast({
+            title: "File too large",
+            description: `${file.name} is too large. Maximum size is 5MB per image.`,
+            variant: "destructive",
+          });
+          continue;
+        }
+
+        const imageUrl = await uploadImageToCloudinary(file);
+        uploadedImages.push({
+          url: imageUrl,
+          filename: file.name,
+          size: file.size,
+          mimeType: file.type,
+          uploadedAt: new Date().toISOString()
+        });
+      }
+
+      if (uploadedImages.length > 0) {
+        setNewExperience(prev => ({
+          ...prev,
+          images: [...(prev.images || []), ...uploadedImages]
+        }));
+        
+        toast({
+          title: "Images uploaded successfully!",
+          description: `${uploadedImages.length} image(s) have been uploaded and saved.`,
+        });
+      }
+    } catch (error) {
+      console.error('Error uploading images:', error);
+      toast({
+        title: "Upload failed",
+        description: "Failed to upload some images. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsImageUploading(false);
+    }
+  };
+
+  const removeImage = (index: number) => {
+    setNewExperience(prev => ({
+      ...prev,
+      images: prev.images?.filter((_, i) => i !== index) || []
+    }));
   };
 
   const filteredAndSortedExperiences = interviewHistory
@@ -583,6 +681,33 @@ export default function PlacementPortal() {
                     <p className="text-sm text-muted-foreground">{record.feedback}</p>
                   </div>
 
+                  {/* Display Images */}
+                  {record.images && record.images.length > 0 && (
+                    <div className="mt-4">
+                      <h4 className="font-medium mb-2">Images:</h4>
+                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                        {record.images.map((image, index) => (
+                          <div key={index} className="relative group">
+                            <img 
+                              src={image.url} 
+                              alt={`Placement image ${index + 1}`}
+                              className="w-full h-32 object-cover rounded-lg border cursor-pointer hover:opacity-90 transition-opacity"
+                              onClick={() => {
+                                // Open image in full screen (you can implement a modal here)
+                                window.open(image.url, '_blank');
+                              }}
+                            />
+                            <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-10 transition-all duration-200 rounded-lg flex items-center justify-center">
+                              <div className="opacity-0 group-hover:opacity-100 transition-opacity text-white text-xs bg-black bg-opacity-50 px-2 py-1 rounded">
+                                Click to view
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   {/* Additional Useful Information */}
                   {(record.benefits?.length || record.workCulture || record.growthOpportunities || record.challenges || record.tips) && (
                     <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg">
@@ -698,6 +823,60 @@ export default function PlacementPortal() {
                 </div>
               </div>
               
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <Label htmlFor="companyType">Company Type</Label>
+                  <select
+                    id="companyType"
+                    className="w-full p-2 border rounded-md"
+                    value={newExperience.companyType}
+                    onChange={(e) => setNewExperience(prev => ({ ...prev, companyType: e.target.value as 'startup' | 'midsize' | 'enterprise' | 'government' }))}
+                  >
+                    <option value="enterprise">Enterprise</option>
+                    <option value="startup">Startup</option>
+                    <option value="midsize">Midsize</option>
+                    <option value="government">Government</option>
+                  </select>
+                </div>
+                <div>
+                  <Label htmlFor="workMode">Work Mode</Label>
+                  <select
+                    id="workMode"
+                    className="w-full p-2 border rounded-md"
+                    value={newExperience.workMode}
+                    onChange={(e) => setNewExperience(prev => ({ ...prev, workMode: e.target.value as 'on-site' | 'remote' | 'hybrid' }))}
+                  >
+                    <option value="on-site">On-site</option>
+                    <option value="remote">Remote</option>
+                    <option value="hybrid">Hybrid</option>
+                  </select>
+                </div>
+                <div>
+                  <Label htmlFor="interviewDifficulty">Difficulty</Label>
+                  <select
+                    id="interviewDifficulty"
+                    className="w-full p-2 border rounded-md"
+                    value={newExperience.interviewDifficulty}
+                    onChange={(e) => setNewExperience(prev => ({ ...prev, interviewDifficulty: e.target.value as 'easy' | 'medium' | 'hard' | 'very-hard' }))}
+                  >
+                    <option value="easy">Easy</option>
+                    <option value="medium">Medium</option>
+                    <option value="hard">Hard</option>
+                    <option value="very-hard">Very Hard</option>
+                  </select>
+                </div>
+              </div>
+              
+              <div>
+                <Label htmlFor="location">Location</Label>
+                <Input 
+                  id="location" 
+                  placeholder="e.g., Bangalore, Remote, Hybrid" 
+                  value={newExperience.location}
+                  onChange={(e) => setNewExperience(prev => ({ ...prev, location: e.target.value }))}
+                />
+              </div>
+              
               <div>
                 <Label htmlFor="skills">Skills Required</Label>
                 <Textarea 
@@ -738,7 +917,49 @@ export default function PlacementPortal() {
                 )}
               </div>
               
-              <div className="flex space-x-2">
+              <div>
+                <Label htmlFor="images">Images (Optional)</Label>
+                <Input 
+                  id="images" 
+                  type="file" 
+                  accept="image/*" 
+                  multiple
+                  onChange={handleImageUpload}
+                />
+                {isImageUploading && (
+                  <div className="flex items-center gap-2 mt-2">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span className="text-sm text-muted-foreground">Uploading images...</span>
+                  </div>
+                )}
+                
+                {/* Display uploaded images */}
+                {newExperience.images && newExperience.images.length > 0 && (
+                  <div className="mt-3 space-y-2">
+                    <p className="text-sm text-green-600">✓ {newExperience.images.length} image(s) uploaded</p>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                      {newExperience.images.map((image, index) => (
+                        <div key={index} className="relative group">
+                          <img 
+                            src={image.url} 
+                            alt={`Uploaded image ${index + 1}`}
+                            className="w-full h-24 object-cover rounded-md border"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => removeImage(index)}
+                            className="absolute top-1 right-1 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div>
                 <Button type="submit" className="flex-1" disabled={isLoading}>
                   {isLoading ? (
                     <>
