@@ -103,7 +103,7 @@ router.get('/callback', async (req, res) => {
     const token = jwt.sign(finalUser, process.env.JWT_SECRET, { expiresIn: '24h' });
 
     // Redirect to frontend with token
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    const frontendUrl = process.env.FRONTEND_URL || 'https://inspiranet.onrender.com';
     res.redirect(`${frontendUrl}/dashboard?token=${token}&google_auth=success`);
   } catch (error) {
     console.error('OAuth callback error:', error);

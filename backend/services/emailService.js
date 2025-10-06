@@ -150,7 +150,7 @@ class EmailService {
           </div>
           
           <div style="text-align: center; margin: 30px 0;">
-            <a href="${process.env.FRONTEND_URL || 'http://localhost:8083'}/profile" 
+            <a href="${process.env.FRONTEND_URL || 'https://inspiranet.onrender.com'}/profile" 
                style="background: #007bff; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block;">
               Update Profile Now
             </a>
@@ -185,7 +185,7 @@ class EmailService {
       3. You can continue networking with the KEC community
       4. Your college email will be archived (read-only)
       
-      Update your profile now: ${process.env.FRONTEND_URL || 'http://localhost:8083'}/profile
+      Update your profile now: ${process.env.FRONTEND_URL || 'https://inspiranet.onrender.com'}/profile
       
       If you have any questions, please contact our support team.
     `;
@@ -246,7 +246,7 @@ class EmailService {
           </div>
           
           <div style="text-align: center; margin: 30px 0;">
-            <a href="${process.env.FRONTEND_URL || 'http://localhost:8083'}/profile" 
+            <a href="${process.env.FRONTEND_URL || 'https://inspiranet.onrender.com'}/profile" 
                style="background: #dc3545; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold;">
               SAVE MY ACCOUNT NOW
             </a>
@@ -280,7 +280,7 @@ class EmailService {
       3. Add your personal email address
       4. Save the changes
       
-      SAVE YOUR ACCOUNT NOW: ${process.env.FRONTEND_URL || 'http://localhost:8083'}/profile
+      SAVE YOUR ACCOUNT NOW: ${process.env.FRONTEND_URL || 'https://inspiranet.onrender.com'}/profile
       
       This is your last chance to preserve your account. Don't wait!
     `;
@@ -329,7 +329,7 @@ class EmailService {
           </div>
           
           <div style="text-align: center; margin: 30px 0;">
-            <a href="${process.env.FRONTEND_URL || 'http://localhost:8083'}/profile" 
+            <a href="${process.env.FRONTEND_URL || 'https://inspiranet.onrender.com'}/profile" 
                style="background: #28a745; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block;">
               Complete Your Alumni Profile
             </a>
@@ -360,7 +360,7 @@ class EmailService {
       3. Explore mentorship opportunities for current students
       4. Stay updated with KEC events and news
       
-      Complete your alumni profile: ${process.env.FRONTEND_URL || 'http://localhost:8083'}/profile
+      Complete your alumni profile: ${process.env.FRONTEND_URL || 'https://inspiranet.onrender.com'}/profile
       
       Welcome to the alumni family! We're excited to see what you'll accomplish next.
     `;
