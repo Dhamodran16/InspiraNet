@@ -1,13 +1,23 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 
-// Middleware to verify JWT token
+// Middleware to verify JWT token or session
 const authenticateToken = async (req, res, next) => {
   try {
+    console.log('Auth middleware - Path:', req.path);
+    
+    // First check for session-based authentication (Google OAuth users)
+    if (req.session && req.session.user && req.session.isAuthenticated) {
+      console.log('Auth middleware - Session-based authentication found');
+      req.user = req.session.user;
+      next();
+      return;
+    }
+
+    // Fallback to JWT token authentication
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
 
-    console.log('Auth middleware - Path:', req.path);
     console.log('Auth middleware - Token present:', !!token);
 
     if (!token) {
@@ -18,6 +28,29 @@ const authenticateToken = async (req, res, next) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     console.log('Auth middleware - Token decoded, userId:', decoded.userId);
     
+    // Check if this is a Google OAuth user (string ID)
+    if (decoded.userId && decoded.userId.startsWith('google-user-')) {
+      console.log('Auth middleware - Google OAuth user detected, using session data');
+      // For Google OAuth users, use the decoded token data directly
+      req.user = {
+        _id: decoded._id || decoded.userId,
+        name: decoded.name,
+        email: decoded.email,
+        type: decoded.type,
+        avatar: decoded.avatar,
+        department: decoded.department,
+        batch: decoded.batch,
+        isVerified: decoded.isVerified,
+        isProfileComplete: decoded.isProfileComplete,
+        role: decoded.role,
+        googleCalendarConnected: decoded.googleCalendarConnected
+      };
+      console.log('Auth middleware - Google OAuth user authenticated:', req.user.name);
+      next();
+      return;
+    }
+    
+    // For regular users, look up in database
     const user = await User.findById(decoded.userId).select('-password');
     
     if (!user) {

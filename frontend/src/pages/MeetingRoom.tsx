@@ -84,7 +84,8 @@ export default function MeetingRoom() {
   // Load RTC configuration
   const loadRTCConfig = useCallback(async () => {
     try {
-      const response = await fetch('https://inspiranet-backend.onrender.com/config');
+      const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
+      const response = await fetch(`${backendUrl}/config`);
       if (response.ok) {
         const data = await response.json();
         if (data && data.rtcConfig && Array.isArray(data.rtcConfig.iceServers)) {

@@ -41,9 +41,15 @@ export const getCurrentConfig = (): URLConfig => {
   const mode = import.meta.env.MODE;
   const env = import.meta.env.VITE_ENVIRONMENT || mode;
   
+  // Force development mode for localhost
+  const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+  
+  if (isLocalhost || env === 'development') {
+    console.log('🔧 Using development configuration (localhost)');
+    return devConfig;
+  }
+  
   switch (env) {
-    case 'development':
-      return devConfig;
     case 'staging':
       return stagingConfig;
     case 'production':

@@ -67,6 +67,13 @@ router.get('/', authenticateToken, async (req, res) => {
 router.get('/unread-count', authenticateToken, async (req, res) => {
   try {
     const userId = req.user._id;
+    
+    // Check if this is a Google OAuth user (string ID)
+    if (typeof userId === 'string' && userId.startsWith('google-user-')) {
+      console.log('🔍 Google OAuth user detected, returning zero unread count');
+      return res.json({ count: 0 });
+    }
+    
     const count = await NotificationService.getUnreadCount(userId);
     res.json({ count });
   } catch (error) {

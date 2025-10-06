@@ -12,6 +12,13 @@ router.get('/', authenticateToken, async (req, res) => {
     
     const userId = req.user._id;
     
+    // Check if this is a Google OAuth user (string ID)
+    if (typeof userId === 'string' && userId.startsWith('google-user-')) {
+      console.log('🔍 Google OAuth user detected, returning empty conversations');
+      // For Google OAuth users, return empty conversations since they don't have database records
+      return res.json({ conversations: [] });
+    }
+    
     // Get current user's follow relationships
     console.log('🔍 Fetching user follow relationships...');
     const currentUser = await User.findById(userId).select('following followers');

@@ -35,6 +35,17 @@ router.get('/', authenticateToken, async (req, res) => {
     const skip = (page - 1) * limit;
 
     let query = { isPublic: true };
+    
+    // For Google OAuth users, return empty posts since they don't have database records
+    if (typeof req.user._id === 'string' && req.user._id.startsWith('google-user-')) {
+      console.log('🔍 Google OAuth user detected, returning empty posts');
+      return res.json({
+        posts: [],
+        totalPages: 0,
+        currentPage: parseInt(page),
+        total: 0
+      });
+    }
 
     if (author) {
       query.author = author;

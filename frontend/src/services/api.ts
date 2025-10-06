@@ -29,6 +29,7 @@ const api: AxiosInstance = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+  withCredentials: true, // Include cookies and session data
 });
 
 // Request interceptor to automatically add auth token

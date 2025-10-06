@@ -1,290 +1,224 @@
 const express = require('express');
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
-const User = require('../models/User');
-const { authenticateToken } = require('../middleware/auth');
-const EmailExpiryService = require('../services/emailExpiryService');
-const studentConversionService = require('../services/studentConversionService');
-
 const router = express.Router();
+const jwt = require('jsonwebtoken');
+const bcrypt = require('bcryptjs');
+const { generateAuthUrl, getTokensFromCode } = require('../auth/googleAuth');
+const User = require('../models/User');
 
-const generateToken = (userId) => jwt.sign({ userId }, process.env.JWT_SECRET, { expiresIn: '30m' });
-const generateRefreshToken = (userId) => jwt.sign({ userId }, process.env.JWT_SECRET, { expiresIn: '7d' });
-
-// Register
-router.post('/register', async (req, res) => {
+// /auth/google (start OAuth) - redirect directly to Google
+router.get('/google', (req, res) => {
   try {
-		const { firstName, lastName, email, password, userType, department, batch, currentYear, company, designation, phone } = req.body;
-
-		if (!firstName || !lastName || !password || !userType) {
-			return res.status(400).json({ error: 'firstName, lastName, password and userType are required' });
+    // If a user is already logged in via JWT, pass their userId in state to link accounts
+    const bearer = req.headers['authorization'] || (req.query?.token ? `Bearer ${req.query.token}` : undefined);
+    let state = undefined;
+    if (bearer && bearer.startsWith('Bearer ')) {
+      try {
+        const token = bearer.split(' ')[1];
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        if (decoded?.userId || decoded?._id) {
+          state = JSON.stringify({ linkUserId: decoded.userId || decoded._id });
+        }
+      } catch (_) {}
     }
-    if (password.length < 6) {
-      return res.status(400).json({ error: 'Password must be at least 6 characters long' });
-    }
 
-		const name = `${firstName.trim()} ${lastName.trim()}`;
-    let collegeEmail = null;
-    let personalEmail = null;
-
-		if (userType === 'student') {
-			if (!email || !email.toLowerCase().endsWith('@kongu.edu')) return res.status(400).json({ error: 'Use your Kongu email (@kongu.edu)' });
-
-			// name.yydept@kongu.edu -> capture year and dept code
-			const m = email.match(/^[a-zA-Z]+\.(\d{2})([a-z]+)@kongu\.edu$/);
-			if (!m) return res.status(400).json({ error: 'Student email must be like name.yydept@kongu.edu (e.g., john.23aim@kongu.edu)' });
-			const emailYear = parseInt(m[1], 10);
-			const emailDept = m[2];
-			
-			// If department is provided, validate it matches email
-			if (department) {
-				// Department short forms per latest requirement (Civil removed)
-				const deptMapping = { MCH: 'mch', AID: 'aid', AIM: 'aim', MTR: 'mtr', AUT: 'aut', EEE: 'eee', ECE: 'ece', CSE: 'cse', IT: 'it', EIE: 'eie' };
-				const expectedDept = deptMapping[department] || String(department).toLowerCase();
-				if (emailDept !== expectedDept) return res.status(400).json({ error: `Email department (${emailDept}) doesn't match selected department (${department})` });
-			}
-
-			// Derive join year from currentYear (I/II/III/IV) or batch
-			const romanToNum = { I: 1, II: 2, III: 3, IV: 4, '1': 1, '2': 2, '3': 3, '4': 4 };
-			let joinYear;
-			if (currentYear) {
-				const n = romanToNum[String(currentYear).toUpperCase()];
-				if (!n) return res.status(400).json({ error: 'Invalid current year. Use I, II, III, or IV' });
-				const now = new Date().getFullYear();
-				joinYear = now - (n - 1);
-				if ((joinYear % 100) !== emailYear) return res.status(400).json({ error: `Email year (${emailYear}) does not match derived join year (${String(joinYear).slice(-2)})` });
-			} else if (batch) {
-				const by = parseInt(batch, 10);
-				if (isNaN(by) || by < 2000) return res.status(400).json({ error: 'Invalid batch year' });
-				joinYear = by;
-				if ((by % 100) !== emailYear) return res.status(400).json({ error: `Email year (${emailYear}) does not match batch year (${batch})` });
-			} else {
-				return res.status(400).json({ error: 'Provide currentYear (I/II/III/IV)' });
-      }
-
-      collegeEmail = email.toLowerCase();
-			
-			// Check if email exists in ANY user type (college or personal)
-			const existingUser = await User.findOne({
-				$or: [
-					{ 'email.college': collegeEmail },
-					{ 'email.personal': collegeEmail }
-				]
-			});
-			if (existingUser) {
-				return res.status(400).json({ 
-					error: `Email ${collegeEmail} is already registered as ${existingUser.type}. One email can only be used for one account type.` 
-				});
-			}
-
-			const hashed = await bcrypt.hash(password, 12);
-			const userData = {
-				name,
-				password: hashed,
-				type: userType,
-				phone: phone || undefined,
-				email: { college: collegeEmail },
-				batch: String(joinYear),
-				studentInfo: { joinYear, currentYear: Math.min(4, new Date().getFullYear() - joinYear + 1) }
-			};
-			
-			// Only include department if provided
-			if (department) {
-				userData.department = department;
-			}
-			
-			const user = new User(userData);
-			await user.save();
-			const token = generateToken(user._id);
-			const refreshToken = generateRefreshToken(user._id);
-			return res.status(201).json({ message: 'User registered successfully', token, refreshToken, user: { _id: user._id, name: user.name, type: user.type, email: user.email, department: user.department, batch: user.batch } });
-		}
-
-		if (userType === 'faculty') {
-			if (!email || !email.toLowerCase().endsWith('@kongu.edu')) return res.status(400).json({ error: 'Use your Kongu email (@kongu.edu)' });
-			
-			// If department is provided, validate it matches email
-			if (department) {
-				const match = email.match(/^[a-zA-Z]+\.([a-z]+)@kongu\.edu$/);
-				if (!match) return res.status(400).json({ error: `Faculty email must be name.${String(department).toLowerCase()}@kongu.edu` });
-				const emailDept = match[1];
-				if (emailDept !== String(department).toLowerCase()) return res.status(400).json({ error: `Email department (${emailDept}) doesn't match selected department (${department})` });
-			}
-
-			collegeEmail = email.toLowerCase();
-			
-			// Check if email exists in ANY user type (college or personal)
-			const existingUser = await User.findOne({
-				$or: [
-					{ 'email.college': collegeEmail },
-					{ 'email.personal': collegeEmail }
-				]
-			});
-			if (existingUser) {
-				return res.status(400).json({ 
-					error: `Email ${collegeEmail} is already registered as ${existingUser.type}. One email can only be used for one account type.` 
-				});
-			}
-
-			const hashed = await bcrypt.hash(password, 12);
-			const userData = {
-				name,
-				password: hashed,
-				type: userType,
-				phone: phone || undefined,
-				email: { college: collegeEmail }
-			};
-			
-			// Only include department if provided
-			if (department) {
-				userData.department = department;
-			}
-			
-			const user = new User(userData);
-			await user.save();
-			const token = generateToken(user._id);
-			const refreshToken = generateRefreshToken(user._id);
-			return res.status(201).json({ message: 'User registered successfully', token, refreshToken, user: { _id: user._id, name: user.name, type: user.type, email: user.email, department: user.department } });
-		}
-
-		if (userType === 'alumni') {
-			if (!email) return res.status(400).json({ error: 'Email is required for alumni' });
-			const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-			if (!re.test(email)) return res.status(400).json({ error: 'Please provide a valid email address' });
-      personalEmail = email.toLowerCase();
-			
-			// Check if email exists in ANY user type (college or personal)
-			const existingUser = await User.findOne({
-				$or: [
-					{ 'email.college': personalEmail },
-					{ 'email.personal': personalEmail }
-				]
-			});
-			if (existingUser) {
-				return res.status(400).json({ 
-					error: `Email ${personalEmail} is already registered as ${existingUser.type}. One email can only be used for one account type.` 
-				});
-			}
-
-			const hashed = await bcrypt.hash(password, 12);
-			const user = new User({ name, password: hashed, type: userType, phone: phone || undefined, email: { personal: personalEmail }, currentCompany: company || undefined, designation: designation || undefined });
-    await user.save();
-    const token = generateToken(user._id);
-    const refreshToken = generateRefreshToken(user._id);
-			return res.status(201).json({ message: 'User registered successfully', token, refreshToken, user: { _id: user._id, name: user.name, type: user.type, email: user.email, currentCompany: user.currentCompany, designation: user.designation } });
-		}
-
-		return res.status(400).json({ error: 'Invalid userType. Use student, faculty, or alumni' });
-	} catch (error) {
-		console.error('❌ Registration error:', error);
-    res.status(500).json({ error: 'Registration failed. Please try again.' });
+    const authUrl = generateAuthUrl(state);
+    res.redirect(authUrl);
+  } catch (error) {
+    console.error('Error generating auth URL:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to generate auth URL' 
+    });
   }
 });
 
-// Login
+// /auth/callback (OAuth callback)
+router.get('/callback', async (req, res) => {
+  try {
+    const { code, state } = req.query;
+    
+    if (!code) {
+      return res.status(400).json({ 
+        success: false,
+        error: 'Authorization code is required' 
+      });
+    }
+
+    const tokens = await getTokensFromCode(code);
+
+    // If we have a state with linkUserId, attach calendar tokens to that user
+    let finalUser;
+    if (state) {
+      try {
+        const parsed = JSON.parse(state);
+        const linkId = parsed?.linkUserId;
+        if (linkId) {
+          // Try to link to an existing DB user
+          const existing = await User.findById(linkId);
+          if (existing) {
+            existing.googleCalendarConnected = true;
+            existing.googleCalendarTokens = tokens;
+            await existing.save();
+            finalUser = {
+              userId: existing._id,
+              _id: existing._id,
+              name: existing.name,
+              email: existing.email,
+              type: existing.type,
+              avatar: existing.avatar,
+              department: existing.department,
+              batch: existing.batch,
+              isVerified: existing.isVerified,
+              isProfileComplete: existing.isProfileComplete,
+              role: 'host',
+              googleCalendarConnected: true
+            };
+          }
+        }
+      } catch (_) {}
+    }
+
+    // If we could not link, create an in-memory Google-only session user (no DB)
+    if (!finalUser) {
+      finalUser = {
+        userId: 'google-user-' + Date.now(),
+        _id: 'google-user-' + Date.now(),
+        name: 'Google User',
+        email: { college: 'google@inspiranet.com', personal: 'google@example.com' },
+        type: 'student',
+        avatar: '',
+        department: '',
+        batch: '',
+        isVerified: true,
+        isProfileComplete: true,
+        role: 'host',
+        googleCalendarConnected: true
+      };
+    }
+
+    // Store user in session
+    req.session.user = finalUser;
+    req.session.isAuthenticated = true;
+    
+    const token = jwt.sign(finalUser, process.env.JWT_SECRET, { expiresIn: '24h' });
+
+    // Redirect to frontend with token
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    res.redirect(`${frontendUrl}/dashboard?token=${token}&google_auth=success`);
+  } catch (error) {
+    console.error('OAuth callback error:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Authorization failed',
+      details: error.message
+    });
+  }
+});
+
+// /auth/validate (validate connection)
+router.get('/validate', (req, res) => {
+  try {
+    const token = req.headers['authorization']?.split(' ')[1];
+    
+    if (!token) {
+      return res.status(401).json({
+        success: false,
+        connected: false,
+        error: 'No token provided'
+      });
+    }
+
+    // Verify JWT token
+    jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
+      if (err) {
+        return res.status(401).json({
+          success: false,
+          connected: false,
+          error: 'Invalid token'
+        });
+      }
+
+      res.json({
+        success: true,
+        connected: true,
+        message: 'Connection is valid',
+        user: {
+          id: user.id,
+          role: user.role,
+          email: user.email
+        }
+      });
+    });
+  } catch (error) {
+    console.error('Validation error:', error);
+    res.status(500).json({
+      success: false,
+      connected: false,
+      error: 'Validation failed'
+    });
+  }
+});
+
+// /auth/login (standard login)
 router.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body;
-		if (!email || !password) return res.status(400).json({ error: 'Email and password are required' });
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-		if (!emailRegex.test(email)) return res.status(400).json({ error: 'Invalid email format' });
-		const user = await User.findOne({ $or: [{ 'email.college': email.toLowerCase() }, { 'email.personal': email.toLowerCase() }] });
-		if (!user) return res.status(401).json({ error: 'Invalid email or password' });
-		const ok = await bcrypt.compare(password, user.password);
-		if (!ok) return res.status(401).json({ error: 'Invalid email or password' });
-    user.lastLogin = new Date();
-    await user.save();
-    const token = generateToken(user._id);
-    const refreshToken = generateRefreshToken(user._id);
-		const userResponse = { _id: user._id, name: user.name, email: user.email, type: user.type, department: user.department, avatar: user.avatar, isVerified: user.isVerified, isProfileComplete: !!user.isProfileComplete, bio: user.bio, location: user.location, studentInfo: user.studentInfo, alumniInfo: user.alumniInfo, facultyInfo: user.facultyInfo };
-		res.json({ message: 'Login successful', token, refreshToken, user: userResponse });
-  } catch (error) {
-    console.error('Login error:', error);
-		if (error.name === 'ValidationError') return res.status(400).json({ error: 'Invalid input data' });
-    res.status(500).json({ error: 'Login failed. Please try again.' });
-  }
-});
 
-// Profile
-router.get('/profile', authenticateToken, async (req, res) => {
-  try {
-    const user = await User.findById(req.user._id).select('-password');
-		if (!user) return res.status(404).json({ error: 'User not found' });
-    res.json({ user });
-	} catch (e) { res.status(500).json({ error: 'Failed to fetch profile' }); }
-});
-
-router.put('/profile', authenticateToken, async (req, res) => {
-  try {
-    const { name, batch, department, company, designation, location, experience, bio, professionalEmail } = req.body;
-    const user = await User.findById(req.user._id);
-		if (!user) return res.status(404).json({ error: 'User not found' });
-    
-    // Update basic fields
-    if (name) user.name = name;
-    if (batch) user.batch = batch;
-    if (department) user.department = department;
-    if (company) user.company = company;
-    if (designation) user.designation = designation;
-    if (location) user.location = location;
-    if (experience) user.experience = experience;
-    if (bio) user.bio = bio;
-    if (professionalEmail) user.professionalEmail = professionalEmail;
-    
-    // Automatically set isProfileComplete to true if user has basic information
-    const hasBasicProfile = user.name && user.email && (
-      user.department || 
-      user.bio || 
-      user.company ||
-      user.designation ||
-      user.location ||
-      user.experience
-    );
-    
-    if (hasBasicProfile) {
-      user.isProfileComplete = true;
+    if (!email || !password) {
+      return res.status(400).json({
+        success: false,
+        error: 'Email and password are required'
+      });
     }
-    
-    await user.save();
-    const token = generateToken(user._id);
-    const refreshToken = generateRefreshToken(user._id);
-		const userResponse = { _id: user._id, name: user.name, email: user.email, type: user.type, avatar: user.avatar, isVerified: user.isVerified, isProfileComplete: user.isProfileComplete };
-		res.json({ message: 'Profile updated successfully', token, refreshToken, user: userResponse });
-	} catch (e) { res.status(500).json({ error: 'Profile update failed' }); }
-});
 
-// Verify
-router.get('/verify', authenticateToken, (req, res) => {
-	try { res.json({ valid: true, user: req.user, message: 'Token verified successfully' }); }
-	catch { res.status(500).json({ error: 'Token verification failed' }); }
-});
+    // Find user by email (check both college and personal email fields)
+    const user = await User.findOne({
+      $or: [
+        { 'email.college': email },
+        { 'email.personal': email }
+      ]
+    });
 
-// Departments
-router.get('/departments', async (_req, res) => {
-	try {
-		res.json({ departments: ['mch', 'aid', 'aim', 'mtr', 'aut', 'eee', 'ece', 'cse', 'it', 'eie'] });
-	} catch { res.status(500).json({ error: 'Failed to fetch departments' }); }
-});
-
-// Refresh token
-router.post('/refresh', authenticateToken, async (req, res) => {
-  try {
-    const userId = req.user.userId;
-    
-    // Get user from database
-    const user = await User.findById(userId).select('-password');
     if (!user) {
-      return res.status(401).json({ error: 'User not found' });
+      return res.status(401).json({
+        success: false,
+        error: 'Invalid credentials'
+      });
     }
 
-    // Generate new token
+    // Check if user has a password (some users might only have Google auth)
+    if (!user.password) {
+      return res.status(401).json({
+        success: false,
+        error: 'Please use Google Sign-In for this account'
+      });
+    }
+
+    // Verify password
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+    if (!isPasswordValid) {
+      return res.status(401).json({
+        success: false,
+        error: 'Invalid credentials'
+      });
+    }
+
+    // Generate JWT token
     const token = jwt.sign(
-      { userId: user._id, email: user.email.college || user.email.personal },
+      { 
+        userId: user._id,
+        _id: user._id,
+        email: user.email.college || user.email.personal,
+        type: user.type,
+        role: 'host' // Allow all authenticated users to create meetings
+      },
       process.env.JWT_SECRET,
       { expiresIn: '24h' }
     );
 
     res.json({
+      success: true,
+      message: 'Login successful',
       token,
       user: {
         _id: user._id,
@@ -295,86 +229,306 @@ router.post('/refresh', authenticateToken, async (req, res) => {
         department: user.department,
         batch: user.batch,
         isVerified: user.isVerified,
+        isProfileComplete: user.isProfileComplete
+      }
+    });
+  } catch (error) {
+    console.error('Login error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Login failed',
+      details: error.message
+    });
+  }
+});
+
+// /auth/register (user registration)
+router.post('/register', async (req, res) => {
+  try {
+    const { name, email, password, type, department, batch } = req.body;
+
+    if (!name || !email || !password || !type) {
+      return res.status(400).json({
+        success: false,
+        error: 'Name, email, password, and type are required'
+      });
+    }
+
+    // Check if user already exists
+    const existingUser = await User.findOne({
+      $or: [
+        { 'email.college': email },
+        { 'email.personal': email }
+      ]
+    });
+
+    if (existingUser) {
+      return res.status(409).json({
+        success: false,
+        error: 'User already exists with this email'
+      });
+    }
+
+    // Hash password
+    const saltRounds = 12;
+    const hashedPassword = await bcrypt.hash(password, saltRounds);
+
+    // Create new user
+    const userData = {
+      name,
+      email: { college: email },
+      password: hashedPassword,
+      type,
+      department: department || '',
+      batch: batch || '',
+      isVerified: false,
+      isProfileComplete: false
+    };
+
+    const user = new User(userData);
+    await user.save();
+
+    // Generate JWT token
+    const token = jwt.sign(
+      { 
+        userId: user._id,
+        _id: user._id,
+        email: user.email.college,
+        type: user.type,
+        role: 'host' // Allow all authenticated users to create meetings
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: '24h' }
+    );
+
+    res.status(201).json({
+      success: true,
+      message: 'Registration successful',
+      token,
+      user: {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        type: user.type,
+        avatar: user.avatar,
+        department: user.department,
+        batch: user.batch,
+        isVerified: user.isVerified,
+        isProfileComplete: user.isProfileComplete
+      }
+    });
+  } catch (error) {
+    console.error('Registration error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Registration failed',
+      details: error.message
+    });
+  }
+});
+
+// /auth/verify (verify session or JWT token and get user info)
+router.get('/verify', async (req, res) => {
+  try {
+    // First check session-based authentication
+    if (req.session.user && req.session.isAuthenticated) {
+      console.log('Session-based authentication found:', req.session.user);
+      return res.json({
+        success: true,
+        message: 'Session is valid',
+        user: req.session.user
+      });
+    }
+
+    // Fallback to JWT token authentication
+    const token = req.headers['authorization']?.split(' ')[1];
+    
+    if (!token) {
+      return res.status(401).json({
+        success: false,
+        error: 'No authentication found'
+      });
+    }
+
+    // Verify JWT token
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    
+    // Check if this is a Google OAuth user (string ID)
+    if (decoded.userId && decoded.userId.startsWith('google-user-')) {
+      console.log('Auth verify - Google OAuth user detected, using token data');
+      // For Google OAuth users, use the decoded token data directly
+      return res.json({
+        success: true,
+        message: 'Token is valid',
+        user: {
+          _id: decoded._id || decoded.userId,
+          name: decoded.name,
+          email: decoded.email,
+          type: decoded.type,
+          avatar: decoded.avatar,
+          department: decoded.department,
+          batch: decoded.batch,
+          isVerified: decoded.isVerified,
+          isProfileComplete: decoded.isProfileComplete,
+          role: decoded.role,
+          googleCalendarConnected: decoded.googleCalendarConnected
+        }
+      });
+    }
+    
+    // For regular users, get from database
+    const user = await User.findById(decoded.userId);
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        error: 'User not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Token is valid',
+      user: {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        type: user.type,
+        avatar: user.avatar,
+        department: user.department,
+        batch: user.batch,
+        isVerified: user.isVerified,
         isProfileComplete: user.isProfileComplete,
-        bio: user.bio,
-        location: user.location,
-        studentInfo: user.studentInfo,
-        alumniInfo: user.alumniInfo,
-        facultyInfo: user.facultyInfo
+        role: user.role,
+        googleCalendarConnected: user.googleCalendarConnected
+      }
+    });
+  } catch (error) {
+    console.error('Authentication verification error:', error);
+    res.status(401).json({
+      success: false,
+      error: 'Invalid authentication',
+      details: error.message
+    });
+  }
+});
+
+// /auth/refresh (refresh JWT token)
+router.post('/refresh', async (req, res) => {
+  try {
+    const token = req.headers['authorization']?.split(' ')[1];
+    
+    if (!token) {
+      return res.status(401).json({
+        success: false,
+        error: 'No token provided'
+      });
+    }
+
+    // Verify current token
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    
+    // Check if this is a Google OAuth user (string ID)
+    if (decoded.userId && decoded.userId.startsWith('google-user-')) {
+      console.log('Auth refresh - Google OAuth user detected, using token data');
+      // For Google OAuth users, generate new token with existing data
+      const newToken = jwt.sign(decoded, process.env.JWT_SECRET, { expiresIn: '24h' });
+      
+      return res.json({
+        success: true,
+        message: 'Token refreshed successfully',
+        token: newToken,
+        user: {
+          _id: decoded._id || decoded.userId,
+          name: decoded.name,
+          email: decoded.email,
+          type: decoded.type,
+          avatar: decoded.avatar,
+          department: decoded.department,
+          batch: decoded.batch,
+          isVerified: decoded.isVerified,
+          isProfileComplete: decoded.isProfileComplete,
+          role: decoded.role,
+          googleCalendarConnected: decoded.googleCalendarConnected
+        }
+      });
+    }
+    
+    // For regular users, get from database
+    const user = await User.findById(decoded.userId);
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        error: 'User not found'
+      });
+    }
+
+    // Generate new token
+    const newToken = jwt.sign(
+      { 
+        userId: user._id,
+        _id: user._id,
+        email: user.email.college || user.email.personal,
+        type: user.type,
+        role: 'host' // Allow all authenticated users to create meetings
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: '24h' }
+    );
+
+    res.json({
+      success: true,
+      message: 'Token refreshed successfully',
+      token: newToken,
+      user: {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        type: user.type,
+        avatar: user.avatar,
+        department: user.department,
+        batch: user.batch,
+        isVerified: user.isVerified,
+        isProfileComplete: user.isProfileComplete
       }
     });
   } catch (error) {
     console.error('Token refresh error:', error);
-    res.status(500).json({ error: 'Token refresh failed' });
+    res.status(401).json({
+      success: false,
+      error: 'Token refresh failed',
+      details: error.message
+    });
   }
 });
 
-// Student conversion (admin/faculty)
-router.post('/convert-student/:studentId', authenticateToken, async (req, res) => {
+// /auth/logout (logout and clear session)
+router.post('/logout', (req, res) => {
   try {
-		if (req.user.type !== 'faculty' && req.user.type !== 'admin') return res.status(403).json({ error: 'Access denied. Admin privileges required.' });
-    const { studentId } = req.params;
-    const result = await studentConversionService.manualConversion(studentId);
-		if (result.success) res.json({ message: result.message });
-		else res.status(400).json({ error: result.error });
-	} catch { res.status(500).json({ error: 'Conversion failed' }); }
-});
-
-// Email expiry status (students)
-router.get('/email-expiry-status', authenticateToken, async (req, res) => {
-  try {
-    const user = req.user;
-    const expiryInfo = EmailExpiryService.checkEmailExpiry(user);
-    
-    res.json({
-      hasExpiryWarning: expiryInfo.shouldMigrate || expiryInfo.isExpired,
-      expiryInfo,
-      message: expiryInfo.isExpired 
-        ? 'Your Kongu email has expired. Please update your profile with a personal email.'
-        : expiryInfo.shouldMigrate 
-        ? `Your Kongu email will expire in ${expiryInfo.daysUntilExpiry} days. Please add a personal email to your profile.`
-        : 'Your email is active.',
-      hasPersonalEmail: !!user.email?.personal,
-      warningLevel: expiryInfo.isExpired ? 'critical' : expiryInfo.shouldMigrate ? 'warning' : 'normal'
+    // Clear session
+    req.session.destroy((err) => {
+      if (err) {
+        console.error('Session destruction error:', err);
+        return res.status(500).json({
+          success: false,
+          error: 'Logout failed'
+        });
+      }
+      
+      // Clear session cookie
+      res.clearCookie('connect.sid');
+      
+      res.json({
+        success: true,
+        message: 'Logged out successfully'
+      });
     });
   } catch (error) {
-    console.error('Email expiry check error:', error);
-    res.status(500).json({ error: 'Failed to check email expiry status' });
-  }
-});
-
-// Migrate student data to personal email
-router.post('/migrate-email', authenticateToken, async (req, res) => {
-  try {
-    const user = req.user;
-    
-    if (user.type !== 'student') {
-      return res.status(400).json({ error: 'Email migration is only available for students' });
-    }
-
-    const result = await EmailExpiryService.migrateStudentData(user._id);
-    res.json(result);
-  } catch (error) {
-    console.error('Email migration error:', error);
-    res.status(500).json({ error: error.message || 'Failed to migrate email data' });
-  }
-});
-
-// Admin endpoint to process all expiring emails
-router.post('/admin/process-expiring-emails', authenticateToken, async (req, res) => {
-  try {
-    const user = req.user;
-    
-    // Check if user is admin (you can add admin role to user model)
-    if (user.type !== 'faculty') {
-      return res.status(403).json({ error: 'Access denied. Only faculty can process expiring emails.' });
-    }
-
-    const results = await EmailExpiryService.processExpiringEmails();
-    res.json(results);
-  } catch (error) {
-    console.error('Process expiring emails error:', error);
-    res.status(500).json({ error: 'Failed to process expiring emails' });
+    console.error('Logout error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Logout failed',
+      details: error.message
+    });
   }
 });
 

@@ -1,360 +1,431 @@
 const express = require('express');
 const router = express.Router();
-const { authenticateToken } = require('../middleware/auth');
+const Meeting = require('../models/Meeting');
+const googleMeetService = require('../services/googleMeetService');
+const { v4: uuidv4 } = require('uuid');
+const jwt = require('jsonwebtoken');
 
-// Meeting rooms storage
-const rooms = {};
-const roomMessages = {};
-const roomMeta = {};
+// Middleware to verify JWT and role
+const authenticateToken = (req, res, next) => {
+  const token = req.headers['authorization']?.split(' ')[1];
+  if (!token) return res.status(401).json({ error: 'Access token required' });
+  
+  jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
+    if (err) return res.status(403).json({ error: 'Invalid token' });
+    req.user = user; // { id, role }
+    next();
+  });
+};
 
-// Enhanced room management
-const RoomManager = {
-  // Add participant to room
-  addParticipant: (roomId, userId, userInfo) => {
-    if (!rooms[roomId]) {
-      rooms[roomId] = [];
-    }
+const requireHost = (req, res, next) => {
+  // Allow access if user has role 'host' or if no role is specified (for existing tokens)
+  if (req.user.role && req.user.role !== 'host') {
+    return res.status(403).json({ error: 'Host access required' });
+  }
+  next();
+};
+
+// Only faculty and alumni can create meetings
+const requireCreatorType = (req, res, next) => {
+  const userType = req.user.type;
+  if (userType !== 'faculty' && userType !== 'alumni') {
+    return res.status(403).json({ error: 'Only faculty and alumni can create meetings' });
+  }
+  next();
+};
+
+// Create multiple Google Meet sessions
+router.post('/create-multiple-meetings', authenticateToken, requireCreatorType, async (req, res) => {
+  try {
+    const { sessions } = req.body;
+    const userId = req.user.userId || req.user._id;
     
-    // Check if user is already in the room
-    const existingIndex = rooms[roomId].findIndex(p => p.userId === userId);
-    if (existingIndex >= 0) {
-      // Update existing participant info
-      rooms[roomId][existingIndex] = { ...rooms[roomId][existingIndex], ...userInfo };
-    } else {
-      // Add new participant
-      rooms[roomId].push({
-        userId,
-        joinedAt: new Date(),
-        isHost: roomMeta[roomId]?.hostId === userId,
-        ...userInfo
+    if (!Array.isArray(sessions) || sessions.length === 0) {
+      return res.status(400).json({
+        error: 'Sessions array is required and must not be empty'
+      });
+    }
+
+    // Check if user has Google Calendar connected
+    const connectionStatus = await googleMeetService.checkGoogleCalendarConnection(userId);
+    
+    if (!connectionStatus.connected) {
+      return res.status(403).json({
+        error: 'Google Calendar access required',
+        message: 'Please connect your Google Calendar account first',
+        action: 'connect_google_calendar',
+        authUrl: `${process.env.BACKEND_URL || 'http://localhost:5000'}/api/auth/google`
+      });
+    }
+
+    // Create all Google Meet sessions in parallel
+    const results = await googleMeetService.createMultipleMeetSessions(userId, sessions);
+
+    // Save all meetings to database
+    const savedMeetings = [];
+    for (let i = 0; i < results.sessions.length; i++) {
+      const session = sessions[i];
+      const googleMeetResult = results.sessions[i];
+      
+      const meeting = new Meeting({
+        id: uuidv4(),
+        host_id: userId,
+        title: session.title,
+        description: session.description || '',
+        start_time: new Date(session.startTime),
+        end_time: new Date(session.endTime),
+        meet_link: googleMeetResult.meetLink,
+        event_id: googleMeetResult.eventId,
+        calendar_link: googleMeetResult.calendarLink,
+        attendees: googleMeetResult.attendees,
+        status: 'active'
+      });
+
+      await meeting.save();
+      savedMeetings.push(meeting);
+    }
+
+    res.json({
+      success: true,
+      message: `${results.totalCreated} Google Meet sessions created successfully`,
+      meetings: savedMeetings.map(meeting => ({
+        id: meeting.id,
+        title: meeting.title,
+        description: meeting.description,
+        start_time: meeting.start_time,
+        end_time: meeting.end_time,
+        meet_link: meeting.meet_link,
+        calendar_link: meeting.calendar_link,
+        event_id: meeting.event_id,
+        attendees: meeting.attendees,
+        status: meeting.status,
+        created_at: meeting.created_at
+      }))
+    });
+  } catch (error) {
+    console.error('Create multiple meetings error:', error);
+    res.status(500).json({ 
+      error: 'Failed to create meetings',
+      details: error.message
+    });
+  }
+});
+
+// List user's Google Calendar events
+router.get('/calendar-events', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.userId || req.user._id;
+    const { maxResults = 10 } = req.query;
+    
+    const result = await googleMeetService.listCalendarEvents(userId, parseInt(maxResults));
+    
+    res.json({
+      success: true,
+      events: result.events
+    });
+  } catch (error) {
+    console.error('List calendar events error:', error);
+    res.status(500).json({ 
+      error: 'Failed to list calendar events',
+      details: error.message
+    });
+  }
+});
+
+// Delete a Google Calendar event
+router.delete('/calendar-events/:eventId', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.userId || req.user._id;
+    const { eventId } = req.params;
+    
+    const result = await googleMeetService.deleteCalendarEvent(userId, eventId);
+    
+    // Also delete from our database if it exists
+    await Meeting.findOneAndUpdate(
+      { event_id: eventId },
+      { status: 'cancelled' }
+    );
+    
+    res.json({
+      success: true,
+      message: 'Event deleted successfully'
+    });
+  } catch (error) {
+    console.error('Delete calendar event error:', error);
+    res.status(500).json({ 
+      error: 'Failed to delete calendar event',
+      details: error.message
+    });
+  }
+});
+
+// Check Google Calendar connection status
+router.get('/google-calendar-status', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.userId || req.user._id;
+    const connectionStatus = await googleMeetService.checkGoogleCalendarConnection(userId);
+    
+    res.json({
+      success: true,
+      connected: connectionStatus.connected,
+      hasTokens: connectionStatus.hasTokens,
+      authUrl: `${process.env.BACKEND_URL || 'http://localhost:5000'}/api/auth/google`
+    });
+  } catch (error) {
+    console.error('Check Google Calendar status error:', error);
+    res.status(500).json({ 
+      error: 'Failed to check Google Calendar status',
+      details: error.message
+    });
+  }
+});
+
+// Test endpoint to verify authentication is working
+router.get('/test-auth', authenticateToken, (req, res) => {
+  res.json({
+    success: true,
+    message: 'Authentication working',
+    user: {
+      id: req.user.userId || req.user._id,
+      role: req.user.role,
+      googleCalendarConnected: req.user.googleCalendarConnected
+    }
+  });
+});
+
+// Simple meeting creation for testing (without Google Calendar)
+router.post('/create-simple-meeting', authenticateToken, requireCreatorType, async (req, res) => {
+  try {
+    const { title, description, start_time, end_time } = req.body;
+    
+    // Validate required fields
+    if (!title || !start_time || !end_time) {
+      return res.status(400).json({
+        error: 'Title, start_time, and end_time are required'
+      });
+    }
+
+    // Create a simple meeting object
+    const meeting = {
+      id: `meeting-${Date.now()}`,
+      title,
+      description: description || '',
+      start_time,
+      end_time,
+      meetLink: `https://meet.google.com/test-${Math.random().toString(36).substr(2, 9)}`,
+      createdBy: req.user.userId || req.user._id,
+      createdAt: new Date().toISOString()
+    };
+
+    res.json({
+      success: true,
+      message: 'Simple meeting created successfully (for testing)',
+      meeting
+    });
+  } catch (error) {
+    console.error('Error creating simple meeting:', error);
+    res.status(500).json({
+      error: 'Failed to create meeting',
+      details: error.message
+    });
+  }
+});
+
+// /create-meeting - Creates meeting with REAL Google Meet link
+// Create a Google Meet session using Google Calendar API
+router.post('/create-meeting', authenticateToken, requireCreatorType, async (req, res) => {
+  try {
+    const { title, description, startTime, endTime, attendees = [] } = req.body;
+    const userId = req.user.userId || req.user._id;
+    
+    // Check if user has Google Calendar connected
+    const connectionStatus = await googleMeetService.checkGoogleCalendarConnection(userId);
+    
+    if (!connectionStatus.connected) {
+      return res.status(403).json({
+        error: 'Google Calendar access required',
+        message: 'Please connect your Google Calendar account first',
+        action: 'connect_google_calendar',
+        authUrl: `${process.env.BACKEND_URL || 'http://localhost:5000'}/api/auth/google`
       });
     }
     
-    return rooms[roomId];
-  },
+    // Validate required fields
+    if (!title || !startTime || !endTime) {
+      return res.status(400).json({
+        error: 'Title, startTime, and endTime are required'
+      });
+    }
 
-  // Remove participant from room
-  removeParticipant: (roomId, userId) => {
-    if (rooms[roomId]) {
-      rooms[roomId] = rooms[roomId].filter(p => p.userId !== userId);
-      
-      // If room is empty, clean it up after 5 minutes
-      if (rooms[roomId].length === 0) {
-        setTimeout(() => {
-          if (rooms[roomId] && rooms[roomId].length === 0) {
-            delete rooms[roomId];
-            delete roomMessages[roomId];
-            delete roomMeta[roomId];
-          }
-        }, 300000); // 5 minutes
+    // Validate date format
+    const startDate = new Date(startTime);
+    const endDate = new Date(endTime);
+    
+    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+      return res.status(400).json({
+        error: 'Invalid date format. Use ISO 8601 format (e.g., 2025-09-28T10:00:00Z)'
+      });
+    }
+
+    if (endDate <= startDate) {
+      return res.status(400).json({
+        error: 'End time must be after start time'
+      });
+    }
+
+    // Create Google Meet session
+    const meetingData = {
+      title,
+      description,
+      startTime: startDate.toISOString(),
+      endTime: endDate.toISOString(),
+      attendees
+    };
+
+    const googleMeetResult = await googleMeetService.createGoogleMeetSession(userId, meetingData);
+
+    // Save to database
+    const meeting = new Meeting({
+      id: uuidv4(),
+      host_id: userId,
+      title,
+      description: description || '',
+      start_time: startDate,
+      end_time: endDate,
+      meet_link: googleMeetResult.meetLink,
+      event_id: googleMeetResult.eventId,
+      calendar_link: googleMeetResult.calendarLink,
+      conference_id: googleMeetResult.conferenceId || null,
+      attendees: googleMeetResult.attendees,
+      expected_attendees: attendees?.map(a => ({ email: a.email, name: a.name || (a.email?.split('@')[0] || 'Unknown'), status: 'invited' })) || [],
+      status: 'active'
+    });
+
+    await meeting.save();
+
+    res.json({
+      success: true,
+      message: 'Google Meet session created successfully',
+      meeting: {
+        id: meeting.id,
+        title: meeting.title,
+        description: meeting.description,
+        start_time: meeting.start_time,
+        end_time: meeting.end_time,
+        meet_link: meeting.meet_link,
+        calendar_link: meeting.calendar_link,
+        event_id: meeting.event_id,
+        conference_id: meeting.conference_id,
+        host_id: meeting.host_id,
+        attendees: meeting.attendees,
+        status: meeting.status,
+        created_at: meeting.created_at
+      }
+    });
+  } catch (error) {
+    console.error('Create meeting error:', error);
+    
+    if (error.code === 401) {
+      return res.status(401).json({ 
+        error: 'Google Calendar authentication failed. Please re-authenticate.' 
+      });
+    }
+    
+    if (error.code === 403) {
+      return res.status(403).json({ 
+        error: 'Insufficient permissions for Google Calendar' 
+      });
+    }
+    
+    res.status(500).json({ 
+      error: 'Failed to create meeting',
+      details: error.message
+    });
+  }
+});
+
+// /meetings - List all active meetings (public endpoint)
+router.get('/meetings', async (req, res) => {
+  try {
+    const meetings = await Meeting.find({ status: 'active' })
+      .select('-event_id -status -created_at')
+      .sort({ start_time: 1 });
+    
+    res.json({
+      success: true,
+      meetings: meetings.map(meeting => ({
+        id: meeting.id,
+        title: meeting.title,
+        description: meeting.description,
+        start_time: meeting.start_time,
+        end_time: meeting.end_time,
+        meet_link: meeting.meet_link,
+        host_id: meeting.host_id // include host to authorize delete client-side
+      }))
+    });
+  } catch (error) {
+    console.error('Get meetings error:', error);
+    res.status(500).json({ 
+      error: 'Failed to fetch meetings',
+      details: error.message
+    });
+  }
+});
+
+// /delete-meeting/:id - Delete meeting from Google Calendar and mark as deleted
+router.delete('/delete-meeting/:id', authenticateToken, requireHost, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const meeting = await Meeting.findOne({ id });
+    if (!meeting) {
+      return res.status(404).json({ error: 'Meeting not found' });
+    }
+
+    const requesterId = (req.user.userId || req.user._id || req.user.id || '').toString();
+    if (meeting.host_id.toString() !== requesterId) {
+      return res.status(403).json({ error: 'You can only delete your own meetings' });
+    }
+
+    // Delete from Google Calendar using service (handles OAuth client)
+    const userId = req.user.userId || req.user._id || req.user.id;
+    try {
+      await googleMeetService.deleteCalendarEvent(userId, meeting.event_id);
+      console.log('Meeting deleted from Google Calendar:', meeting.event_id);
+    } catch (googleError) {
+      console.error('Error deleting event from Google Calendar:', googleError);
+      // If Google reports already deleted (410) or not found (404), continue
+      const status = googleError?.code || googleError?.response?.status;
+      if (status !== 404 && status !== 410) {
+        // Proceed with DB delete anyway to unblock user action
+        console.warn('Proceeding with marking meeting deleted in DB despite Google error');
       }
     }
-    
-    return rooms[roomId] || [];
-  },
 
-  // Get room participants
-  getParticipants: (roomId) => {
-    return rooms[roomId] || [];
-  },
-
-  // Check if user is in room
-  isUserInRoom: (roomId, userId) => {
-    return rooms[roomId]?.some(p => p.userId === userId) || false;
-  },
-
-  // Get room info
-  getRoomInfo: (roomId) => {
-    return {
-      roomId,
-      participants: rooms[roomId] || [],
-      messages: roomMessages[roomId] || [],
-      meta: roomMeta[roomId] || null
-    };
-  }
-};
-
-// Build ICE server config
-function buildIceServers() {
-  const iceServers = [
-    { urls: "stun:stun.l.google.com:19302" },
-    { urls: "stun:stun1.l.google.com:19302" },
-  ];
-
-  if (process.env.TURN_URL && process.env.TURN_USERNAME && process.env.TURN_PASSWORD) {
-    iceServers.push({
-      urls: process.env.TURN_URL,
-      username: process.env.TURN_USERNAME,
-      credential: process.env.TURN_PASSWORD,
-    });
-  }
-  return iceServers;
-}
-
-// Get RTC configuration
-router.get('/config', authenticateToken, (req, res) => {
-  res.json({ rtcConfig: { iceServers: buildIceServers() } });
-});
-
-// Create a new meeting
-router.post('/create', authenticateToken, (req, res) => {
-  try {
-    const { title, description, scheduledFor } = req.body;
-    const userId = req.user._id;
-    
-    // Generate unique room ID
-    const roomId = `meeting_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    
-    // Create meeting room
-    rooms[roomId] = [];
-    roomMessages[roomId] = [];
-    roomMeta[roomId] = {
-      hostId: userId,
-      title: title || 'Untitled Meeting',
-      description: description || '',
-      scheduledFor: scheduledFor || null,
-      createdAt: new Date(),
-      createdBy: userId.toString()
-    };
-
-    res.json({
-      success: true,
-      roomId,
-      message: 'Meeting created successfully'
-    });
-  } catch (error) {
-    console.error('Error creating meeting:', error);
-    res.status(500).json({ error: 'Failed to create meeting' });
-  }
-});
-
-// Get meeting info
-router.get('/:roomId', authenticateToken, (req, res) => {
-  try {
-    const { roomId } = req.params;
-    
-    if (!roomMeta[roomId]) {
-      return res.status(404).json({ error: 'Meeting not found' });
-    }
-
-    const meetingInfo = {
-      roomId,
-      ...roomMeta[roomId],
-      participantCount: rooms[roomId] ? rooms[roomId].length : 0
-    };
-
-    res.json({ success: true, meeting: meetingInfo });
-  } catch (error) {
-    console.error('Error getting meeting info:', error);
-    res.status(500).json({ error: 'Failed to get meeting info' });
-  }
-});
-
-// Get all active meetings
-router.get('/', authenticateToken, (req, res) => {
-  try {
-    const activeMeetings = Object.keys(roomMeta).map(roomId => ({
-      roomId,
-      ...roomMeta[roomId],
-      participantCount: rooms[roomId] ? rooms[roomId].length : 0
-    }));
-
-    res.json({ success: true, meetings: activeMeetings });
-  } catch (error) {
-    console.error('Error getting meetings:', error);
-    res.status(500).json({ error: 'Failed to get meetings' });
-  }
-});
-
-// Delete a meeting (host only)
-router.delete('/:roomId', authenticateToken, (req, res) => {
-  try {
-    const { roomId } = req.params;
-    const userId = req.user._id.toString();
-    
-    if (!roomMeta[roomId]) {
-      return res.status(404).json({ error: 'Meeting not found' });
-    }
-
-    // Only host can delete the meeting
-    if (roomMeta[roomId].hostId !== userId) {
-      return res.status(403).json({ error: 'Only the meeting host can delete this meeting' });
-    }
-
-    // Clean up meeting data
-    delete rooms[roomId];
-    delete roomMessages[roomId];
-    delete roomMeta[roomId];
+    // Permanently remove from database
+    await Meeting.deleteOne({ id });
 
     res.json({ success: true, message: 'Meeting deleted successfully' });
   } catch (error) {
-    console.error('Error deleting meeting:', error);
-    res.status(500).json({ error: 'Failed to delete meeting' });
-  }
-});
-
-// Delete meeting (host only)
-router.delete('/:roomId', authenticateToken, (req, res) => {
-  try {
-    const { roomId } = req.params;
-    const userId = req.user.id;
-
-    if (!roomMeta[roomId]) {
-      return res.status(404).json({ error: 'Meeting not found' });
-    }
-
-    if (roomMeta[roomId].hostId !== userId) {
-      return res.status(403).json({ error: 'Only the host can delete the meeting' });
-    }
-
-    // Clean up meeting data
-    delete rooms[roomId];
-    delete roomMessages[roomId];
-    delete roomMeta[roomId];
-
-    res.json({ success: true, message: 'Meeting deleted successfully' });
-  } catch (error) {
-    console.error('Error deleting meeting:', error);
-    res.status(500).json({ error: 'Failed to delete meeting' });
-  }
-});
-
-// Join meeting room
-router.post('/:roomId/join', authenticateToken, (req, res) => {
-  try {
-    const { roomId } = req.params;
-    const userId = req.user._id.toString();
-    const userInfo = {
-      name: req.user.name,
-      avatar: req.user.avatar,
-      type: req.user.type,
-      department: req.user.type === 'alumni' ? req.user.alumniInfo?.currentCompany : req.user.department
-    };
+    console.error('Delete meeting error:', error);
     
-    if (!roomMeta[roomId]) {
-      return res.status(404).json({ error: 'Meeting not found' });
+    if (error.code === 401) {
+      return res.status(401).json({ 
+        error: 'Google Calendar authentication failed' 
+      });
     }
-
-    // Add participant to room
-    const participants = RoomManager.addParticipant(roomId, userId, userInfo);
     
-    res.json({
-      success: true,
-      roomId,
-      participants,
-      meetingInfo: roomMeta[roomId]
+    if (error.code === 410) {
+      return res.status(410).json({ 
+        error: 'Event already deleted from Google Calendar' 
+      });
+    }
+    
+    res.status(500).json({ 
+      error: 'Failed to delete meeting',
+      details: error.message
     });
-  } catch (error) {
-    console.error('Error joining meeting:', error);
-    res.status(500).json({ error: 'Failed to join meeting' });
   }
 });
 
-// Leave meeting room
-router.post('/:roomId/leave', authenticateToken, (req, res) => {
-  try {
-    const { roomId } = req.params;
-    const userId = req.user._id.toString();
-    
-    // Remove participant from room
-    const participants = RoomManager.removeParticipant(roomId, userId);
-    
-    res.json({
-      success: true,
-      roomId,
-      participants
-    });
-  } catch (error) {
-    console.error('Error leaving meeting:', error);
-    res.status(500).json({ error: 'Failed to leave meeting' });
-  }
-});
-
-// Get meeting participants
-router.get('/:roomId/participants', authenticateToken, (req, res) => {
-  try {
-    const { roomId } = req.params;
-    
-    if (!roomMeta[roomId]) {
-      return res.status(404).json({ error: 'Meeting not found' });
-    }
-
-    const participants = RoomManager.getParticipants(roomId);
-    
-    res.json({
-      success: true,
-      participants
-    });
-  } catch (error) {
-    console.error('Error getting participants:', error);
-    res.status(500).json({ error: 'Failed to get participants' });
-  }
-});
-
-// Send message to meeting
-router.post('/:roomId/message', authenticateToken, (req, res) => {
-  try {
-    const { roomId } = req.params;
-    const { content, type = 'text' } = req.body;
-    const userId = req.user._id.toString();
-    
-    if (!roomMeta[roomId]) {
-      return res.status(404).json({ error: 'Meeting not found' });
-    }
-
-    if (!content || !content.trim()) {
-      return res.status(400).json({ error: 'Message content is required' });
-    }
-
-    // Initialize messages array if not exists
-    if (!roomMessages[roomId]) {
-      roomMessages[roomId] = [];
-    }
-
-    const message = {
-      id: Date.now().toString(),
-      content: content.trim(),
-      type,
-      sender: {
-        userId,
-        name: req.user.name,
-        avatar: req.user.avatar
-      },
-      timestamp: new Date(),
-      reactions: []
-    };
-
-    roomMessages[roomId].push(message);
-    
-    res.json({
-      success: true,
-      message
-    });
-  } catch (error) {
-    console.error('Error sending message:', error);
-    res.status(500).json({ error: 'Failed to send message' });
-  }
-});
-
-// Get meeting messages
-router.get('/:roomId/messages', authenticateToken, (req, res) => {
-  try {
-    const { roomId } = req.params;
-    
-    if (!roomMeta[roomId]) {
-      return res.status(404).json({ error: 'Meeting not found' });
-    }
-
-    const messages = roomMessages[roomId] || [];
-    
-    res.json({
-      success: true,
-      messages
-    });
-  } catch (error) {
-    console.error('Error getting messages:', error);
-    res.status(500).json({ error: 'Failed to get messages' });
-  }
-});
-
-module.exports = { router, rooms, roomMessages, roomMeta, RoomManager };
+module.exports = router;

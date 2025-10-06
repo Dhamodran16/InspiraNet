@@ -7,7 +7,7 @@ import AlumniDirectory from '@/components/AlumniDirectory';
 import MessagesPage from '@/pages/MessagesPage';
 import NotificationsPage from '@/pages/NotificationsPage';
 import PlacementPortal from '@/components/placements/PlacementPortal';
-import MeetingManagement from "@/components/meet/MeetingManagement";
+import GoogleCalendarHostDashboard from '@/components/meetings/GoogleCalendarHostDashboard';
 import ProfileView from '@/components/profile/ProfileView';
 import Settings from '@/components/Settings';
 import ErrorBoundary from '@/components/ErrorBoundary';
@@ -93,7 +93,7 @@ const DashboardPage = () => {
       case "placements":
         return <PlacementPortal />;
       case "meetings":
-        return <MeetingManagement />;
+        return <GoogleCalendarHostDashboard />;
       case "profile":
         return <ProfileView />;
       case "settings":

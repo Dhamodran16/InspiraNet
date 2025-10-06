@@ -3,12 +3,12 @@ import { productionConfig, validateProductionConfig } from './production';
 
 const isProduction = import.meta.env.PROD;
 
-// Use production config in production mode, fallback to development values
+// Use proper environment-based configuration
 export const config = {
-  apiUrl: import.meta.env.VITE_API_URL || 'https://inspiranet-backend.onrender.com',
-  socketUrl: import.meta.env.VITE_SOCKET_URL || 'https://inspiranet-backend.onrender.com',
-  meetingUrl: import.meta.env.VITE_MEETING_URL || 'https://inspiranet-backend.onrender.com',
-  environment: import.meta.env.MODE || 'production'
+  apiUrl: import.meta.env.VITE_API_URL || (import.meta.env.MODE === 'development' ? 'http://localhost:5000' : 'https://inspiranet-backend.onrender.com'),
+  socketUrl: import.meta.env.VITE_SOCKET_URL || (import.meta.env.MODE === 'development' ? 'http://localhost:5000' : 'https://inspiranet-backend.onrender.com'),
+  meetingUrl: import.meta.env.VITE_MEETING_URL || (import.meta.env.MODE === 'development' ? 'http://localhost:5000' : 'https://inspiranet-backend.onrender.com'),
+  environment: import.meta.env.MODE || 'development'
 };
 
 // Validate production config on app startup

@@ -113,7 +113,7 @@ const MeetingManagement: React.FC = () => {
   // Delete meeting
   const handleDeleteMeeting = async (roomId: string) => {
     try {
-      const response = await api.delete(`/api/meetings/${roomId}`);
+      const response = await api.delete(`/meetings/${roomId}`);
       if (response.data.success) {
         toast({
           title: "Success",
@@ -269,7 +269,7 @@ const MeetingManagement: React.FC = () => {
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-2">
                         <h3 className="text-lg font-semibold">{meeting.title}</h3>
-                        {meeting.hostId === user?.id && (
+                        {meeting.hostId === user?._id && (
                           <Badge variant="secondary">Host</Badge>
                         )}
                       </div>
@@ -315,7 +315,7 @@ const MeetingManagement: React.FC = () => {
                         <ExternalLink className="h-4 w-4 mr-1" />
                         Join
                       </Button>
-                      {meeting.hostId === user?.id && (
+                      {meeting.hostId === user?._id && (
                         <Button
                           size="sm"
                           variant="destructive"

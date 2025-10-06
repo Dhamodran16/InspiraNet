@@ -6,6 +6,7 @@ import { ThemeProvider } from '@/contexts/ThemeContext';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import CookieConsent from '@/components/CookieConsent';
 import ScrollToTop from '@/components/ScrollToTop';
+import { initializeGoogleAPIs } from '@/services/googleCalendarClient';
 
 // Lazy load components for better performance
 const LandingPage = React.lazy(() => import('@/pages/LandingPage'));
@@ -36,14 +37,26 @@ const LoadingSpinner = () => (
 
 function App() {
   useEffect(() => {
+    // Initialize Google APIs for Calendar and Meet integration
+    const initializeAPIs = async () => {
+      try {
+        // Initialize Google APIs
+        initializeGoogleAPIs();
+        console.log('✅ Google APIs initialized');
+      } catch (error) {
+        console.warn('Google API initialization failed:', error);
+      }
+    };
+
     // Initialize basic performance optimizations
     const initializePerformance = async () => {
       try {
-        // Preload critical resources
+        // Preload critical resources using proper URL configuration
+        const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
         const criticalResources = [
-          'https://inspiranet-backend.onrender.com/api/config/departments',
-          'https://inspiranet-backend.onrender.com/api/config/designations',
-          'https://inspiranet-backend.onrender.com/api/config/placement-statuses'
+          `${backendUrl}/api/config/departments`,
+          `${backendUrl}/api/config/designations`,
+          `${backendUrl}/api/config/placement-statuses`
         ];
 
         // Preload critical resources using fetch
@@ -59,6 +72,7 @@ function App() {
       }
     };
 
+    initializeAPIs();
     initializePerformance();
 
     // Global error handler for socket-related errors

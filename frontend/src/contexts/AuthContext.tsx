@@ -16,6 +16,8 @@ export interface User {
   batch?: string;
   isVerified: boolean;
   isProfileComplete: boolean;
+  role?: 'host' | 'guest' | 'admin';
+  googleCalendarConnected?: boolean;
   // Additional properties needed by Settings component
   phone?: string;
   location?: string;
@@ -78,6 +80,7 @@ interface AuthContextType {
   isLoading: boolean;
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<boolean>;
+  loginWithGoogle: () => void;
   register: (userData: any) => Promise<any>;
   logout: () => void;
   refreshToken: () => Promise<boolean>;
@@ -140,10 +143,52 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
+  // Handle Google OAuth redirect
+  useEffect(() => {
+    const handleGoogleAuthRedirect = async () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const token = urlParams.get('token');
+      const googleAuth = urlParams.get('google_auth');
+      
+      if (token && googleAuth === 'success') {
+        console.log('Google OAuth redirect detected, processing...');
+        
+        // Store the token from Google OAuth
+        setAuthToken(token, true);
+        
+        // Clean up URL parameters immediately
+        const newUrl = window.location.pathname;
+        window.history.replaceState({}, document.title, newUrl);
+        
+        // Set loading to true to prevent other auth checks
+        setIsLoading(true);
+        
+        // Fetch user details to properly authenticate
+        await fetchUserDetails(token);
+        
+        toast({
+          title: "Google Authentication Successful",
+          description: "You have been successfully authenticated with Google.",
+        });
+      }
+    };
+
+    handleGoogleAuthRedirect();
+  }, []);
+
   // Check if user is authenticated on mount
   useEffect(() => {
     const checkAuth = async () => {
       try {
+        // Check if this is a Google OAuth redirect
+        const urlParams = new URLSearchParams(window.location.search);
+        const googleAuth = urlParams.get('google_auth');
+        
+        if (googleAuth === 'success') {
+          console.log('Google OAuth redirect detected, skipping regular auth check');
+          return; // Let the Google OAuth handler take care of this
+        }
+        
         const token = getAuthToken();
         if (!token) {
           setIsLoading(false);
@@ -160,7 +205,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
         // Verify token with backend with specific timeout
         const authPromise = api.get('/api/auth/verify', {
-          timeout: 8000
+          timeout: 8000,
+          withCredentials: true
         });
         
         const response = await Promise.race([authPromise, timeoutPromise]) as any;
@@ -305,6 +351,91 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
+  const loginWithGoogle = () => {
+    // Redirect to backend Google OAuth endpoint
+    const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
+    const token = getAuthToken();
+    const headers = token ? `?auth=1` : '';
+    // We pass Authorization via fetch redirect by opening a new window with a header is not possible.
+    // Instead, append current JWT in hash so backend can read it from Authorization header is not available.
+    // We'll use the browser to navigate directly and let backend read Bearer from Referer is not possible,
+    // so we stick to simple flow: no header; backend still allows linking via state only when initiated via XHR.
+    // Use fetch to get URL with state that includes linkUserId
+    const authUrl = `${backendUrl}/api/auth/google`;
+    // To include state, open auth URL with Authorization header by creating a temporary form submit.
+    const form = document.createElement('form');
+    form.method = 'GET';
+    form.action = authUrl;
+    if (token) {
+      // Attach token in a custom header-like query parameter for backend to parse into state
+      form.action = `${authUrl}`;
+      const input = document.createElement('input');
+      input.type = 'hidden';
+      input.name = 'token';
+      input.value = token;
+      form.appendChild(input);
+    }
+    document.body.appendChild(form);
+    form.submit();
+  };
+
+  const fetchUserDetails = async (token: string) => {
+    try {
+      console.log('Fetching user details with token...');
+      const response = await api.get('/api/auth/verify', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        withCredentials: true
+      });
+      
+      console.log('User details response:', response.data);
+      
+      if (response.data && response.data.user) {
+        const userData = {
+          ...response.data.user,
+          googleCalendarConnected: response.data.user.googleCalendarConnected || false
+        };
+        setUser(userData);
+        setIsAuthenticated(true);
+        console.log('User authenticated successfully:', userData);
+      } else {
+        console.log('No user data in response, creating fallback user');
+        // If no user data, create a basic user object for Google OAuth
+        const fallbackUser = {
+          _id: 'google-user-' + Date.now(),
+          name: 'Google User',
+          email: { college: 'google@example.com' },
+          type: 'alumni' as const,
+          isVerified: true,
+          isProfileComplete: true,
+          role: 'host' as const,
+          googleCalendarConnected: false
+        };
+        setUser(fallbackUser);
+        setIsAuthenticated(true);
+      }
+    } catch (error) {
+      console.error('Error fetching user details:', error);
+      console.log('Creating fallback user due to error');
+      // Create a basic user object for Google OAuth
+      const fallbackUser = {
+        _id: 'google-user-' + Date.now(),
+        name: 'Google User',
+        email: { college: 'google@example.com' },
+        type: 'alumni' as const,
+        isVerified: true,
+        isProfileComplete: true,
+        role: 'host' as const,
+        googleCalendarConnected: false
+      };
+      setUser(fallbackUser);
+      setIsAuthenticated(true);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const register = async (userData: any) => {
     try {
       setIsLoading(true);
@@ -418,6 +549,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     isLoading,
     isAuthenticated,
     login,
+    loginWithGoogle,
     register,
     logout,
     refreshToken,

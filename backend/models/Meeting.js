@@ -1,118 +1,123 @@
 const mongoose = require('mongoose');
 
 const meetingSchema = new mongoose.Schema({
-  roomId: {
-    type: String,
-    required: true,
-    unique: true,
-    index: true
+  id: { 
+    type: String, 
+    required: true, 
+    unique: true 
+  }, // Use UUID for primary key
+  host_id: { 
+    type: String, 
+    required: true 
+  }, // User's ID (from auth)
+  title: { 
+    type: String, 
+    required: true 
   },
-  hostId: {
-    type: String,
-    required: true
+  description: { 
+    type: String 
   },
-  hostName: {
-    type: String,
-    required: true
+  start_time: { 
+    type: Date, 
+    required: true 
   },
-  participants: [{
-    userId: String,
-    username: String,
-    joinedAt: {
-      type: Date,
-      default: Date.now
-    },
-    leftAt: Date
-  }],
-  messages: [{
-    userId: String,
-    username: String,
-    text: String,
-    timestamp: {
-      type: Date,
-      default: Date.now
+  end_time: { 
+    type: Date, 
+    required: true 
+  },
+  meet_link: { 
+    type: String, 
+    required: true 
+  }, // hangoutLink from Google
+  calendar_link: {
+    type: String
+  }, // Google Calendar event link
+  event_id: { 
+    type: String, 
+    required: true 
+  }, // Google event ID for deletion
+  conference_id: {
+    type: String
+  }, // Google Meet conferenceRecord ID for attendance API
+  attendees: [{
+    email: { type: String, required: true },
+    name: { type: String },
+    responseStatus: { 
+      type: String, 
+      enum: ['accepted', 'declined', 'tentative', 'needsAction'],
+      default: 'needsAction'
     }
   }],
-  status: {
-    type: String,
-    enum: ['active', 'completed'],
-    default: 'active'
+  // Expected attendees list for fallback attendance (stored at creation time)
+  expected_attendees: [{
+    email: { type: String },
+    name: { type: String },
+    status: { type: String, default: 'invited' }
+  }],
+  status: { 
+    type: String, 
+    enum: ['active', 'cancelled', 'completed'], 
+    default: 'active' 
   },
-  createdAt: {
-    type: Date,
-    default: Date.now,
-    expires: 300, // 5 minutes in seconds
-    index: true
+  created_at: { 
+    type: Date, 
+    default: Date.now 
   },
-  completedAt: Date,
-  scheduledFor: {
-    type: Date,
-    required: true
-  },
-  title: {
-    type: String,
-    default: 'Untitled Meeting'
-  },
-  description: String,
-  maxParticipants: {
-    type: Number,
-    default: 10
+  updated_at: { 
+    type: Date, 
+    default: Date.now 
   }
-}, {
-  timestamps: true
 });
 
-// Index for faster queries
+// Attendance tracking schemas
+const participantSessionSchema = new mongoose.Schema({
+  joinedAt: { type: Date },
+  leftAt: { type: Date },
+  duration: { type: Number } // minutes
+}, { _id: false });
+
+const participantAttendanceSchema = new mongoose.Schema({
+  email: { type: String },
+  name: { type: String },
+  joinTime: { type: Date },
+  leaveTime: { type: Date },
+  duration: { type: Number }, // minutes
+  sessions: { type: [participantSessionSchema], default: [] },
+  attendancePercentage: { type: Number },
+  attendanceStatus: { type: String, enum: ['Present', 'Partial', 'Absent'] },
+  statusColor: { type: String }
+}, { _id: false });
+
+// Extend meeting schema with attendance fields
+meetingSchema.add({
+  total_duration: { type: Number }, // minutes
+  attendance: { type: [participantAttendanceSchema], default: [] },
+  attendance_conference_id: { type: String },
+  attendance_processed_at: { type: Date },
+  attendance_summary: {
+    totalParticipants: { type: Number, default: 0 },
+    presentCount: { type: Number, default: 0 },
+    partialCount: { type: Number, default: 0 },
+    absentCount: { type: Number, default: 0 }
+  },
+  // In-app presence logs (client-side joins/leaves)
+  attendance_logs: [{
+    email: { type: String },
+    name: { type: String },
+    events: [{ type: { type: String, enum: ['join', 'leave'] }, timestamp: { type: Date } }]
+  }]
+});
+
+// Indexes for better performance
+meetingSchema.index({ host_id: 1, status: 1 });
+meetingSchema.index({ event_id: 1 }, { unique: true });
 meetingSchema.index({ status: 1 });
+meetingSchema.index({ start_time: 1 });
 
-// Method to add participant
-meetingSchema.methods.addParticipant = function(userId, username) {
-  const existingParticipant = this.participants.find(p => p.userId === userId);
-  if (!existingParticipant) {
-    this.participants.push({
-      userId,
-      username,
-      joinedAt: new Date()
-    });
-  }
-  return this.save();
-};
-
-// Method to remove participant
-meetingSchema.methods.removeParticipant = function(userId) {
-  const participant = this.participants.find(p => p.userId === userId);
-  if (participant) {
-    participant.leftAt = new Date();
-  }
-  return this.save();
-};
-
-// Method to add message
-meetingSchema.methods.addMessage = function(userId, username, text) {
-  this.messages.push({
-    userId,
-    username,
-    text,
-    timestamp: new Date()
-  });
-  return this.save();
-};
-
-// Method to complete meeting
-meetingSchema.methods.completeMeeting = function() {
-  this.status = 'completed';
-  this.completedAt = new Date();
-  return this.save();
-};
-
-// Static method to find active meetings
-meetingSchema.statics.findActive = function() {
-  return this.find({ status: 'active' });
-};
-
-// Static method to find meeting by room ID
-meetingSchema.statics.findByRoomId = function(roomId) {
-  return this.findOne({ roomId, status: 'active' });
-};
+// Update the updated_at field before saving
+meetingSchema.pre('save', function(next) {
+  this.updated_at = new Date();
+  next();
+});
 
 module.exports = mongoose.model('Meeting', meetingSchema);

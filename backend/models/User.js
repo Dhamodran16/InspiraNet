@@ -224,6 +224,18 @@ const userSchema = new mongoose.Schema({
     default: null
   },
 
+  // Google Calendar Integration
+  googleCalendarTokens: {
+    access_token: String,
+    refresh_token: String,
+    expiry_date: Number,
+    scope: String
+  },
+  googleCalendarConnected: {
+    type: Boolean,
+    default: false
+  },
+
   // System fields
   isVerified: {
     type: Boolean,

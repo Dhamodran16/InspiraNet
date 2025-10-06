@@ -8,13 +8,12 @@ import {
   Home,
   Users,
   MessageSquare,
-  Calendar,
   Briefcase,
   LogOut,
   User,
-  Building2,
   Bell,
-  Settings
+  Settings,
+  Video
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { socketService } from "@/services/socketService";
@@ -66,7 +65,7 @@ export default function Sidebar({ currentSection, onSectionChange, onLogout, onC
     { id: "messages", name: "Messages", icon: MessageSquare, description: "Chat with connections" },
     { id: "notifications", name: "Notifications", icon: Bell, description: "Stay updated" },
     { id: "placements", name: "Placements", icon: Briefcase, description: "Career opportunities" },
-    { id: "meetings", name: "Virtual Meetings", icon: Building2, description: "Online discussions" }
+    { id: "meetings", name: "Meetings", icon: Video, description: "Google Meet integration" }
   ];
 
   // Initial counts from API and real-time updates for unread counts
