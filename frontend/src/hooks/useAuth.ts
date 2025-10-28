@@ -14,7 +14,7 @@ interface UseAuthReturn {
   
   // Actions
   login: (email: string, password: string) => Promise<void>;
-  register: (userData: any) => Promise<void>;
+  register: (userData: any) => Promise<any>;
   logout: () => void;
   clearError: () => void;
   refreshAuth: () => Promise<void>;
@@ -228,9 +228,9 @@ export const useAuth = (): UseAuthReturn => {
           description: `Account created successfully for ${response.user.name}`,
         });
 
-        // Redirect to profile completion
-        console.log('📝 Redirecting to profile completion...');
-        navigate('/profile-completion', { replace: true });
+        // Return the response for the caller to handle navigation
+        console.log('📝 Registration successful, returning response...');
+        return response;
       } else {
         throw new Error('Invalid response from server');
       }
@@ -257,6 +257,8 @@ export const useAuth = (): UseAuthReturn => {
         description: errorMessage,
         variant: "destructive",
       });
+      
+      throw error;
     } finally {
       setIsLoading(false);
     }
