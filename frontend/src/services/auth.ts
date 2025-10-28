@@ -115,9 +115,23 @@ class AuthService {
   async register(data: RegisterData): Promise<AuthResponse> {
     try {
       console.log('🚀 Attempting user registration with data:', { ...data, password: '[HIDDEN]' });
+      console.log('🔍 Field validation:', {
+        name: !!data.name,
+        email: !!data.email,
+        password: !!data.password,
+        type: !!data.type,
+        nameValue: data.name,
+        emailValue: data.email,
+        typeValue: data.type
+      });
       
       // Validate data before sending
       if (!data.name || !data.password || !data.type) {
+        console.error('❌ Validation failed:', {
+          name: data.name,
+          password: data.password ? '[HIDDEN]' : 'MISSING',
+          type: data.type
+        });
         throw new Error('Missing required fields: name, password, and type are required');
       }
 

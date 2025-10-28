@@ -16,7 +16,7 @@ class GoogleCalendarService {
       'https://www.googleapis.com/auth/calendar',
       'https://www.googleapis.com/auth/calendar.events',
       'https://www.googleapis.com/auth/meetings.space.readonly',
-      'https://www.googleapis.com/auth/meetings.participants.readonly'
+      'https://www.googleapis.com/auth/meetings.space.created'
     ];
 
     return this.oauth2Client.generateAuthUrl({

@@ -11,13 +11,13 @@ const oauth2Client = new google.auth.OAuth2(
 const SCOPES = [
   'https://www.googleapis.com/auth/calendar',
   'https://www.googleapis.com/auth/calendar.events',
-  // Google Meet scopes for attendance APIs
+  // Google Meet scopes for conference creation
   'https://www.googleapis.com/auth/meetings.space.readonly',
-  'https://www.googleapis.com/auth/meetings.participants.readonly',
   'https://www.googleapis.com/auth/meetings.space.created',
+  // Standard OAuth scopes
   'openid',
-  'email',
-  'profile'
+  'https://www.googleapis.com/auth/userinfo.email',
+  'https://www.googleapis.com/auth/userinfo.profile'
 ];
 
 const generateAuthUrl = (state) => {

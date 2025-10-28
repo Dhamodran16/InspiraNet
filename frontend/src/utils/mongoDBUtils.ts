@@ -130,6 +130,11 @@ export const sanitizeUserData = (data: any): any => {
   if (data.bio) sanitized.bio = data.bio.trim();
   if (data.location) sanitized.location = data.location.trim();
   
+  // Preserve critical fields
+  if (data.type) sanitized.type = data.type;
+  if (data.password) sanitized.password = data.password;
+  if (data.userType) sanitized.type = data.userType; // Handle both type and userType
+  
   // Sanitize numeric fields
   if (data.joinYear) sanitized.joinYear = parseInt(data.joinYear);
   if (data.phone) sanitized.phone = data.phone.replace(/\D/g, '');

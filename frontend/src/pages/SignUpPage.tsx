@@ -14,7 +14,7 @@ import {
   GraduationCap, 
   BookOpen
 } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
@@ -164,25 +164,37 @@ const SignUpPage = () => {
     setError('');
 
     try {
+      console.log('🚀 SignUpPage sending data:', signupData);
       const response = await register(signupData);
       
-      if (response.token && response.user) {
+      if (response && response.token && response.user) {
         toast({
           title: "✅ Account Created Successfully!",
           description: "Welcome to KEC Alumni Network!",
         });
         navigate('/profile-completion');
       } else {
-        throw new Error('Registration failed');
+        throw new Error('Registration failed - no response data');
       }
     } catch (error: any) {
       console.error('Registration error:', error);
-      setError(error.message || 'Registration failed. Please try again.');
-      toast({
-        title: "❌ Registration Failed",
-        description: error.message || 'Registration failed. Please try again.',
-        variant: "destructive",
-      });
+      
+      // Handle specific error cases
+      if (error.message && error.message.includes('already exists')) {
+        setError('An account with this email already exists. Please try logging in instead.');
+        toast({
+          title: "Account Already Exists",
+          description: "This email is already registered. Please try logging in instead.",
+          variant: "destructive",
+        });
+      } else {
+        setError(error.message || 'Registration failed. Please try again.');
+        toast({
+          title: "❌ Registration Failed",
+          description: error.message || 'Registration failed. Please try again.',
+          variant: "destructive",
+        });
+      }
     } finally {
       setIsLoadingAuth(false);
     }
@@ -450,7 +462,20 @@ const SignUpPage = () => {
 
               {error && (
                 <div className="text-sm text-red-300 bg-red-900/30 p-3 rounded-md border border-red-500/30 backdrop-blur-sm">
-                  {error}
+                  <div className="flex items-center justify-between">
+                    <span>{error}</span>
+                    {error.includes('already exists') && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => navigate('/signin')}
+                        className="ml-2 text-red-300 border-red-500 hover:bg-red-500/20"
+                      >
+                        Sign In
+                      </Button>
+                    )}
+                  </div>
                 </div>
               )}
 
