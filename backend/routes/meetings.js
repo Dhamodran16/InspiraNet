@@ -69,6 +69,7 @@ router.post('/create-multiple-meetings', authenticateToken, requireCreatorType, 
       
       const meeting = new Meeting({
         id: uuidv4(),
+        roomId: `google-meet-${uuidv4()}`, // Use unique roomId for Google Meet meetings
         host_id: userId,
         title: session.title,
         description: session.description || '',
@@ -287,6 +288,7 @@ router.post('/create-meeting', authenticateToken, requireCreatorType, async (req
     // Save to database
     const meeting = new Meeting({
       id: uuidv4(),
+      roomId: `google-meet-${uuidv4()}`, // Use unique roomId for Google Meet meetings
       host_id: userId,
       title,
       description: description || '',

@@ -6,6 +6,11 @@ const meetingSchema = new mongoose.Schema({
     required: true, 
     unique: true 
   }, // Use UUID for primary key
+  roomId: {
+    type: String,
+    unique: true,
+    sparse: true // Allow multiple null values
+  }, // Room ID for socket-based meetings
   host_id: { 
     type: String, 
     required: true 

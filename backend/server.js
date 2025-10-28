@@ -4,6 +4,7 @@ const cors = require('cors');
 const bodyParser = require('body-parser');
 const session = require('express-session');
 const cookieParser = require('cookie-parser');
+const meetingCleanupService = require('./services/meetingCleanupService');
 require('dotenv').config({ path: './config.env' });
 
 const app = express();
@@ -45,9 +46,46 @@ app.get('/api/health', (req, res) => {
       'Real Google Calendar API integration',
       'OAuth 2.0 authentication',
       'Automatic Google Meet link generation',
-      'Meeting CRUD operations'
+      'Meeting CRUD operations',
+      'Automatic meeting cleanup'
     ]
   });
+});
+
+// Meeting cleanup endpoint
+app.get('/api/cleanup-stats', async (req, res) => {
+  try {
+    const stats = await meetingCleanupService.getCleanupStats();
+    res.json({
+      success: true,
+      stats,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get cleanup stats',
+      details: error.message
+    });
+  }
+});
+
+// Manual cleanup trigger
+app.post('/api/cleanup-meetings', async (req, res) => {
+  try {
+    await meetingCleanupService.manualCleanup();
+    res.json({
+      success: true,
+      message: 'Manual cleanup completed',
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: 'Manual cleanup failed',
+      details: error.message
+    });
+  }
 });
 
 // Database Connection
@@ -135,6 +173,9 @@ app.use('*', (req, res) => {
 const startServer = async () => {
   try {
     await connectDB();
+    
+    // Start meeting cleanup service
+    meetingCleanupService.start();
     
     const server = app.listen(PORT, () => {
       console.log(`🚀 Google Calendar API server running on port ${PORT}`);
