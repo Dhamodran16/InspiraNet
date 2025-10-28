@@ -165,7 +165,7 @@ const SignUpPage = () => {
 
     try {
       console.log('🚀 SignUpPage sending data:', signupData);
-      const response = await register(signupData);
+      const response: any = await register(signupData);
       
       if (response && response.token && response.user) {
         toast({
