@@ -4,7 +4,8 @@ const helmet = require('helmet');
 const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
 const mongoose = require('mongoose');
-// Multer moved to individual route files
+const jwt = require('jsonwebtoken');
+const multer = require('multer');
 const { createServer } = require('http');
 const { Server } = require('socket.io');
 require('dotenv').config({ path: './config.env' });
@@ -25,13 +26,17 @@ const statsRoutes = require('./routes/stats');
 const configRoutes = require('./routes/config');
 const followRoutes = require('./routes/follows');
 const placementRoutes = require('./routes/placements');
+const meetingRoutes = require('./routes/meetings');
+const calendarMeetingRoutes = require('./routes/calendarMeetings');
+const googleMeetRoutes = require('./routes/googleMeet');
+const CronService = require('./services/cronService');
+const { startEmailExpiryMonitoring } = require('./services/emailExpiryService');
 
 // Import middleware
 const { authenticateToken } = require('./middleware/auth');
 
 // Import services
 const SocketService = require('./services/socketService');
-const studentConversionService = require('./services/studentConversionService'); // initializes schedules
 const { startRealtimeWatchers } = require('./services/realtimeWatchers');
 
 // Email validation middleware
@@ -40,468 +45,475 @@ const { checkEmailValidity, checkEmailExpiryWarning } = require('./middleware/em
 const app = express();
 const ensureDb = require('./middleware/db');
 const server = createServer(app);
-const PORT = process.env.PORT || 5000;
+const getBasePort = () => (process.env.PORT ? Number(process.env.PORT) : 5000);
+let currentPort = getBasePort();
 
 // Parse frontend URLs from environment variable
 const frontendUrls = process.env.FRONTEND_URL 
   ? process.env.FRONTEND_URL.split(',').map(url => url.trim())
-  : ['http://localhost:8084', 'http://localhost:8085', 'http://localhost:3000'];
+  : process.env.CORS_ORIGIN 
+    ? [process.env.CORS_ORIGIN]
+    : [];
 
-// Initialize Socket.io
+// Security middleware
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com"],
+      imgSrc: ["'self'", "data:", "https:", "http:"],
+      scriptSrc: ["'self'"],
+      connectSrc: ["'self'", "https://api.cloudinary.com", "wss:", "ws:"],
+    },
+  },
+}));
+
+// Rate limiting
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 1000, // limit each IP to 1000 requests per windowMs
+  message: 'Too many requests from this IP, please try again later.',
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+app.use(limiter);
+
+// Logging middleware
+if (process.env.NODE_ENV === 'development') {
+  app.use(morgan('dev'));
+} else {
+  app.use(morgan('combined'));
+}
+
+// CORS configuration
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    // Check if origin is in allowed list
+    if (frontendUrls.indexOf(origin) !== -1) {
+      return callback(null, true);
+    }
+    
+    // For development, allow all localhost origins (any port)
+    if (process.env.NODE_ENV === 'development' || !process.env.NODE_ENV) {
+      if (origin.includes('localhost') || origin.includes('127.0.0.1')) {
+      return callback(null, true);
+      }
+    }
+    
+    // Additional check: if CORS_ORIGIN is set and matches, allow it
+    if (process.env.CORS_ORIGIN && origin === process.env.CORS_ORIGIN) {
+      return callback(null, true);
+    }
+    
+    // Log rejected origins for debugging
+    console.log('CORS: Rejected origin:', origin);
+    return callback(new Error('Not allowed by CORS'));
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
+  exposedHeaders: ['Content-Range', 'X-Content-Range'],
+  preflightContinue: false,
+  optionsSuccessStatus: 204
+};
+
+// Apply CORS middleware BEFORE other middleware
+app.use(cors(corsOptions));
+
+// Handle preflight requests explicitly
+app.options('*', cors(corsOptions));
+
+// Initialize Socket.io for real-time messaging and notifications
 const io = new Server(server, {
   cors: {
-    origin: frontendUrls,
-    methods: ['GET', 'POST'],
-    credentials: true
-  }
+    origin: function (origin, callback) {
+      // Allow requests with no origin (like mobile apps or curl requests)
+      if (!origin) return callback(null, true);
+      
+      // Check if origin is in allowed list
+      if (frontendUrls.indexOf(origin) !== -1) {
+        return callback(null, true);
+      }
+      
+      // For development, allow all localhost origins (any port)
+      if (process.env.NODE_ENV === 'development' || !process.env.NODE_ENV) {
+        if (origin.includes('localhost') || origin.includes('127.0.0.1')) {
+        return callback(null, true);
+        }
+      }
+      
+      // Allow the production frontend URL
+      if (origin === 'https://inspiranet.onrender.com') {
+        return callback(null, true);
+      }
+      
+      return callback(new Error('Not allowed by CORS'));
+    },
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin']
+  },
+  transports: ["websocket", "polling"],
+  pingTimeout: 60000,
+  pingInterval: 25000,
 });
 
-// Initialize Socket Service
+// Initialize Socket Service for real-time messaging
 const socketService = new SocketService(io);
 startRealtimeWatchers(io);
 
 // Make io available to routes
 app.set('io', io);
 
-// Middleware
-app.use(helmet());
-app.use(cors({
-  origin: frontendUrls,
-  credentials: true
-}));
-app.use(morgan('combined'));
+// Socket.IO connection handling for real-time messaging and notifications
+io.on('connection', (socket) => {
+  console.log('🔌 New socket connection:', socket.id);
+  
+  // Handle user authentication
+  socket.on('authenticate', async (data) => {
+    try {
+      const token = data.token;
+      if (!token) {
+        socket.emit('auth_error', { message: 'No token provided' });
+        return;
+      }
+      
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      const user = await User.findById(decoded.userId);
+      
+      if (!user) {
+        socket.emit('auth_error', { message: 'User not found' });
+        return;
+      }
+      
+      // Store user info in socket
+      socket.userId = user._id.toString();
+      socket.user = user;
+      
+      // Join user-specific room for notifications
+      socket.join(`user_${user._id}`);
+      
+      // Emit authentication success
+      socket.emit('authenticated', { 
+        userId: user._id, 
+        name: user.name,
+        email: user.email,
+        profilePicture: user.profilePicture
+      });
+      
+      console.log(`✅ Socket authenticated: ${user.name} (${socket.id})`);
+    } catch (error) {
+      console.error('Socket authentication error:', error);
+      socket.emit('auth_error', { message: 'Authentication failed' });
+    }
+  });
+  
+  // Handle disconnection
+  socket.on('disconnect', () => {
+    console.log('🔌 Socket disconnected:', socket.id);
+    // Clean up any room memberships or other state
+  });
+    
+  // Real-time messaging events (not Google meetings)
+  socket.on('join-conversation', (conversationId) => {
+    if (socket.userId) {
+      socket.join(`conversation_${conversationId}`);
+      console.log(`User ${socket.userId} joined conversation ${conversationId}`);
+    }
+  });
+
+  socket.on('leave-conversation', (conversationId) => {
+    socket.leave(`conversation_${conversationId}`);
+    console.log(`User ${socket.userId} left conversation ${conversationId}`);
+  });
+
+  socket.on('typing', (data) => {
+    if (socket.userId && data.conversationId) {
+      socket.to(`conversation_${data.conversationId}`).emit('user-typing', {
+        userId: socket.userId,
+        userName: socket.user?.name,
+        isTyping: data.isTyping
+      });
+    }
+  });
+
+  socket.on('stop-typing', (data) => {
+    if (socket.userId && data.conversationId) {
+      socket.to(`conversation_${data.conversationId}`).emit('user-stop-typing', {
+        userId: socket.userId,
+        userName: socket.user?.name
+      });
+    }
+  });
+});
+
+// Body parsing middleware
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Connect to MongoDB with robust connection handling
+// File upload middleware
+const storage = multer.memoryStorage();
+const upload = multer({ 
+  storage: storage,
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10MB limit
+  },
+  fileFilter: (req, file, cb) => {
+    // Allow images and documents
+    const allowedTypes = /jpeg|jpg|png|gif|pdf|doc|docx|txt/;
+    const extname = allowedTypes.test(file.originalname.toLowerCase());
+    const mimetype = allowedTypes.test(file.mimetype);
+    
+    if (mimetype && extname) {
+      return cb(null, true);
+    } else {
+      cb(new Error('Only images and documents are allowed'));
+    }
+  }
+});
+
+// Make upload middleware available to routes
+app.set('upload', upload);
+
+// Database connection with retry logic
 const connectDB = async () => {
   try {
     console.log('🔄 Attempting to connect to MongoDB...');
     
-    // Close any existing connection first
-    if (mongoose.connection.readyState !== 0) {
-      await mongoose.connection.close();
-      console.log('🔄 Closed existing connection');
-    }
-    
-    const options = {
-      serverSelectionTimeoutMS: 60000,        // Increased to 60s
-      socketTimeoutMS: 120000,                // Increased to 120s
-      connectTimeoutMS: 60000,                // Increased to 60s
-      retryWrites: true,
-      w: 'majority',
-      maxPoolSize: 5,                         // Reduced for stability
-      minPoolSize: 1,                         // Reduced for stability
-      maxIdleTimeMS: 60000,                   // Increased to 60s
-      family: 4,                              // Force IPv4
-      heartbeatFrequencyMS: 30000,           // Heartbeat every 30 seconds
-      retryReads: true
-      // Removed unsupported options: keepAlive, keepAliveInitialDelay, autoReconnect, reconnectTries, reconnectInterval
-    };
+    const conn = await mongoose.connect(process.env.MONGODB_URI, {
+      serverSelectionTimeoutMS: 5000,
+      socketTimeoutMS: 45000,
+      bufferCommands: false,
+      maxPoolSize: 10,
+      minPoolSize: 5,
+      maxIdleTimeMS: 30000,
+      serverApi: {
+        version: '1',
+        strict: true,
+        deprecationErrors: true,
+      }
+    });
 
-    await mongoose.connect(process.env.MONGODB_URI, options);
-    console.log('✅ Connected to MongoDB Atlas successfully');
+    console.log('✅ MongoDB connection established');
+    console.log(`📊 Connected to: ${conn.connection.host}`);
     
-    // Wait longer for connection to fully stabilize
-    setTimeout(async () => {
-      try {
-        if (mongoose.connection.readyState === 1 && mongoose.connection.db) {
+    // Test the connection
           await mongoose.connection.db.admin().ping();
           console.log('✅ Database ping successful - connection stable');
-        } else {
-          console.log('⚠️ Connection not ready for ping test (state:', mongoose.connection.readyState, ')');
-        }
-      } catch (pingError) {
-        console.log('⚠️ Ping test failed:', pingError.message);
-      }
-    }, 5000); // Wait 5 seconds instead of 2
     
-  } catch (err) {
-    console.error('❌ MongoDB connection error:', err.message);
+    // Start realtime watchers
+    startRealtimeWatchers();
+    console.log('✅ Realtime Mongo watchers started');
     
-    // Log specific error details
-    if (err.name === 'MongoServerSelectionError') {
-      console.error('🔍 Server selection failed. This usually means:');
-      console.error('   - IP address not whitelisted in Atlas');
-      console.error('   - Network connectivity issues');
-      console.error('   - Atlas cluster is down or paused');
-    }
-    
-    if (err.code === 'ENOTFOUND') {
-      console.error('🔍 DNS resolution failed. Check your internet connection.');
-    }
-    
-    if (err.code === 'ETIMEDOUT') {
-      console.error('🔍 Connection timeout. This usually means:');
-      console.error('   - IP address not whitelisted');
-      console.error('   - Firewall blocking connection');
-      console.error('   - Network issues');
-    }
-    
-    console.log('🔄 Retrying connection in 15 seconds...');
-    setTimeout(connectDB, 15000);
+  } catch (error) {
+    console.error('❌ MongoDB connection error:', error.message);
+    console.log('🔄 Retrying connection in 5 seconds...');
+    setTimeout(connectDB, 5000);
   }
 };
 
-// Improved MongoDB connection event handlers with connection state management
-let isReconnecting = false;
-let connectionAttempts = 0;
-const maxConnectionAttempts = 5;
-
-mongoose.connection.on('error', (err) => {
-  console.error('❌ MongoDB connection error:', err.message);
-  
-  // Don't retry immediately on error, let the disconnect handler handle it
-  if (err.name === 'MongoServerSelectionError') {
-    console.log('⚠️ Server selection error detected. Will attempt reconnection...');
-  }
-});
-
-mongoose.connection.on('disconnected', () => {
-  console.log('⚠️ MongoDB disconnected. Current state:', mongoose.connection.readyState);
-  
-  // Only attempt reconnection if we're not already reconnecting
-  if (!isReconnecting && connectionAttempts < maxConnectionAttempts) {
-    isReconnecting = true;
-    connectionAttempts++;
-    
-    // Use exponential backoff for reconnection attempts
-    const reconnectDelay = Math.min(15000 * Math.pow(2, Math.min(connectionAttempts - 1, 4)), 120000);
-    console.log(`🔄 Reconnection attempt ${connectionAttempts}/${maxConnectionAttempts} in ${reconnectDelay/1000} seconds...`);
-    
-    setTimeout(async () => {
-      try {
-        if (mongoose.connection.readyState === 0) { // Only reconnect if still disconnected
-          await connectDB();
-        }
-      } catch (error) {
-        console.error('❌ Reconnection attempt failed:', error.message);
-      } finally {
-        isReconnecting = false;
-      }
-    }, reconnectDelay);
-  } else if (connectionAttempts >= maxConnectionAttempts) {
-    console.error('❌ Maximum reconnection attempts reached. Please check your MongoDB Atlas configuration.');
-    console.error('📋 Troubleshooting steps:');
-    console.error('   1. Verify your IP is whitelisted in MongoDB Atlas');
-    console.error('   2. Check if your Atlas cluster is running');
-    console.error('   3. Verify your MONGODB_URI in config.env');
-    console.error('   4. Try connecting from a different network');
-  }
-});
-
-mongoose.connection.on('connected', () => {
-  console.log('✅ MongoDB connection established');
-  // Track connection start time for health monitoring
-  mongoose.connection.startTime = Date.now();
-  // Reset reconnection state on successful connection
-  isReconnecting = false;
-  connectionAttempts = 0;
-  mongoose.connection.reconnectAttempts = 0;
-});
-
-mongoose.connection.on('reconnected', () => {
-  console.log('✅ MongoDB reconnected successfully');
-  // Reset reconnection state
-  isReconnecting = false;
-  connectionAttempts = 0;
-});
-
-mongoose.connection.on('close', () => {
-  console.log('🔌 MongoDB connection closed');
-});
-
-mongoose.connection.on('fullsetup', () => {
-  console.log('✅ MongoDB connection fully established with all replica set members');
-});
-
-mongoose.connection.on('all', () => {
-  console.log('✅ MongoDB connection established with all replica set members');
-});
-
-// Add connection health monitoring with improved stability
-let connectionHealthCheck;
-const startHealthMonitoring = () => {
-  connectionHealthCheck = setInterval(async () => {
-    try {
-      if (mongoose.connection.readyState === 1 && mongoose.connection.db) {
-        // Only ping if connection has been stable for a while
-        const connectionTime = Date.now() - (mongoose.connection.startTime || Date.now());
-        if (connectionTime > 10000) { // Only ping after 10 seconds of connection
-          await mongoose.connection.db.admin().ping();
-          console.log('💓 Database health check: OK');
-        } else {
-          console.log('💓 Database health check: Connection still stabilizing');
-        }
-      } else {
-        console.log('⚠️ Database health check: Connection not ready (state:', mongoose.connection.readyState, ')');
-      }
-    } catch (error) {
-      console.error('❌ Database health check failed:', error.message);
-      // Don't force reconnection on health check failure - let natural reconnection handle it
-      console.log('⚠️ Health check failed, but connection may still be valid');
-    }
-  }, 60000); // Check every 60 seconds instead of 30
-};
-
-// Initialize connection and health monitoring
-connectDB().then(() => {
-  startHealthMonitoring();
-}).catch(err => {
-  console.error('❌ Initial connection failed:', err.message);
-});
-
-// Add process error handling to prevent crashes
-process.on('uncaughtException', (err) => {
-  console.error('❌ Uncaught Exception:', err);
-  console.error('Stack trace:', err.stack);
-  
-  // Log specific MongoDB-related errors
-  if (err.name === 'MongoError' || err.name === 'MongoServerSelectionError') {
-    console.error('🔍 MongoDB-related error detected. This might indicate connection issues.');
-  }
-  
-  // Don't exit immediately, try to recover
-  console.log('🔄 Attempting to recover from uncaught exception...');
-  
-  // Try to close MongoDB connection gracefully
-  if (mongoose.connection.readyState === 1) {
-    mongoose.connection.close(() => {
-      console.log('✅ MongoDB connection closed due to uncaught exception');
-    });
-  }
-});
-
-process.on('unhandledRejection', (reason, promise) => {
-  console.error('❌ Unhandled Rejection at:', promise, 'reason:', reason);
-  
-  // Log specific MongoDB-related rejections
-  if (reason && reason.name === 'MongoError') {
-    console.error('🔍 MongoDB-related rejection detected. This might indicate connection issues.');
-  }
-  
-  // Don't exit immediately, try to recover
-  console.log('🔄 Attempting to recover from unhandled rejection...');
-});
-
-// Graceful shutdown handling
-const gracefulShutdown = async (signal) => {
-  console.log(`🔄 ${signal} received, shutting down gracefully...`);
-  
-  // Stop accepting new requests
-  server.close(() => {
-    console.log('✅ HTTP server closed gracefully');
-    
-    // Close MongoDB connection
-    if (mongoose.connection.readyState === 1) {
-      mongoose.connection.close(() => {
-        console.log('✅ MongoDB connection closed gracefully');
-        
-        // Stop health monitoring
-        if (connectionHealthCheck) {
-          clearInterval(connectionHealthCheck);
-          console.log('✅ Health monitoring stopped');
-        }
-        
-        console.log('✅ Graceful shutdown completed');
-        process.exit(0);
-      });
-    } else {
-      console.log('✅ MongoDB connection already closed');
-      process.exit(0);
-    }
-  });
-  
-  // Force exit after 30 seconds if graceful shutdown fails
-  setTimeout(() => {
-    console.error('❌ Forced shutdown after timeout');
-    process.exit(1);
-  }, 30000);
-};
-
-process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
-process.on('SIGINT', () => gracefulShutdown('SIGINT'));
-
-// Rate limiting
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 1000, // limit each IP to 1000 requests per windowMs (increased significantly)
-  message: {
-    error: 'Too many requests. Please wait a moment and try again.',
-    retryAfter: Math.ceil(15 * 60 / 60) // minutes
-  },
-  standardHeaders: true,
-  legacyHeaders: false
-});
-
-// Specific rate limiting for health checks (more lenient)
-const healthLimiter = rateLimit({
-  windowMs: 1 * 60 * 1000, // 1 minute
-  max: 100 // limit each IP to 100 health checks per minute (increased)
-});
-
-// Specific rate limiting for stats (very lenient for real-time updates)
-const statsLimiter = rateLimit({
-  windowMs: 1 * 60 * 1000, // 1 minute
-  max: 200 // limit each IP to 200 stats requests per minute
-});
-
-app.use('/api/health', healthLimiter);
-app.use('/api/stats', statsLimiter);
-app.use('/api/', limiter);
-
-// Multer configuration moved to individual route files
+// Connect to database
+connectDB();
 
 // Routes
-
-// Health check with detailed database status
-app.get('/api/health', (req, res) => {
-  const dbStatus = {
-    readyState: mongoose.connection.readyState,
-    readyStateText: ['disconnected', 'connected', 'connecting', 'disconnecting'][mongoose.connection.readyState] || 'unknown',
-    host: mongoose.connection.host,
-    port: mongoose.connection.port,
-    name: mongoose.connection.name,
-    collections: Object.keys(mongoose.connection.collections).length
-  };
-
-  const systemStatus = {
-    uptime: process.uptime(),
-    memory: process.memoryUsage(),
-    nodeVersion: process.version,
-    platform: process.platform,
-    timestamp: new Date().toISOString()
-  };
-
-  const healthStatus = {
-    status: dbStatus.readyState === 1 ? 'OK' : 'UNHEALTHY',
-    database: dbStatus,
-    system: systemStatus,
-    message: dbStatus.readyState === 1 
-      ? 'KEC Alumni Network API is running with healthy database connection'
-      : 'KEC Alumni Network API is running but database connection is not ready'
-  };
-
-  res.status(dbStatus.readyState === 1 ? 200 : 503).json(healthStatus);
-});
-
-// Database-specific health check
-app.get('/api/health/db', async (req, res) => {
-  try {
-    if (mongoose.connection.readyState !== 1 || !mongoose.connection.db) {
-      return res.status(503).json({
-        status: 'UNHEALTHY',
-        message: 'Database connection is not ready',
-        readyState: mongoose.connection.readyState,
-        readyStateText: ['disconnected', 'connected', 'connecting', 'disconnecting'][mongoose.connection.readyState] || 'unknown'
-      });
-    }
-
-    // Test database connectivity with a ping
-    const startTime = Date.now();
-    await mongoose.connection.db.admin().ping();
-    const responseTime = Date.now() - startTime;
-
-    res.json({
-      status: 'OK',
-      message: 'Database connection is healthy',
-      readyState: mongoose.connection.readyState,
-      readyStateText: 'connected',
-      responseTime: `${responseTime}ms`,
-      host: mongoose.connection.host,
-      port: mongoose.connection.port,
-      database: mongoose.connection.name,
-      collections: Object.keys(mongoose.connection.collections).length,
-      timestamp: new Date().toISOString()
-    });
-  } catch (error) {
-    console.error('Database health check failed:', error);
-    res.status(503).json({
-      status: 'UNHEALTHY',
-      message: 'Database health check failed',
-      error: error.message,
-      readyState: mongoose.connection.readyState,
-      readyStateText: ['disconnected', 'connected', 'connecting', 'disconnecting'][mongoose.connection.readyState] || 'unknown',
-      timestamp: new Date().toISOString()
-    });
+// Add logging middleware to debug route matching
+app.use((req, res, next) => {
+  // Log all API requests for debugging
+  if (req.path.startsWith('/api')) {
+    console.log(`[${new Date().toISOString()}] ${req.method} ${req.path} - Original URL: ${req.originalUrl}`);
   }
+  next();
 });
 
-// Auth routes (ensure DB is ready so login/register won't 500 on DB timeouts)
-app.use('/api/auth', ensureDb, authRoutes);
-
-// Attach email expiry warning headers for authenticated routes
-app.use(checkEmailExpiryWarning);
-
-// Short-circuit requests if DB is not ready yet
-app.use('/api', ensureDb);
-
-// Configuration routes (public for reading, protected for admin operations)
-app.use('/api/config', configRoutes);
-
-// Messaging routes (protected)
+app.use('/api/auth', authRoutes);
+console.log('✅ Auth routes mounted at /api/auth - callback route should be at /api/auth/callback');
 app.use('/api/messages', messageRoutes);
-
-// Conversation routes (protected)
 app.use('/api/conversations', conversationRoutes);
-
-// Post routes (protected)
 app.use('/api/posts', postRoutes);
-
-// Event routes (protected)
 app.use('/api/events', eventRoutes);
-
-// Job routes (protected)
 app.use('/api/jobs', jobRoutes);
-
-// Placement routes (protected)
-app.use('/api/placements', placementRoutes);
-
-// Notification routes (protected)
 app.use('/api/notifications', notificationRoutes);
-
-// User routes (protected)
 app.use('/api/users', userRoutes);
-
-// Stats routes (protected)
+console.log('✅ User routes mounted at /api/users');
+console.log('   Available routes: GET /profile, PUT /profile, GET /:userId, etc.');
+app.use('/api/email-migration', require('./routes/emailMigration'));
 app.use('/api/stats', statsRoutes);
-
-// Follow routes (protected)
+app.use('/api/config', configRoutes);
 app.use('/api/follows', followRoutes);
+app.use('/api/placements', placementRoutes);
 
 // Group routes (protected)
 app.use('/api/groups', require('./routes/groups'));
 
-// Posts API routes are now handled in /routes/posts.js
-
-// Events API routes are now handled in /routes/events.js
-
-// Job routes are now handled in /routes/jobs.js
-
-// Error handling middleware
-app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({ error: 'Something went wrong!' });
-});
-
-// 404 handler
-app.use('*', (req, res) => {
-  res.status(404).json({ error: 'Route not found' });
-});
-
-// Start server
-server.listen(PORT, () => {
-  const backendUrl = process.env.BACKEND_URL || `http://localhost:${PORT}`;
-  console.log(`🚀 KEC Alumni Network API server running on port ${PORT}`);
-  console.log(`📊 Health check: ${backendUrl}/api/health`);
-  console.log(`🌐 Frontend URL: ${process.env.FRONTEND_URL || 'http://localhost:8083'}`);
-  console.log(`🔌 WebSocket server ready for real-time messaging`);
+// Meeting routes (protected)
+app.use('/api/meetings', meetingRoutes);
+app.use('/api', calendarMeetingRoutes);
+app.use('/api/google-meet', googleMeetRoutes);
   
-  // Email service status
-  if (process.env.SMTP_USER && process.env.SMTP_PASS) {
-    console.log(`📧 Email service: Configured (${process.env.SMTP_HOST || 'smtp.gmail.com'})`);
-  } else {
-    console.log(`📧 Email service: Not configured (using console logging)`);
+// Health check endpoint
+// Root endpoint - API info
+app.get('/', (req, res) => {
+  res.json({ 
+    success: true,
+    message: 'InspiraNet API Server',
+    version: '1.0.0',
+    timestamp: new Date().toISOString(),
+    endpoints: {
+      health: '/health',
+      api: '/api',
+      auth: '/api/auth',
+      users: '/api/users',
+      posts: '/api/posts',
+      events: '/api/events',
+      messages: '/api/messages'
+    }
+  });
+});
+  
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.json({ status: 'OK', timestamp: new Date().toISOString() });
+});
+
+// 🚨 ADMIN ENDPOINT: System Capacity Monitoring
+app.get('/admin/system-stats', (req, res) => {
+  try {
+    res.json({
+      success: true,
+      data: {
+      timestamp: new Date().toISOString(),
+      system: {
+          status: 'operational',
+          uptime: process.uptime(),
+          memory: process.memoryUsage(),
+          version: process.version,
+          platform: process.platform
+        },
+        database: {
+          status: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
+          host: mongoose.connection.host,
+          name: mongoose.connection.name
+      },
+      limits: {
+          concurrentUsers: '1000 users max',
+        concurrentRooms: '100 rooms max',
+          fileUploadSize: '10MB max',
+          rateLimit: '1000 requests per 15min'
+      },
+      recommendations: {
+          optimalConcurrentUsers: '500-800 users',
+        optimalTotalRooms: '50-80 rooms',
+          recommendedFileSize: '5MB or less'
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Error getting system stats:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get system statistics'
+    });
   }
 });
 
+// Error handling middleware
+app.use((err, req, res, next) => {
+  // Don't interfere with CORS errors - let CORS middleware handle them
+  if (err.message && err.message.includes('CORS')) {
+    return res.status(403).json({
+      success: false,
+      error: 'CORS policy violation: Origin not allowed'
+    });
+  }
+  
+  console.error('Unhandled error:', err);
+  res.status(500).json({
+    success: false,
+    error: process.env.NODE_ENV === 'production' ? 'Internal server error' : err.message
+  });
+});
+
+// 404 handler - catch all unmatched routes
+app.use('*', (req, res) => {
+  console.log(`❌ Route not found: ${req.method} ${req.originalUrl}`);
+  console.log(`   Path: ${req.path}`);
+  console.log(`   Base URL: ${req.baseUrl}`);
+  
+  // Return 400 for API routes that don't exist (bad request)
+  // Return 404 for non-API routes (not found)
+  const statusCode = req.path.startsWith('/api') ? 400 : 404;
+  
+  res.status(statusCode).json({
+    success: false,
+    error: 'Route not found',
+    method: req.method,
+    path: req.path,
+    originalUrl: req.originalUrl
+  });
+});
+
+// Initialize cron jobs
+CronService.init();
+
+// Start email expiry monitoring
+startEmailExpiryMonitoring();
+
+// Start server with automatic port fallback when PORT is not explicitly set
+const startServer = (port) => {
+  server.listen(port, () => {
+    const backendUrl = process.env.BACKEND_URL || 'https://inspiranet-backend.onrender.com';
+    console.log(`🚀 KEC Alumni Network API server running on port ${port}`);
+    console.log(`📊 Health check: ${backendUrl}/api/health`);
+    console.log(`🌐 Frontend URL: ${process.env.FRONTEND_URL || 'https://inspiranet.onrender.com'}`);
+    console.log(`🔌 WebSocket server ready for real-time messaging`);
+    console.log(`🕐 Cron jobs: Initialized for email expiry processing`);
+    
+    // Email service status
+    if (process.env.SMTP_USER && process.env.SMTP_PASS) {
+      console.log(`📧 Email service: Configured (${process.env.SMTP_HOST || 'smtp.gmail.com'})`);
+    } else {
+      console.log(`📧 Email service: Not configured (using console logging)`);
+    }
+    
+    console.log(`🔒 Security: Helmet, CORS, Rate limiting enabled`);
+    console.log(`📁 File uploads: Enabled (max 10MB)`);
+    console.log(`🔄 Auto-retry: Enabled for failed connections`);
+  });
+};
+
+// Start server with port fallback
+const startWithFallback = async () => {
+  try {
+    startServer(currentPort);
+  } catch (error) {
+    if (error.code === 'EADDRINUSE') {
+      console.log(`⚠️ Port ${currentPort} is in use, trying port ${currentPort + 1}`);
+      currentPort += 1;
+      setTimeout(() => startWithFallback(), 1000);
+    } else {
+      console.error('❌ Failed to start server:', error);
+      process.exit(1);
+    }
+  }
+};
+
+// Handle uncaught exceptions
+process.on('uncaughtException', (error) => {
+  console.error('❌ Uncaught Exception:', error);
+  console.log('🔄 Attempting to recover from uncaught exception...');
+  // Don't exit the process, let it continue running
+});
+
+// Handle unhandled promise rejections
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('❌ Unhandled Rejection at:', promise, 'reason:', reason);
+  console.log('🔄 Attempting to recover from unhandled rejection...');
+  // Don't exit the process, let it continue running
+});
+
+// Start the server
+startWithFallback();

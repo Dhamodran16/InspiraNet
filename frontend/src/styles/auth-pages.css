@@ -3,7 +3,6 @@
 .auth-page {
   min-height: 100vh;
   position: relative;
-  overflow: hidden;
 }
 
 .auth-background {
@@ -127,7 +126,6 @@
   max-width: 500px;
   box-shadow: 0 25px 50px rgba(0, 0, 0, 0.3);
   position: relative;
-  overflow: hidden;
 }
 
 .auth-form-container::before {
@@ -384,7 +382,6 @@
   cursor: pointer;
   transition: all 0.3s ease;
   position: relative;
-  overflow: hidden;
 }
 
 .auth-submit-btn:hover {

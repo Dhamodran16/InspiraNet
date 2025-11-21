@@ -1,8 +1,12 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
@@ -26,15 +30,17 @@ import {
   Phone,
   MapPin as LocationIcon,
   UserPlus,
-  UserMinus
+  UserMinus,
+  Eye,
+  ExternalLink,
+  FileText,
+  Code2,
+  Link as LinkIcon
 } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
-import { useToast } from '@/hooks/use-toast';
-import PostFeed from '@/components/posts/PostFeed';
+import UserPostsFeed from '@/components/posts/UserPostsFeed';
 import { getUserStats } from '@/services/api';
 import { socketService } from '@/services/socketService';
 import api from '@/services/api';
-import { useNavigate, useParams } from 'react-router-dom';
 
 interface UserProfile {
   _id: string;
@@ -43,30 +49,46 @@ interface UserProfile {
     college?: string;
     personal?: string;
   };
-  type: 'alumni' | 'student' | 'teacher';
-  batch: string;
-  department: string;
-  company: string;
-  designation: string;
-  location: string;
-  experience: string;
-  bio: string;
-  professionalEmail: string;
-  avatar: string;
-  socialLinks: {
+  type: 'alumni' | 'student' | 'teacher' | 'faculty';
+  batch?: string;
+  department?: string;
+  company?: string;
+  designation?: string;
+  location?: string;
+  experience?: string;
+  bio?: string;
+  professionalEmail?: string;
+  phone?: string;
+  avatar?: string;
+  socialLinks?: {
     linkedin?: string;
     github?: string;
     twitter?: string;
     website?: string;
+    leetcode?: string;
+    customLinks?: { label: string; url: string }[];
   };
-  skills: string[];
-  interests: string[];
-  achievements: Array<{
-    title: string;
-    description: string;
-    date: string;
-    certificate?: string;
-  }>;
+  skills?: string[];
+  interests?: string[];
+  resume?: string;
+  portfolio?: string;
+  city?: string;
+  state?: string;
+  country?: string;
+  studentInfo?: {
+    batch?: string;
+    department?: string;
+    graduationYear?: string;
+    placementStatus?: string;
+    placementCompany?: string;
+    placementPackage?: string;
+  };
+  alumniInfo?: {
+    graduationYear?: number;
+    currentCompany?: string;
+    jobTitle?: string;
+  };
+
   education: Array<{
     degree: string;
     institution: string;
@@ -88,14 +110,17 @@ interface ProfileStats {
   posts: number;
   connections: number;
   events: number;
-  achievements: number;
 }
 
-interface OtherUserProfileProps {
-  userId: string;
-}
+const formatPlacementStatus = (status?: string) => {
+  if (!status) return 'Permanent';
+  if (status === 'placed') return 'Permanent';
+  const readable = status.replace(/_/g, ' ');
+  return readable.charAt(0).toUpperCase() + readable.slice(1);
+};
 
-export default function OtherUserProfile({ userId }: OtherUserProfileProps) {
+export default function OtherUserProfile() {
+  const { userId } = useParams<{ userId: string }>();
   const { user: currentUser } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -105,11 +130,12 @@ export default function OtherUserProfile({ userId }: OtherUserProfileProps) {
     posts: 0,
     connections: 0,
     events: 0,
-    achievements: 0
+
   });
   const [loading, setLoading] = useState(true);
   const [followStatus, setFollowStatus] = useState<'none' | 'following' | 'followers' | 'mutual' | 'requested' | 'not-following'>('none');
   const [connections, setConnections] = useState<any[]>([]);
+  const [currentUserFollowing, setCurrentUserFollowing] = useState<string[]>([]);
 
   const loadProfile = async (targetUserId: string) => {
     try {
@@ -139,10 +165,30 @@ export default function OtherUserProfile({ userId }: OtherUserProfileProps) {
 
   const loadConnections = async (targetUserId: string) => {
     try {
-      const response = await api.get(`/api/follows/connections/${targetUserId}`);
-      setConnections(response.data.connections || []);
+      const response = await api.get(`/api/users/${targetUserId}/connections`);
+      console.log('OtherUserProfile - Connections API response:', response.data);
+      // Use mutual connections from the response
+      const mutualConnections = response.data?.mutual || [];
+      // Filter out the current user from connections
+      const filteredConnections = mutualConnections.filter(
+        (connection: any) => connection._id !== currentUser?._id
+      );
+      console.log('Mutual connections:', filteredConnections);
+      setConnections(filteredConnections);
     } catch (error) {
       console.error('Error loading connections:', error);
+    }
+  };
+
+  const loadCurrentUserFollowing = async () => {
+    if (!currentUser?._id) return;
+    try {
+      const response = await api.get(`/api/users/${currentUser._id}/connections`);
+      const following = response.data?.following || [];
+      const followingIds = following.map((user: any) => user._id);
+      setCurrentUserFollowing(followingIds);
+    } catch (error) {
+      console.error('Error loading current user following:', error);
     }
   };
 
@@ -164,11 +210,35 @@ export default function OtherUserProfile({ userId }: OtherUserProfileProps) {
         title: "Follow Request Sent",
         description: "Your request is pending approval",
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error sending follow request:', error);
+      
+      // Handle specific error cases
+      let errorMessage = "Failed to send follow request";
+      let errorTitle = "Error";
+      
+      if (error.response?.status === 409) {
+        errorTitle = "Already Following";
+        errorMessage = error.response.data?.error || "You are already following this user or have a pending request";
+        // Update follow status based on the specific error
+        if (error.response.data?.error?.includes('already following')) {
+          setFollowStatus('following');
+        } else if (error.response.data?.error?.includes('request already sent')) {
+          setFollowStatus('requested');
+        }
+      } else if (error.response?.status === 429) {
+        errorTitle = "Limit Exceeded";
+        errorMessage = error.response.data?.error || "Daily follow request limit exceeded";
+      } else if (error.response?.status === 404) {
+        errorTitle = "User Not Found";
+        errorMessage = "The user you're trying to follow doesn't exist";
+      } else if (error.response?.data?.error) {
+        errorMessage = error.response.data.error;
+      }
+      
       toast({
-        title: "Error",
-        description: "Failed to send follow request",
+        title: errorTitle,
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -185,11 +255,30 @@ export default function OtherUserProfile({ userId }: OtherUserProfileProps) {
         title: "Unfollowed",
         description: "You are no longer following this user",
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error unfollowing user:', error);
+      
+      // Handle specific error cases
+      let errorMessage = "Failed to unfollow user";
+      let errorTitle = "Error";
+      
+      if (error.response?.status === 400) {
+        errorTitle = "Cannot Unfollow";
+        errorMessage = error.response.data?.error || "You are not following this user or cannot unfollow";
+        // Update follow status based on the specific error
+        if (error.response.data?.error?.includes('not following')) {
+          setFollowStatus('not-following');
+        }
+      } else if (error.response?.status === 404) {
+        errorTitle = "User Not Found";
+        errorMessage = "The user you're trying to unfollow doesn't exist";
+      } else if (error.response?.data?.error) {
+        errorMessage = error.response.data.error;
+      }
+      
       toast({
-        title: "Error",
-        description: "Failed to unfollow user",
+        title: errorTitle,
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -207,8 +296,66 @@ export default function OtherUserProfile({ userId }: OtherUserProfileProps) {
       loadStats(userId);
       loadConnections(userId);
       checkFollowStatus(userId);
+      loadCurrentUserFollowing();
     }
+  }, [userId, currentUser]);
+
+  // Listen for profile updates via socket
+  useEffect(() => {
+    if (!userId) return;
+
+    const handleProfileUpdate = (data: { userId: string; user: any }) => {
+      if (data.userId === userId) {
+        console.log('🔄 Profile updated via socket, reloading...');
+        loadProfile(userId);
+        loadStats(userId);
+      }
+    };
+
+    socketService.on('user_profile_updated', handleProfileUpdate);
+
+    return () => {
+      socketService.off('user_profile_updated', handleProfileUpdate);
+    };
   }, [userId]);
+
+  // Handle case where userId is not provided
+  if (!userId) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold text-gray-900 mb-4">User Not Found</h2>
+          <p className="text-gray-600 mb-4">The requested user profile could not be found.</p>
+          <Button onClick={() => navigate('/dashboard')} variant="outline">
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Dashboard
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  useEffect(() => {
+    if (!currentUser?._id || !userId) return;
+    
+    // Listen for follow status updates
+    const handleFollowStatusUpdate = (data: any) => {
+      console.log('🔄 OtherUserProfile - Follow status update received:', data);
+      if (data.followerId === userId || data.followeeId === userId) {
+        console.log('🔄 Refreshing other user profile data due to follow status change');
+        // Refresh connections, stats, and follow status
+        loadConnections(userId);
+        loadStats(userId);
+        checkFollowStatus(userId);
+      }
+    };
+    
+    socketService.onFollowStatusUpdate(handleFollowStatusUpdate);
+    
+    return () => {
+      socketService.offFollowStatusUpdate();
+    };
+  }, [currentUser, userId]);
 
   if (loading) {
     return (
@@ -233,6 +380,17 @@ export default function OtherUserProfile({ userId }: OtherUserProfileProps) {
     );
   }
 
+  const socialLinks = profile.socialLinks || {};
+  const customSocialLinks = Array.isArray(socialLinks.customLinks) ? socialLinks.customLinks : [];
+  const hasSocialLinks = Boolean(
+    socialLinks.linkedin ||
+    socialLinks.github ||
+    socialLinks.twitter ||
+    socialLinks.website ||
+    socialLinks.leetcode ||
+    customSocialLinks.length > 0
+  );
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -254,13 +412,14 @@ export default function OtherUserProfile({ userId }: OtherUserProfileProps) {
                 Message
               </Button>
               
-              {followStatus === 'none' && (
+              {(followStatus === 'none' || followStatus === 'not-following') && (
                 <Button 
                   onClick={() => handleFollow(userId)}
                   disabled={loading}
+                  className="bg-blue-600 hover:bg-blue-700"
                 >
                   <UserPlus className="h-4 w-4 mr-2" />
-                  {loading ? 'Following...' : 'Follow'}
+                  {loading ? 'Sending...' : 'Follow'}
                 </Button>
               )}
               
@@ -320,10 +479,10 @@ export default function OtherUserProfile({ userId }: OtherUserProfileProps) {
                       <span>{profile.department}</span>
                     </>
                   )}
-                  {profile.batch && (
+                  {(profile.batch || (profile.type === 'alumni' && profile.alumniInfo?.graduationYear)) && (
                     <>
                       <span>•</span>
-                      <span>{profile.batch}</span>
+                      <span>{profile.batch || (profile.type === 'alumni' ? profile.alumniInfo?.graduationYear : '')}</span>
                     </>
                   )}
                 </div>
@@ -337,6 +496,29 @@ export default function OtherUserProfile({ userId }: OtherUserProfileProps) {
                   </div>
                 )}
                 
+                {/* Information Visibility - Show Email Address */}
+                {profile.email?.college && (
+                  <div className="flex items-center space-x-2">
+                    <Mail className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm">{profile.email.college}</span>
+                  </div>
+                )}
+                {profile.email?.personal && (
+                  <div className="flex items-center space-x-2">
+                    <Mail className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm">{profile.email.personal}</span>
+                  </div>
+                )}
+                
+                {/* Information Visibility - Show Phone Number */}
+                {profile.phone && (
+                  <div className="flex items-center space-x-2">
+                    <Phone className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm">{profile.phone}</span>
+                  </div>
+                )}
+                
+                {/* Information Visibility - Show Location */}
                 {profile.location && (
                   <div className="flex items-center space-x-2">
                     <LocationIcon className="h-4 w-4 text-muted-foreground" />
@@ -344,10 +526,44 @@ export default function OtherUserProfile({ userId }: OtherUserProfileProps) {
                   </div>
                 )}
                 
+                {(profile.city || profile.state || profile.country) && (
+                  <div className="flex items-center space-x-2">
+                    <MapPin className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm">
+                      {[profile.city, profile.state, profile.country].filter(Boolean).join(', ')}
+                    </span>
+                  </div>
+                )}
+                
+                {/* Information Visibility - Show Company */}
                 {profile.company && (
                   <div className="flex items-center space-x-2">
                     <Building className="h-4 w-4 text-muted-foreground" />
                     <span className="text-sm">{profile.company}</span>
+                  </div>
+                )}
+                {profile.studentInfo && (
+                  <div>
+                    <h4 className="text-xs uppercase tracking-wider text-muted-foreground">Placement Status</h4>
+                    <Badge variant={!profile.studentInfo.placementStatus || profile.studentInfo.placementStatus === 'placed' ? 'default' : 'secondary'}>
+                      {formatPlacementStatus(profile.studentInfo.placementStatus)}
+                    </Badge>
+                  </div>
+                )}
+                
+                {/* Information Visibility - Show Batch Year - Check all possible locations */}
+                {(profile.batch || (profile.type === 'alumni' && profile.alumniInfo?.graduationYear)) && (
+                  <div className="flex items-center space-x-2">
+                    <Calendar className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm">Batch {profile.batch || (profile.type === 'alumni' ? profile.alumniInfo?.graduationYear : '')}</span>
+                  </div>
+                )}
+                
+                {/* Information Visibility - Show Department */}
+                {profile.department && (
+                  <div className="flex items-center space-x-2">
+                    <GraduationCap className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm">{profile.department}</span>
                   </div>
                 )}
                 
@@ -386,10 +602,7 @@ export default function OtherUserProfile({ userId }: OtherUserProfileProps) {
                     <div className="text-2xl font-bold text-primary">{stats.events}</div>
                     <div className="text-sm text-muted-foreground">Events</div>
                   </div>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-primary">{stats.achievements}</div>
-                    <div className="text-sm text-muted-foreground">Achievements</div>
-                  </div>
+                  
                 </div>
               </CardContent>
             </Card>
@@ -412,56 +625,175 @@ export default function OtherUserProfile({ userId }: OtherUserProfileProps) {
               </Card>
             )}
 
+            {/* Interests */}
+            {profile.interests && profile.interests.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Interests</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex flex-wrap gap-2">
+                    {profile.interests.map((interest, index) => (
+                      <Badge key={index} variant="outline">
+                        {interest}
+                      </Badge>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Resume */}
+            {profile.resume && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Resume</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <a 
+                    href={profile.resume} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="flex items-center space-x-2 text-sm text-blue-600 hover:text-blue-800"
+                  >
+                    <Award className="h-4 w-4" />
+                    <span>View Resume</span>
+                    <ExternalLink className="h-3 w-3" />
+                  </a>
+                </CardContent>
+              </Card>
+            )}
+
             {/* Social Links */}
-            {profile.socialLinks && Object.values(profile.socialLinks).some(link => link) && (
+            {hasSocialLinks && (
               <Card>
                 <CardHeader>
                   <CardTitle className="text-lg">Social Links</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-2">
-                  {profile.socialLinks.linkedin && (
+                  {socialLinks.linkedin && (
                     <a 
-                      href={profile.socialLinks.linkedin} 
+                      href={socialLinks.linkedin} 
                       target="_blank" 
                       rel="noopener noreferrer"
                       className="flex items-center space-x-2 text-sm text-blue-600 hover:text-blue-800"
                     >
                       <Linkedin className="h-4 w-4" />
                       <span>LinkedIn</span>
+                      <ExternalLink className="h-3 w-3" />
                     </a>
                   )}
-                  {profile.socialLinks.github && (
+                  {socialLinks.github && (
                     <a 
-                      href={profile.socialLinks.github} 
+                      href={socialLinks.github} 
                       target="_blank" 
                       rel="noopener noreferrer"
                       className="flex items-center space-x-2 text-sm text-gray-600 hover:text-gray-800"
                     >
                       <Github className="h-4 w-4" />
                       <span>GitHub</span>
+                      <ExternalLink className="h-3 w-3" />
                     </a>
                   )}
-                  {profile.socialLinks.twitter && (
+                  {socialLinks.leetcode && (
                     <a 
-                      href={profile.socialLinks.twitter} 
+                      href={socialLinks.leetcode} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="flex items-center space-x-2 text-sm text-purple-600 hover:text-purple-800"
+                    >
+                      <Code2 className="h-4 w-4" />
+                      <span>LeetCode</span>
+                      <ExternalLink className="h-3 w-3" />
+                    </a>
+                  )}
+                  {socialLinks.twitter && (
+                    <a 
+                      href={socialLinks.twitter} 
                       target="_blank" 
                       rel="noopener noreferrer"
                       className="flex items-center space-x-2 text-sm text-blue-400 hover:text-blue-600"
                     >
                       <Twitter className="h-4 w-4" />
                       <span>Twitter</span>
+                      <ExternalLink className="h-3 w-3" />
                     </a>
                   )}
-                  {profile.socialLinks.website && (
+                  {socialLinks.website && (
                     <a 
-                      href={profile.socialLinks.website} 
+                      href={socialLinks.website} 
                       target="_blank" 
                       rel="noopener noreferrer"
                       className="flex items-center space-x-2 text-sm text-green-600 hover:text-green-800"
                     >
                       <Globe className="h-4 w-4" />
                       <span>Website</span>
+                      <ExternalLink className="h-3 w-3" />
                     </a>
+                  )}
+                  {customSocialLinks.length > 0 && (
+                    <div className="space-y-2 pt-2">
+                      <Label className="text-xs uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                        <LinkIcon className="h-3 w-3" />
+                        Custom Links
+                      </Label>
+                      {customSocialLinks.map((link, index) => (
+                        <a 
+                          key={`${link.label}-${index}`}
+                          href={link.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center space-x-2 text-sm text-primary hover:text-primary/80"
+                        >
+                          <LinkIcon className="h-4 w-4" />
+                          <span>{link.label}</span>
+                          <ExternalLink className="h-3 w-3" />
+                        </a>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
+            {(profile.resume || profile.portfolio) && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <FileText className="h-4 w-4" />
+                    Resume & Portfolio
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {profile.resume && (
+                    <div>
+                      <Label className="text-sm font-medium text-muted-foreground">Resume</Label>
+                      <a 
+                        href={profile.resume}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-800"
+                      >
+                        <FileText className="h-4 w-4" />
+                        <span>View Resume</span>
+                        <ExternalLink className="h-3 w-3" />
+                      </a>
+                    </div>
+                  )}
+                  {profile.portfolio && (
+                    <div>
+                      <Label className="text-sm font-medium text-muted-foreground">Portfolio</Label>
+                      <a 
+                        href={profile.portfolio}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 text-sm text-green-600 hover:text-green-800"
+                      >
+                        <Globe className="h-4 w-4" />
+                        <span>View Portfolio</span>
+                        <ExternalLink className="h-3 w-3" />
+                      </a>
+                    </div>
                   )}
                 </CardContent>
               </Card>
@@ -471,107 +803,103 @@ export default function OtherUserProfile({ userId }: OtherUserProfileProps) {
           {/* Right Column - Tabs */}
           <div className="lg:col-span-2">
             <Tabs defaultValue="posts" className="space-y-6">
-              <TabsList className="grid w-full grid-cols-4">
+                              <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="posts">Posts</TabsTrigger>
-                <TabsTrigger value="achievements">Achievements</TabsTrigger>
-                <TabsTrigger value="education">Education</TabsTrigger>
                 <TabsTrigger value="connections">Connections</TabsTrigger>
               </TabsList>
 
               <TabsContent value="posts" className="space-y-4">
-                <PostFeed />
+                <UserPostsFeed userId={userId || ''} showDeleteButton={false} />
               </TabsContent>
 
-              <TabsContent value="achievements" className="space-y-4">
-                {profile.achievements && profile.achievements.length > 0 ? (
-                  <div className="space-y-4">
-                    {profile.achievements.map((achievement, index) => (
-                      <Card key={index}>
-                        <CardHeader>
-                          <CardTitle className="flex items-center space-x-2">
-                            <Award className="h-5 w-5 text-yellow-500" />
-                            <span>{achievement.title}</span>
-                          </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <p className="text-sm text-muted-foreground mb-2">{achievement.description}</p>
-                          <div className="flex items-center justify-between text-xs text-muted-foreground">
-                            <span>{achievement.date}</span>
-                            {achievement.certificate && (
-                              <a 
-                                href={achievement.certificate} 
-                                target="_blank" 
-                                rel="noopener noreferrer"
-                                className="text-primary hover:underline"
-                              >
-                                View Certificate
-                              </a>
-                            )}
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                ) : (
-                  <Card>
-                    <CardContent className="text-center py-8">
-                      <Award className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                      <p className="text-muted-foreground">No achievements yet</p>
-                    </CardContent>
-                  </Card>
-                )}
-              </TabsContent>
 
-              <TabsContent value="education" className="space-y-4">
-                {profile.education && profile.education.length > 0 ? (
-                  <div className="space-y-4">
-                    {profile.education.map((edu, index) => (
-                      <Card key={index}>
-                        <CardHeader>
-                          <CardTitle className="flex items-center space-x-2">
-                            <GraduationCap className="h-5 w-5 text-blue-500" />
-                            <span>{edu.degree}</span>
-                          </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <p className="text-sm text-muted-foreground mb-2">{edu.institution}</p>
-                          <div className="flex items-center justify-between text-xs text-muted-foreground">
-                            <span>{edu.year}</span>
-                            {edu.gpa && <span>GPA: {edu.gpa}</span>}
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                ) : (
-                  <Card>
-                    <CardContent className="text-center py-8">
-                      <GraduationCap className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                      <p className="text-muted-foreground">No education history yet</p>
-                    </CardContent>
-                  </Card>
-                )}
-              </TabsContent>
+
 
               <TabsContent value="connections" className="space-y-4">
                 {connections.length > 0 ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {connections.map((connection) => (
-                      <Card key={connection._id}>
-                        <CardContent className="flex items-center space-x-3 p-4">
-                          <Avatar className="h-10 w-10">
-                            <AvatarImage src={connection.avatar} />
-                            <AvatarFallback>
-                              {connection.name.split(' ').map(n => n[0]).join('')}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div className="flex-1">
-                            <h4 className="font-medium">{connection.name}</h4>
-                            <p className="text-sm text-muted-foreground">{connection.type}</p>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {connections.map((connection) => {
+                      const isFollowing = currentUserFollowing.includes(connection._id);
+                      return (
+                        <Card key={connection._id} className="h-full">
+                          <CardContent className="flex flex-col h-full p-4">
+                            {/* Profile Info Section */}
+                            <div className="flex items-start space-x-3 mb-4">
+                              <Avatar className="h-12 w-12 flex-shrink-0">
+                                <AvatarImage src={connection.avatar} />
+                                <AvatarFallback className="bg-primary text-primary-foreground">
+                                  {connection.name.split(' ').map(n => n[0]).join('')}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div className="flex-1 min-w-0">
+                                <h4 className="font-semibold text-sm truncate">{connection.name}</h4>
+                                <p className="text-xs text-muted-foreground capitalize">{connection.type}</p>
+                                {connection.department && (
+                                  <p className="text-xs text-muted-foreground truncate">
+                                    {connection.department}
+                                  </p>
+                                )}
+                                {connection.batch && (
+                                  <p className="text-xs text-muted-foreground">
+                                    Batch {connection.batch}
+                                  </p>
+                                )}
+                                {connection.company && (
+                                  <p className="text-xs text-muted-foreground truncate">
+                                    {connection.company}
+                                  </p>
+                                )}
+                                {(connection.city || connection.state || connection.country) && (
+                                  <p className="text-xs text-muted-foreground truncate">
+                                    {[connection.city, connection.state, connection.country].filter(Boolean).join(', ')}
+                                  </p>
+                                )}
+                                {connection.skills && connection.skills.length > 0 && (
+                                  <p className="text-xs text-muted-foreground truncate">
+                                    Skills: {connection.skills.slice(0, 2).join(', ')}{connection.skills.length > 2 ? '...' : ''}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                            
+                            {/* Action Buttons Section */}
+                            <div className="flex space-x-2 mt-auto">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => navigate(`/profile/${connection._id}`)}
+                                className="flex-1 text-xs"
+                              >
+                                <Eye className="h-3 w-3 mr-1" />
+                                View
+                              </Button>
+                              {!isFollowing && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleFollow(connection._id)}
+                                  className="flex-1 text-xs text-blue-600 hover:text-blue-700 border-blue-200 hover:border-blue-300"
+                                >
+                                  <UserPlus className="h-3 w-3 mr-1" />
+                                  Follow
+                                </Button>
+                              )}
+                              {isFollowing && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  disabled
+                                  className="flex-1 text-xs text-green-600 border-green-200"
+                                >
+                                  <UserMinus className="h-3 w-3 mr-1" />
+                                  Following
+                                </Button>
+                              )}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
                   </div>
                 ) : (
                   <Card>

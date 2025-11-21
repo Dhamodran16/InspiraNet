@@ -77,7 +77,7 @@ export const validateEmailForUserType = (email: string, userType: string): boole
 // Department validation
 export const validateDepartment = (department: string): boolean => {
   const validDepartments = [
-    'cse', 'ece', 'eee', 'mech', 'civil', 'chemical', 'biotech', 'it', 'ai', 'ai&ds'
+    'mch', 'aid', 'aim', 'mtr', 'aut', 'eee', 'ece', 'cse', 'it', 'eie', 'csd'
   ];
   return validDepartments.includes(department.toLowerCase());
 };

@@ -121,7 +121,7 @@ const SignInPage = () => {
   };
 
   return (
-    <div className="min-h-screen relative overflow-hidden">
+    <div className="min-h-screen relative">
       {/* Full Background Image */}
       <div
         ref={backgroundRef}
@@ -144,7 +144,7 @@ const SignInPage = () => {
 
         {/* Right Panel - Sign In Form */}
         <div ref={formRef} className="w-full max-w-md bg-white/10 backdrop-blur-md border border-white/20 flex flex-col shadow-2xl min-h-screen">
-          <div className="flex-1 flex flex-col justify-center p-8 overflow-hidden">
+          <div className="flex-1 flex flex-col justify-center p-8">
             {/* Header */}
             <div ref={headerRef} className="text-center mb-6">
               <div className="flex items-center justify-center gap-3 mb-3">

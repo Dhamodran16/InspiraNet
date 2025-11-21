@@ -1,0 +1,31 @@
+# SPA Routing for Render - Explicit and Reliable
+# This file MUST be in the root directory for Render to recognize it
+
+# Root route
+/    /index.html   200
+
+# Critical routes with explicit handling
+/signin    /index.html   200
+/signup    /index.html   200
+/dashboard    /index.html   200
+/profile    /index.html   200
+/messages    /index.html   200
+/notifications    /index.html   200
+/create-post    /index.html   200
+
+# Meeting routes - CRITICAL for fixing 404 errors
+/meeting    /index.html   200
+/meeting/*    /index.html   200
+
+# Legal pages - CRITICAL for fixing 404 errors
+/privacy-policy    /index.html   200
+/terms    /index.html   200
+/cookie-policy    /index.html   200
+
+# Other important routes
+/team    /index.html   200
+/profile/*    /index.html   200
+/messages/*    /index.html   200
+
+# Catch-all for any other routes - MUST be last
+/*    /index.html   200

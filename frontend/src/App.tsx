@@ -1,102 +1,106 @@
-import { Toaster } from "@/components/ui/toaster";
-import { Toaster as Sonner } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Routes, Route } from "react-router-dom";
-import { AuthProvider } from "@/contexts/AuthContext";
-import { ThemeProvider } from "@/contexts/ThemeContext";
-import Index from "./pages/Index";
-import UserInfo from "./pages/UserInfo";
-import NotFound from "./pages/NotFound";
-import SignInPage from "./pages/SignInPage";
-import SignUpPage from "./pages/SignUpPage";
-import ProtectedRoute from "@/routes/ProtectedRoute";
-import ProfileView from "@/components/profile/ProfileView";
-import ProfileCompletionPage from "./pages/ProfileCompletionPage";
-import DashboardPage from "./pages/DashboardPage";
-import CreatePostPage from "./pages/CreatePostPage";
-import TeamPage from "./pages/TeamPage";
-import PrivacyPolicyPage from "./pages/PrivacyPolicyPage";
-import TermsPage from "./pages/TermsPage";
-import CookiePolicyPage from "./pages/CookiePolicyPage";
+import React, { useEffect } from 'react';
+import { Routes, Route } from 'react-router-dom';
+import { Toaster } from '@/components/ui/toaster';
+import { AuthProvider } from '@/contexts/AuthContext';
+import { ThemeProvider } from '@/contexts/ThemeContext';
+import ErrorBoundary from '@/components/ErrorBoundary';
+import CookieConsent from '@/components/CookieConsent';
+import ScrollToTop from '@/components/ScrollToTop';
+import performanceService from '@/services/performanceService';
 
-const queryClient = new QueryClient();
+// Lazy load components for better performance
+const LandingPage = React.lazy(() => import('@/pages/LandingPage'));
+const SignInPage = React.lazy(() => import('@/pages/SignInPage'));
+const SignUpPage = React.lazy(() => import('@/pages/SignUpPage'));
+const DashboardPage = React.lazy(() => import('@/pages/DashboardPage'));
+const Profile = React.lazy(() => import('@/pages/Profile'));
+const OtherUserProfile = React.lazy(() => import('@/components/profile/OtherUserProfile'));
+const EditProfile = React.lazy(() => import('@/pages/EditProfile'));
+const EnhancedMessagesPage = React.lazy(() => import('@/pages/EnhancedMessagesPage'));
+const NotificationsPage = React.lazy(() => import('@/pages/NotificationsPage'));
+const CreatePostPage = React.lazy(() => import('@/pages/CreatePostPage'));
+const ProfileCompletionPage = React.lazy(() => import('@/pages/ProfileCompletionPage'));
+const PrivacyPolicyPage = React.lazy(() => import('@/pages/PrivacyPolicyPage'));
+const TermsPage = React.lazy(() => import('@/pages/TermsPage'));
+const CookiePolicyPage = React.lazy(() => import('@/pages/CookiePolicyPage'));
+const TeamPage = React.lazy(() => import('@/pages/TeamPage'));
+const NotFound = React.lazy(() => import('@/pages/NotFound'));
 
-const App = () => {
+// Loading component
+const LoadingSpinner = () => (
+  <div className="min-h-screen bg-background flex items-center justify-center">
+    <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+  </div>
+);
+
+function App() {
+  useEffect(() => {
+    // Initialize performance optimizations
+    const initializePerformance = async () => {
+      try {
+        // Preload critical resources
+        performanceService.preloadResources([
+          '/api/config/departments',
+          '/api/config/designations',
+          '/api/config/placement-statuses'
+        ]);
+
+        // Register service worker for caching
+        await performanceService.registerServiceWorker();
+
+        // Setup background sync for offline support
+        await performanceService.setupBackgroundSync();
+
+        // Optimize bundle
+        performanceService.optimizeBundle();
+
+        console.log('Performance optimizations initialized');
+      } catch (error) {
+        console.warn('Performance initialization failed:', error);
+      }
+    };
+
+    initializePerformance();
+
+    // Cleanup on unmount
+    return () => {
+      performanceService.cleanup();
+    };
+  }, []);
+
   return (
-    <div className="viewport-container">
-      <QueryClientProvider client={queryClient}>
-        <ThemeProvider>
-          <AuthProvider>
-            <TooltipProvider>
-              <Toaster />
-              <Sonner />
+    <ThemeProvider>
+      <AuthProvider>
+        <div className="App">
+          <ScrollToTop />
+          <ErrorBoundary>
+            <React.Suspense fallback={<LoadingSpinner />}>
               <Routes>
-                {/* Landing Page - Entry Point */}
-                <Route path="/" element={<Index />} />
-                
-                {/* Authentication Routes - Updated to use new split-screen pages */}
+                <Route path="/" element={<LandingPage />} />
                 <Route path="/signin" element={<SignInPage />} />
                 <Route path="/signup" element={<SignUpPage />} />
-                
-                {/* Legal and Information Pages */}
-                <Route path="/team" element={<TeamPage />} />
+                <Route path="/dashboard" element={<DashboardPage />} />
+                <Route path="/profile" element={<Profile />} />
+                <Route path="/profile/:userId" element={<OtherUserProfile />} />
+                <Route path="/profile/edit" element={<EditProfile />} />
+                <Route path="/messages" element={<EnhancedMessagesPage />} />
+                <Route path="/notifications" element={<NotificationsPage />} />
+                <Route path="/create-post" element={<CreatePostPage />} />
+                <Route path="/profile-completion" element={<ProfileCompletionPage />} />
                 <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
-                <Route path="/terms-of-service" element={<TermsPage />} />
+                <Route path="/terms" element={<TermsPage />} />
                 <Route path="/cookie-policy" element={<CookiePolicyPage />} />
-                
-                {/* Profile Completion Route - Required for new users */}
-                <Route 
-                  path="/profile-completion" 
-                  element={
-                    <ProtectedRoute>
-                      <ProfileCompletionPage />
-                    </ProtectedRoute>
-                  } 
-                />
-                
-                {/* Main Dashboard - All features available here */}
-                <Route 
-                  path="/dashboard" 
-                  element={
-                    <ProtectedRoute requireProfileComplete={true}>
-                      <DashboardPage />
-                    </ProtectedRoute>
-                  } 
-                />
-                
-                {/* Create Post Route */}
-                <Route 
-                  path="/create-post" 
-                  element={
-                    <ProtectedRoute requireProfileComplete={true}>
-                      <CreatePostPage />
-                    </ProtectedRoute>
-                  } 
-                />
-                
-                {/* Profile View Route */}
-                <Route
-                  path="/profile/:userId"
-                  element={
-                    <ProtectedRoute>
-                      <ProfileView />
-                    </ProtectedRoute>
-                  }
-                />
-                
-                {/* User Info Route */}
-                <Route path="/user-info" element={<UserInfo />} />
-                
-                {/* Catch all other routes */}
+                <Route path="/team" element={<TeamPage />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
-            </TooltipProvider>
-          </AuthProvider>
-        </ThemeProvider>
-      </QueryClientProvider>
-    </div>
+            </React.Suspense>
+          </ErrorBoundary>
+          <CookieConsent />
+          <Toaster />
+        </div>
+      </AuthProvider>
+    </ThemeProvider>
   );
-};
+}
 
 export default App;

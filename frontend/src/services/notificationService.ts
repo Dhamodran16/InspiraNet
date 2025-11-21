@@ -140,8 +140,12 @@ class NotificationService {
   }
 
   // Get user notification settings
-  async getSettings(): Promise<NotificationSettings> {
+  async getSettings(): Promise<{ success?: boolean; settings: NotificationSettings } | NotificationSettings> {
     const response = await api.get('/api/notifications/settings');
+    // Handle both response structures: { success: true, settings } or { settings }
+    if (response.data && response.data.settings) {
+      return response.data;
+    }
     return response.data;
   }
 

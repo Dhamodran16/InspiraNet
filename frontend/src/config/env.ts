@@ -4,16 +4,11 @@ import { productionConfig, validateProductionConfig } from './production';
 const isProduction = import.meta.env.PROD;
 
 // Use production config in production mode, fallback to development values
-const config = isProduction ? {
-  backendUrl: productionConfig.backendUrl,
-  frontendUrl: productionConfig.frontendUrl,
-  socketUrl: productionConfig.socketUrl,
-  environment: 'production',
-} : {
-  backendUrl: import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000',
-  frontendUrl: import.meta.env.VITE_FRONTEND_URL || 'http://localhost:8084',
-  socketUrl: import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000',
-  environment: import.meta.env.MODE || 'development',
+export const config = {
+  apiUrl: import.meta.env.VITE_API_URL || 'https://inspiranet-backend.onrender.com',
+  socketUrl: import.meta.env.VITE_SOCKET_URL || 'https://inspiranet-backend.onrender.com',
+  meetingUrl: import.meta.env.VITE_MEETING_URL || 'https://inspiranet-backend.onrender.com',
+  environment: import.meta.env.MODE || 'production'
 };
 
 // Validate production config on app startup

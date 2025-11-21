@@ -1,4 +1,6 @@
-const API_BASE_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
+import { getBackendUrl } from '../utils/urlConfig';
+
+const API_BASE_URL = getBackendUrl();
 
 export interface LoginCredentials {
   email: string;
@@ -12,6 +14,11 @@ export interface RegisterData {
   type: 'alumni' | 'student' | 'faculty';
   department?: string;
   personalEmail?: string;
+}
+
+export interface SocialLink {
+  label: string;
+  url: string;
 }
 
 export interface AuthResponse {
@@ -39,7 +46,16 @@ export interface AuthResponse {
     alumniInfo?: any;
     facultyInfo?: any;
     skills?: string[];
-    socialLinks?: any;
+    socialLinks?: {
+      linkedin?: string;
+      github?: string;
+      personalWebsite?: string;
+      twitter?: string;
+      instagram?: string;
+      facebook?: string;
+      leetcode?: string;
+      customLinks?: SocialLink[];
+    };
     resume?: string;
     portfolio?: string;
   };
@@ -55,6 +71,18 @@ export interface ProfileUpdateData {
   experience?: string;
   bio?: string;
   professionalEmail?: string;
+  resume?: string;
+  portfolio?: string;
+  socialLinks?: {
+    linkedin?: string;
+    github?: string;
+    personalWebsite?: string;
+    twitter?: string;
+    instagram?: string;
+    facebook?: string;
+    leetcode?: string;
+    customLinks?: SocialLink[];
+  };
 }
 
 class AuthService {
@@ -124,12 +152,10 @@ class AuthService {
       }
 
       // Type-specific validation
-      if (data.type === 'student' && !data.department) {
-        throw new Error('Students must provide department');
-      }
+      // Department is now optional for students during registration, will be collected in profile completion
 
-      if (data.type === 'faculty' && (!data.department || !data.email)) {
-        throw new Error('Faculty must provide department and email');
+      if (data.type === 'faculty' && !data.email) {
+        throw new Error('Faculty must provide email');
       }
 
       if (data.type === 'alumni' && !data.email) {
@@ -330,6 +356,26 @@ class AuthService {
         }
       }
       
+      // Log the exact payload being sent
+      console.log('📤 PUT /api/users/profile - Request Details (via authService):');
+      console.log('📤 URL:', `${API_BASE_URL}/api/users/profile`);
+      console.log('📤 Headers:', {
+        'Content-Type': headers['Content-Type'],
+        'Authorization': headers['Authorization'] ? 'Bearer [TOKEN_PRESENT]' : 'MISSING'
+      });
+      console.log('📤 Payload (full):', JSON.stringify(payload, null, 2));
+      console.log('📤 Payload (summary):', {
+        name: payload.name,
+        email: payload.email,
+        hasStudentInfo: !!payload.studentInfo,
+        hasAlumniInfo: !!payload.alumniInfo,
+        hasFacultyInfo: !!payload.facultyInfo,
+        skillsCount: payload.skills?.length || 0,
+        hasSocialLinks: !!payload.socialLinks,
+        department: payload.department,
+        keys: Object.keys(payload)
+      });
+      
       const response = await this.makeRequest(`${API_BASE_URL}/api/users/profile`, {
         method: 'PUT',
         headers,
@@ -338,10 +384,20 @@ class AuthService {
 
       const responseData = await response.json();
       console.log('📡 User info update response:', response.status);
+      console.log('📡 Response data:', responseData);
 
       if (!response.ok) {
+        console.error('❌ Profile update failed:', {
+          status: response.status,
+          statusText: response.statusText,
+          error: responseData.error,
+          message: responseData.message,
+          details: responseData.details
+        });
+        
         if (response.status === 400) {
-          const errorMsg = responseData.error || responseData.details || 'Invalid user information';
+          const errorMsg = responseData.error || responseData.message || responseData.details || 'Invalid user information';
+          console.error('❌ 400 Error details:', responseData);
           throw new Error(errorMsg);
         }
         if (response.status === 401) {

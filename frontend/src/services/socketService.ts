@@ -1,5 +1,8 @@
 import { io, Socket } from 'socket.io-client';
-import { useAuth } from '@/contexts/AuthContext';
+import { getSocketUrl } from '../utils/urlConfig';
+
+// 🚀 Dynamic socket URL based on environment
+const SOCKET_URL = getSocketUrl();
 
 // Types
 export interface Message {
@@ -74,7 +77,7 @@ export interface Event {
 
 class SocketService {
   private socket: Socket | null = null;
-  private isConnecting = false;
+  private isConnected = false;
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 5;
   private reconnectDelay = 1000;
@@ -84,31 +87,37 @@ class SocketService {
   }
 
   private setupSocket() {
-    if (this.socket || this.isConnecting) return;
+    if (this.socket || this.isConnected) return;
 
-    this.isConnecting = true;
+    this.isConnected = true;
     
     try {
       const token = localStorage.getItem('authToken') || sessionStorage.getItem('authToken');
       if (!token) {
         console.warn('No authentication token found for socket connection');
-        this.isConnecting = false;
+        this.isConnected = false;
         return;
       }
 
-      this.socket = io(import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000', {
-        auth: { token },
+      this.socket = io(SOCKET_URL, {
         transports: ['websocket', 'polling'],
         timeout: 20000,
         reconnection: true,
         reconnectionAttempts: this.maxReconnectAttempts,
         reconnectionDelay: this.reconnectDelay,
+        auth: {
+          token: token
+        }
       });
 
       this.setupEventHandlers();
+      
+      // Authenticate with the backend
+      this.socket.emit('authenticate', { token });
+      
     } catch (error) {
       console.error('Error setting up socket connection:', error);
-      this.isConnecting = false;
+      this.isConnected = false;
     }
   }
 
@@ -117,18 +126,30 @@ class SocketService {
 
     this.socket.on('connect', () => {
       console.log('Socket connected:', this.socket?.id);
-      this.isConnecting = false;
+      this.isConnected = true;
       this.reconnectAttempts = 0;
+    });
+
+    this.socket.on('authenticated', (data) => {
+      console.log('✅ Socket authenticated:', data);
+      this.isConnected = true;
+      this.reconnectAttempts = 0;
+    });
+
+    this.socket.on('auth_error', (error) => {
+      console.error('❌ Socket authentication failed:', error);
+      this.isConnected = false;
+      this.reconnectAttempts++;
     });
 
     this.socket.on('disconnect', (reason) => {
       console.log('Socket disconnected:', reason);
-      this.isConnecting = false;
+      this.isConnected = false;
     });
 
     this.socket.on('connect_error', (error) => {
       console.error('Socket connection error:', error);
-      this.isConnecting = false;
+      this.isConnected = false;
       this.reconnectAttempts++;
       
       if (this.reconnectAttempts >= this.maxReconnectAttempts) {
@@ -144,7 +165,9 @@ class SocketService {
 
   // Connection management
   connect() {
-    if (!this.socket || !this.socket.connected) {
+    // Only try to connect if we have a token
+    const token = localStorage.getItem('authToken') || sessionStorage.getItem('authToken');
+    if (token && (!this.socket || !this.socket.connected)) {
       this.setupSocket();
     }
   }
@@ -156,16 +179,12 @@ class SocketService {
     }
   }
 
-  isConnected(): boolean {
-    return this.socket?.connected || false;
+  // Connection status
+  getConnectionStatus(): boolean {
+    return this.isConnected;
   }
 
-  // Messaging methods
-  joinConversations(conversationIds: string[]) {
-    if (this.socket?.connected) {
-      this.socket.emit('join_conversations', conversationIds);
-    }
-  }
+
 
   sendMessage(conversationId: string, content: string, messageType: 'text' | 'image' | 'file' = 'text', mediaUrl?: string) {
     if (this.socket?.connected) {
@@ -181,6 +200,114 @@ class SocketService {
   startTyping(conversationId: string) {
     if (this.socket?.connected) {
       this.socket.emit('typing_start', { conversationId });
+    }
+  }
+
+  onUserConnected(callback: (userId: string, userName: string) => void) {
+    if (this.socket) {
+      this.socket.on('user-connected', callback);
+    }
+  }
+
+  offUserConnected() {
+    if (this.socket) {
+      this.socket.off('user-connected');
+    }
+  }
+
+  onUserDisconnected(callback: (userId: string, userName: string) => void) {
+    if (this.socket) {
+      this.socket.on('user-disconnected', callback);
+    }
+  }
+
+  offUserDisconnected() {
+    if (this.socket) {
+      this.socket.off('user-disconnected');
+    }
+  }
+
+  onOffer(callback: (offer: RTCSessionDescriptionInit, senderId: string) => void) {
+    if (this.socket) {
+      this.socket.on('offer', callback);
+    }
+  }
+
+  offOffer() {
+    if (this.socket) {
+      this.socket.off('offer');
+    }
+  }
+
+  onAnswer(callback: (answer: RTCSessionDescriptionInit, senderId: string) => void) {
+    if (this.socket) {
+      this.socket.on('answer', callback);
+    }
+  }
+
+  offAnswer() {
+    if (this.socket) {
+      this.socket.off('answer');
+    }
+  }
+
+  onIceCandidate(callback: (candidate: RTCIceCandidateInit, senderId: string) => void) {
+    if (this.socket) {
+      this.socket.on('ice-candidate', callback);
+    }
+  }
+
+  offIceCandidate() {
+    if (this.socket) {
+      this.socket.off('ice-candidate');
+    }
+  }
+
+  onUserTyping(callback: (userId: string, isTyping: boolean, userName: string) => void) {
+    if (this.socket) {
+      this.socket.on('user-typing', callback);
+    }
+  }
+
+  offUserTyping() {
+    if (this.socket) {
+      this.socket.off('user-typing');
+    }
+  }
+
+  onUserRaisedHand(callback: (userId: string, raised: boolean, userName: string) => void) {
+    if (this.socket) {
+      this.socket.on('user-raised-hand', callback);
+    }
+  }
+
+  offUserRaisedHand() {
+    if (this.socket) {
+      this.socket.off('user-raised-hand');
+    }
+  }
+
+  onHostMuteAll(callback: () => void) {
+    if (this.socket) {
+      this.socket.on('host-mute-all', callback);
+    }
+  }
+
+  offHostMuteAll() {
+    if (this.socket) {
+      this.socket.off('host-mute-all');
+    }
+  }
+
+  onRoomInfo(callback: (info: any) => void) {
+    if (this.socket) {
+      this.socket.on('room-info', callback);
+    }
+  }
+
+  offRoomInfo() {
+    if (this.socket) {
+      this.socket.off('room-info');
     }
   }
 
@@ -258,6 +385,30 @@ class SocketService {
     }
   }
 
+  onActivityLog(callback: (payload: any) => void) {
+    if (this.socket) {
+      this.socket.on('activity_log_created', callback);
+    }
+  }
+
+  offActivityLog() {
+    if (this.socket) {
+      this.socket.off('activity_log_created');
+    }
+  }
+
+  onActivityLogCleared(callback: () => void) {
+    if (this.socket) {
+      this.socket.on('activity_log_cleared', callback);
+    }
+  }
+
+  offActivityLogCleared() {
+    if (this.socket) {
+      this.socket.off('activity_log_cleared');
+    }
+  }
+
   offPreferenceUpdate() {
     if (this.socket) {
       this.socket.off('preference_updated');
@@ -312,13 +463,13 @@ class SocketService {
   // Message read status listeners
   onMessageRead(callback: (data: any) => void) {
     if (this.socket) {
-      this.socket.on('message_read', callback);
+      this.socket.on('messages_read', callback);
     }
   }
 
   offMessageRead() {
     if (this.socket) {
-      this.socket.off('message_read');
+      this.socket.off('messages_read');
     }
   }
 
@@ -407,18 +558,7 @@ class SocketService {
     }
   }
 
-  // Enhanced messaging methods
-  onMessageStatus(callback: (data: { messageId: string; status: string; readAt?: string }) => void) {
-    if (this.socket) {
-      this.socket.on('message_status_update', callback);
-    }
-  }
 
-  offMessageStatus() {
-    if (this.socket) {
-      this.socket.off('message_status_update');
-    }
-  }
 
   onUserOnlineStatus(callback: (data: { userId: string; isOnline: boolean; lastSeen?: string }) => void) {
     if (this.socket) {
@@ -475,6 +615,8 @@ class SocketService {
       this.socket.off('follow_request_rejected');
     }
   }
+
+
 
   // Follow/Unfollow listeners
   onFollowStatusUpdate(callback: (data: any) => void) {
@@ -537,6 +679,90 @@ class SocketService {
     }
   }
 
+  // Enhanced real-time messaging methods
+  onMessageStatus(callback: (data: any) => void) {
+    if (this.socket) {
+      this.socket.on('message_status_update', callback);
+    }
+  }
+
+  offMessageStatus() {
+    if (this.socket) {
+      this.socket.off('message_status_update');
+    }
+  }
+
+  onUserStatus(callback: (data: any) => void) {
+    if (this.socket) {
+      this.socket.on('user_status_change', callback);
+    }
+  }
+
+  offUserStatus() {
+    if (this.socket) {
+      this.socket.off('user_status_change');
+    }
+  }
+
+  onConversationUpdate(callback: (data: any) => void) {
+    if (this.socket) {
+      this.socket.on('conversation_update', callback);
+    }
+  }
+
+  offConversationUpdate() {
+    if (this.socket) {
+      this.socket.off('conversation_update');
+    }
+  }
+
+  onNotificationUpdated(callback: (data: any) => void) {
+    if (this.socket) {
+      this.socket.on('notification_updated', callback);
+    }
+  }
+
+  offNotificationUpdated() {
+    if (this.socket) {
+      this.socket.off('notification_updated');
+    }
+  }
+
+  // Join and leave conversation rooms
+  joinConversations(conversationIds: string[]) {
+    this.socket?.emit('join_conversations', conversationIds);
+  }
+
+  leaveConversations(conversationIds: string[]) {
+    conversationIds.forEach(id => {
+      this.socket?.emit('leave_conversation', { conversationId: id });
+    });
+  }
+
+  // Generic emit method for custom events
+  emit(event: string, data: any) {
+    if (this.socket?.connected) {
+      this.socket.emit(event, data);
+    }
+  }
+
+  // Generic event listener
+  on(event: string, callback: (data: any) => void) {
+    if (this.socket) {
+      this.socket.on(event, callback);
+    }
+  }
+
+  // Remove specific event listener
+  off(event: string, callback?: (data: any) => void) {
+    if (this.socket) {
+      if (callback) {
+        this.socket.off(event, callback);
+      } else {
+        this.socket.off(event);
+      }
+    }
+  }
 
 }
 

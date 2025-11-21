@@ -15,10 +15,30 @@ const userSchema = new mongoose.Schema({
       trim: true,
       lowercase: true
     },
+    professional: {
+      type: String,
+      trim: true,
+      lowercase: true
+    },
     personal: {
       type: String,
       trim: true,
       lowercase: true
+    }
+  },
+  emailMigration: {
+    migrated: {
+      type: Boolean,
+      default: false
+    },
+    migratedAt: {
+      type: Date
+    },
+    oldCollegeEmail: {
+      type: String
+    },
+    newPersonalEmail: {
+      type: String
     }
   },
   password: {
@@ -43,7 +63,7 @@ const userSchema = new mongoose.Schema({
   },
   department: {
     type: String,
-    required: function() { return this.type === 'student' || this.type === 'faculty'; },
+    required: false, // Department is optional during registration, will be collected during profile completion
     trim: true,
     lowercase: true
   },
@@ -214,7 +234,12 @@ const userSchema = new mongoose.Schema({
     personalWebsite: String,
     twitter: String,
     instagram: String,
-    facebook: String
+    facebook: String,
+    leetcode: String,
+    customLinks: [{
+      label: String,
+      url: String
+    }]
   },
   resume: {
     type: String,
@@ -319,7 +344,28 @@ const userSchema = new mongoose.Schema({
   pendingFollowRequests: [{
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User'
-  }]
+  }],
+
+  // Google Calendar Integration
+  googleCalendarConnected: {
+    type: Boolean,
+    default: false
+  },
+  googleCalendarTokens: {
+    access_token: String,
+    refresh_token: String,
+    expiry_date: Number,
+    token_type: {
+      type: String,
+      default: 'Bearer'
+    },
+    scope: String
+  },
+  role: {
+    type: String,
+    enum: ['host', 'guest', 'admin'],
+    default: 'guest'
+  }
 }, {
   timestamps: true
 });

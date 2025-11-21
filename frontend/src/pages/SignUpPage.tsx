@@ -164,23 +164,22 @@ const SignUpPage = () => {
     setError('');
 
     try {
-      const response = await register(signupData);
+      // Store signup data in localStorage instead of creating account immediately
+      localStorage.setItem('pendingSignupData', JSON.stringify(signupData));
       
-      if (response.token && response.user) {
         toast({
-          title: "✅ Account Created Successfully!",
-          description: "Welcome to KEC Alumni Network!",
+        title: "✅ Information Saved",
+        description: "Please complete your profile to create your account",
         });
+      
+      // Navigate to profile completion page
         navigate('/profile-completion');
-      } else {
-        throw new Error('Registration failed');
-      }
     } catch (error: any) {
-      console.error('Registration error:', error);
-      setError(error.message || 'Registration failed. Please try again.');
+      console.error('Error saving signup data:', error);
+      setError(error.message || 'Failed to save information. Please try again.');
       toast({
-        title: "❌ Registration Failed",
-        description: error.message || 'Registration failed. Please try again.',
+        title: "❌ Error",
+        description: error.message || 'Failed to save information. Please try again.',
         variant: "destructive",
       });
     } finally {
@@ -189,7 +188,7 @@ const SignUpPage = () => {
   };
 
   return (
-    <div className="min-h-screen relative overflow-hidden">
+    <div className="min-h-screen relative">
       {/* Full Background Image */}
       <div
         ref={backgroundRef}
@@ -212,7 +211,7 @@ const SignUpPage = () => {
 
         {/* Right Panel - Sign Up Form */}
         <div ref={formRef} className="w-full max-w-md bg-white/10 backdrop-blur-md border border-white/20 flex flex-col shadow-2xl min-h-screen">
-          <div className="flex-1 flex flex-col justify-center p-8 overflow-hidden">
+          <div className="flex-1 flex flex-col justify-center p-8">
                      {/* Header */}
             <div ref={headerRef} className="text-center mb-6">
               <div className="flex items-center justify-center gap-3 mb-3">
@@ -454,8 +453,41 @@ const SignUpPage = () => {
                 </div>
               )}
 
+              {/* Terms and Privacy Policy Acceptance */}
+              <div className="text-xs text-white/80 text-center space-y-2">
+                <p>
+                  By creating an account, you agree to our{' '}
+                  <button 
+                    type="button"
+                    onClick={() => window.open('/terms', '_blank')} 
+                    className="text-cyan-300 hover:text-cyan-200 underline"
+                  >
+                    Terms of Service
+                  </button>
+                  {' '}and{' '}
+                  <button 
+                    type="button"
+                    onClick={() => window.open('/privacy-policy', '_blank')} 
+                    className="text-cyan-300 hover:text-cyan-200 underline"
+                  >
+                    Privacy Policy
+                  </button>
+                </p>
+                <p>
+                  We use cookies to enhance your experience. See our{' '}
+                  <button 
+                    type="button"
+                    onClick={() => window.open('/cookie-policy', '_blank')} 
+                    className="text-cyan-300 hover:text-cyan-200 underline"
+                  >
+                    Cookie Policy
+                  </button>
+                  {' '}for more information.
+                </p>
+              </div>
+
               <Button type="submit" className="w-full bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white py-2.5 font-medium shadow-lg" disabled={isLoadingAuth}>
-                {isLoadingAuth ? "Creating Account..." : "Create Account"}
+                {isLoadingAuth ? "Submitting..." : "Submit"}
               </Button>
             </form>
             

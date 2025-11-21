@@ -8,6 +8,7 @@ export interface User {
   name: string;
   email: {
     college?: string;
+    professional?: string;
     personal?: string;
   };
   type: 'student' | 'alumni' | 'faculty';
@@ -16,9 +17,15 @@ export interface User {
   batch?: string;
   isVerified: boolean;
   isProfileComplete: boolean;
-  // Additional properties needed by Settings component
+  // Additional properties needed by Settings component and throughout app
   phone?: string;
   location?: string;
+  city?: string;
+  state?: string;
+  country?: string;
+  timezone?: string;
+  dateOfBirth?: Date | string;
+  gender?: string;
   designation?: string;
   company?: string;
   bio?: string;
@@ -27,11 +34,20 @@ export interface User {
   skills?: string[];
   languages?: string[];
   interests?: string[];
+  goals?: string[];
+  extraCurricularActivities?: string[];
   joinYear?: number;
+  resume?: string;
+  portfolio?: string;
   socialLinks?: {
     linkedin?: string;
     github?: string;
     personalWebsite?: string;
+    twitter?: string;
+    instagram?: string;
+    facebook?: string;
+    leetcode?: string;
+    customLinks?: { label: string; url: string }[];
   };
   // Student-specific information
   studentInfo?: {
@@ -73,6 +89,16 @@ export interface User {
     officeHours?: string;
     consultationAvailable?: boolean;
   };
+  // Google Calendar Integration
+  googleCalendarConnected?: boolean;
+  googleCalendarTokens?: {
+    access_token?: string;
+    refresh_token?: string;
+    expiry_date?: number;
+    token_type?: string;
+    scope?: string;
+  };
+  role?: 'host' | 'guest' | 'admin';
 }
 
 interface AuthContextType {
@@ -80,6 +106,7 @@ interface AuthContextType {
   isLoading: boolean;
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<boolean>;
+  loginWithGoogle: () => void;
   register: (userData: any) => Promise<any>;
   logout: () => void;
   refreshToken: () => Promise<boolean>;
@@ -127,8 +154,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           return;
         }
 
+        // Add timeout to prevent hanging
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('Auth check timeout')), 10000); // 10 second timeout
+        });
+
         // Verify token with backend
-        const response = await api.get('/api/auth/verify');
+        const authPromise = api.get('/api/auth/verify');
+        
+        const response = await Promise.race([authPromise, timeoutPromise]) as any;
 
         if (response.data && response.data.user) {
           setUser(response.data.user);
@@ -142,16 +176,28 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             variant: "destructive",
           });
         }
-      } catch (error) {
-        console.error('Auth check failed:', error);
+      } catch (error: any) {
+        console.error('Auth check error:', error);
+        
+        // Remove invalid token
         removeAuthToken();
+        
+        // Only show error toast for network errors, not for missing tokens
+        if (error.message !== 'Auth check timeout' && error.response?.status !== 401) {
+          toast({
+            title: "Authentication Error",
+            description: "Please log in again.",
+            variant: "destructive",
+          });
+        }
       } finally {
+        // Always set loading to false, even if there are errors
         setIsLoading(false);
       }
     };
 
     checkAuth();
-  }, []);
+  }, [toast]);
 
   const login = async (email: string, password: string): Promise<boolean> => {
     try {
@@ -310,11 +356,32 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
+  const loginWithGoogle = async () => {
+    try {
+      // Get the auth URL from backend (which includes userId in state)
+      const backendUrl = import.meta.env.VITE_BACKEND_URL || 'https://inspiranet-backend.onrender.com';
+      const response = await api.get(`${backendUrl}/api/auth/google`);
+      
+      if (response.data && response.data.authUrl) {
+        // Redirect to Google OAuth (full page redirect, not popup)
+        window.location.href = response.data.authUrl;
+      } else {
+        throw new Error('Failed to get authorization URL');
+      }
+    } catch (error: any) {
+      console.error('Error initiating Google OAuth:', error);
+      // Fallback: try direct redirect if API call fails
+      const backendUrl = import.meta.env.VITE_BACKEND_URL || 'https://inspiranet-backend.onrender.com';
+      window.location.href = `${backendUrl}/api/auth/google`;
+    }
+  };
+
   const value: AuthContextType = {
     user,
     isLoading,
     isAuthenticated,
     login,
+    loginWithGoogle,
     register,
     logout,
     refreshToken,

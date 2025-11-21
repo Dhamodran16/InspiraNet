@@ -38,7 +38,7 @@ const Footer: React.FC<FooterProps> = ({ transparent = true }) => {
   return (
     <footer className={rootClasses}>
       <div className="container mx-auto px-4 py-12">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           <div className="space-y-4">
             <div className="flex items-center space-x-2">
               <GraduationCap className="h-8 w-8 text-white" />
@@ -98,29 +98,17 @@ const Footer: React.FC<FooterProps> = ({ transparent = true }) => {
             </ul>
           </div>
 
-          <div>
-            <h3 className="font-semibold text-lg mb-4 text-white">Contact Us</h3>
-            <div className="space-y-3">
-              <div className="flex items-center space-x-2 text-white/90">
-                <Mail className="h-4 w-4 text-yellow-300" />
-                <span>inspiranet@gmail.com</span>
-              </div>
-              <div className="flex items-center space-x-2 text-white/90">
-                <MapPin className="h-4 w-4 text-yellow-300" />
-                <span>Kongu Engineering College<br />Perundurai, Erode - 638060</span>
-              </div>
-            </div>
-          </div>
+
         </div>
 
         <div className="border-t border-white/20 mt-12 pt-8 flex flex-col md:flex-row justify-between items-center">
           <p className="text-white/80 text-sm">© 2025 KEC Alumni Network. All rights reserved.</p>
           <div className="flex space-x-6 mt-4 md:mt-0">
             <button onClick={() => window.open("/privacy-policy", "_blank")} className="text-white/80 hover:text-yellow-300 text-sm transition-colors">Privacy Policy</button>
-            <button onClick={() => window.open("/terms-of-service", "_blank")} className="text-white/80 hover:text-yellow-300 text-sm transition-colors">Terms of Service</button>
-            <button onClick={() => navigate("/team")} className="text-sm transition-transform duration-200 hover:scale-105">
+            <button onClick={() => window.open("/terms", "_blank")} className="text-white/80 hover:text-yellow-300 text-sm transition-colors">Terms of Service</button>
+            <button onClick={() => window.open("/team", "_blank")} className="text-sm transition-transform duration-200 hover:scale-105">
               <span className="font-serif font-extrabold tracking-wide text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-orange-400 to-pink-500 drop-shadow">
-                Developed by Beyond Bonds
+                Beyond Bonds
               </span>
             </button>
             <button onClick={() => window.open("/cookie-policy", "_blank")} className="text-white/80 hover:text-yellow-300 text-sm transition-colors">Cookie Policy</button>
@@ -132,3 +120,4 @@ const Footer: React.FC<FooterProps> = ({ transparent = true }) => {
 };
 
 export default Footer;
+

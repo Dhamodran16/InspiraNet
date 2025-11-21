@@ -42,7 +42,7 @@ const userSettingsSchema = new mongoose.Schema({
   privacy: {
     profileVisibility: {
       type: String,
-      enum: ['public', 'connections', 'private'],
+      enum: ['public', 'connections'],
       default: 'public'
     },
     showEmail: { type: Boolean, default: false },
@@ -51,11 +51,6 @@ const userSettingsSchema = new mongoose.Schema({
     showCompany: { type: Boolean, default: true },
     showBatch: { type: Boolean, default: true },
     showDepartment: { type: Boolean, default: true },
-    allowMessagesFrom: {
-      type: String,
-      enum: ['everyone', 'connections', 'none'],
-      default: 'connections'
-    },
     showOnlineStatus: { type: Boolean, default: true }
   },
   
@@ -93,11 +88,22 @@ const userSettingsSchema = new mongoose.Schema({
   security: {
     twoFactorEnabled: { type: Boolean, default: false },
     loginNotifications: { type: Boolean, default: true },
-    sessionTimeout: { type: Number, default: 24 }, // hours
+    sessionTimeout: { type: Number, default: 30 }, // minutes (frontend uses minutes)
     requirePasswordChange: { type: Boolean, default: false },
     lastPasswordChange: { type: Date },
     passwordExpiryDays: { type: Number, default: 90 }
-  }
+  },
+
+  activityLog: [{
+    action: { type: String, required: true },
+    status: {
+      type: String,
+      enum: ['success', 'error', 'pending'],
+      default: 'success'
+    },
+    details: { type: String },
+    timestamp: { type: Date, default: Date.now }
+  }]
 }, {
   timestamps: true
 });

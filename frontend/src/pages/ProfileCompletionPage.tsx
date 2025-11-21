@@ -1,9 +1,12 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import type { ChangeEvent, FC } from 'react';
+import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { uploadResumeToCloudinary } from '@/services/cloudinary';
 import { ConfigService } from '@/services/config';
 import { authService } from '@/services/auth';
+import api from '@/services/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import TagInput from '@/components/ui/TagInput';
@@ -15,7 +18,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Upload, FileText, User, GraduationCap, Briefcase, Calendar } from 'lucide-react';
+import { Loader2, Upload, FileText, User, GraduationCap, Briefcase, Calendar, Link2, X as CloseIcon } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
@@ -26,8 +29,15 @@ gsap.registerPlugin(ScrollTrigger);
 interface UserInfoData {
   personalEmail?: string;
   dateOfBirth?: string;
+  phone?: string;
+  gender?: string;
+  location?: string;
+  city?: string;
+  state?: string;
+  country?: string;
+  timezone?: string;
+  department?: string;
   bio?: string;
-  areaOfInterest?: string; // New field for area of interest
   skills?: string[];
   languages?: string[];
   extraCurricularActivities?: string[];
@@ -40,6 +50,8 @@ interface UserInfoData {
     twitter?: string;
     instagram?: string;
     facebook?: string;
+    leetcode?: string;
+    customLinks?: { label: string; url: string }[];
   };
   resume?: string;
   portfolio?: string;
@@ -51,7 +63,7 @@ interface UserInfoData {
     batch?: string;
     section?: string;
     currentSemester?: string;
-    cgpa?: string;
+
     specialization?: string;
     subjects?: string[];
     placementStatus?: string;
@@ -82,7 +94,7 @@ interface UserInfoData {
   };
 }
 
-const ProfileCompletionPage: React.FC = () => {
+const ProfileCompletionPage: FC = () => {
   const navigate = useNavigate();
   const { user, updateUser } = useAuth();
   const { toast } = useToast();
@@ -96,7 +108,9 @@ const ProfileCompletionPage: React.FC = () => {
     extraCurricularActivities: [],
     interests: [],
     goals: [],
-    socialLinks: {},
+    socialLinks: {
+      customLinks: []
+    },
     studentInfo: {},
     alumniInfo: {},
     facultyInfo: {}
@@ -105,14 +119,147 @@ const ProfileCompletionPage: React.FC = () => {
   const [departments, setDepartments] = useState<string[]>([]);
   const [designations, setDesignations] = useState<string[]>([]);
   const [placementStatuses, setPlacementStatuses] = useState<string[]>([]);
+  const [customLinkName, setCustomLinkName] = useState('');
+  const [customLinkUrl, setCustomLinkUrl] = useState('');
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
+  // Validation function for mandatory fields based on user type and year
+  const validateMandatoryFields = () => {
+    const errors: string[] = [];
+    
+    // Get user type from pending signup data or existing user
+    const pendingSignupDataStr = localStorage.getItem('pendingSignupData');
+    const pendingSignupData = pendingSignupDataStr ? JSON.parse(pendingSignupDataStr) : null;
+    const currentUserType = user?.type || pendingSignupData?.userType;
+    
+    // Email validation function
+    const isValidEmail = (email: string) => {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      return emailRegex.test(email);
+    };
+
+    // URL validation function
+    const isValidUrl = (url: string) => {
+      try {
+        new URL(url);
+        return true;
+      } catch {
+        return false;
+      }
+    };
+
+    if (currentUserType === 'faculty') {
+      // Faculty mandatory fields
+      if (!formData.personalEmail?.trim()) {
+        errors.push('Personal Email is required for faculty');
+      } else if (!isValidEmail(formData.personalEmail.trim())) {
+        errors.push('Please enter a valid personal email address');
+      }
+      
+      if (!formData.bio?.trim()) errors.push('Bio is required for faculty');
+      if (!formData.facultyInfo?.department) errors.push('Department is required for faculty');
+      if (!formData.facultyInfo?.designation) errors.push('Designation is required for faculty');
+      if (!formData.skills || formData.skills.length === 0) errors.push('Skills are required for faculty');
+      
+      if (!formData.socialLinks?.linkedin) {
+        errors.push('LinkedIn Profile is required for faculty');
+      } else if (!isValidUrl(formData.socialLinks.linkedin)) {
+        errors.push('Please enter a valid LinkedIn URL');
+      }
+      
+    } else if (currentUserType === 'alumni') {
+      // Alumni mandatory fields - More reasonable requirements
+      if (!formData.personalEmail?.trim()) {
+        errors.push('Personal Email is required for alumni');
+      } else if (!isValidEmail(formData.personalEmail.trim())) {
+        errors.push('Please enter a valid personal email address');
+      }
+      
+      if (!formData.bio?.trim()) errors.push('Bio is required for alumni');
+      if (!formData.interests || formData.interests.length === 0) errors.push('Interests are required for alumni');
+      if (!formData.studentInfo?.graduationYear) errors.push('Graduation Year is required for alumni');
+      if (!formData.studentInfo?.department) errors.push('Department is required for alumni');
+      if (!formData.alumniInfo?.jobTitle) errors.push('Job Title is required for alumni');
+      if (!formData.skills || formData.skills.length === 0) errors.push('Skills are required for alumni');
+      
+      // LinkedIn is required but GitHub is optional for alumni
+      if (!formData.socialLinks?.linkedin) {
+        errors.push('LinkedIn Profile is required for alumni');
+      } else if (!isValidUrl(formData.socialLinks.linkedin)) {
+        errors.push('Please enter a valid LinkedIn URL');
+      }
+      
+      // Optional fields with validation if provided
+      if (formData.socialLinks?.github && !isValidUrl(formData.socialLinks.github)) {
+        errors.push('Please enter a valid GitHub URL');
+      }
+      
+      if (formData.portfolio && !isValidUrl(formData.portfolio)) {
+        errors.push('Please enter a valid Portfolio URL');
+      }
+      
+
+      
+    } else if (currentUserType === 'student') {
+      // Student mandatory fields based on year
+      const currentYear = user?.studentInfo?.currentYear || formData.studentInfo?.currentYear;
+      
+      // Common mandatory fields for all students
+      if (!formData.personalEmail?.trim()) {
+        errors.push('Personal Email is required for students');
+      } else if (!isValidEmail(formData.personalEmail.trim())) {
+        errors.push('Please enter a valid personal email address');
+      }
+      
+      if (!formData.bio?.trim()) errors.push('Bio is required for students');
+      if (!formData.interests || formData.interests.length === 0) errors.push('Interests are required for students');
+      if (!formData.studentInfo?.graduationYear) errors.push('Graduation Year is required for students');
+      if (!formData.studentInfo?.department) errors.push('Department is required for students');
+      if (!formData.skills || formData.skills.length === 0) errors.push('Skills are required for students');
+      
+      // LinkedIn is required for all students
+      if (!formData.socialLinks?.linkedin) {
+        errors.push('LinkedIn Profile is required for students');
+      } else if (!isValidUrl(formData.socialLinks.linkedin)) {
+        errors.push('Please enter a valid LinkedIn URL');
+      }
+      
+
+      
+      // Additional fields for 2nd, 3rd, and 4th year students
+      if (currentYear === '2' || currentYear === '3' || currentYear === '4') {
+        if (!formData.socialLinks?.github) {
+          errors.push('GitHub Profile is required for 2nd, 3rd, and 4th year students');
+        } else if (!isValidUrl(formData.socialLinks.github)) {
+          errors.push('Please enter a valid GitHub URL');
+        }
+        
+      if (formData.portfolio && !isValidUrl(formData.portfolio)) {
+          errors.push('Please enter a valid Portfolio URL');
+        }
+      }
+      
+      // Specialization is required for 3rd and 4th year students
+      if ((currentYear === '3' || currentYear === '4') && !formData.studentInfo?.specialization) {
+        errors.push('Specialization is required for 3rd and 4th year students');
+      }
+    }
+    
+    return errors;
+  };
 
   useEffect(() => {
-    if (!user) {
-      navigate('/');
+    // Check if there's pending signup data (user not yet created)
+    const pendingSignupData = localStorage.getItem('pendingSignupData');
+    
+    if (!pendingSignupData && !user) {
+      // No pending signup and no user - redirect to signup
+      navigate('/signup');
       return;
     }
 
-    if (user.isProfileComplete) {
+    // If user exists and profile is complete, go to dashboard
+    if (user && user.isProfileComplete) {
       navigate('/dashboard');
       return;
     }
@@ -142,17 +289,17 @@ const ProfileCompletionPage: React.FC = () => {
         console.error('Error fetching configuration data:', error);
         // Use fallback data if configuration fails
         setDepartments([
-          'Civil Engineering',
           'Mechanical Engineering',
+          'Artificial Intelligence and Data Science',
+          'Artificial Intelligence and Machine Learning',
           'Mechatronics Engineering',
           'Automobile Engineering',
-          'Electrical and Electronics Engineering (EEE)',
-          'Electronics and Communication Engineering (ECE)',
-          'Electronics and Instrumentation Engineering (EIE)',
-          'Computer Science and Engineering (CSE)',
-          'Information Technology (IT)',
-          'Artificial Intelligence and Machine Learning (AIML)',
-          'Food Technology'
+          'Electrical and Electronics Engineering',
+          'Electronics and Communication Engineering',
+          'Electronics and Instrumentation Engineering',
+          'Computer Science and Engineering',
+          'Information Technology',
+          'Computer Science and Design'
         ]);
         setDesignations([
           'Professor',
@@ -232,7 +379,182 @@ const ProfileCompletionPage: React.FC = () => {
     }
   };
 
-  const handleResumeUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleAddCustomLink = () => {
+    if (!customLinkName.trim() || !customLinkUrl.trim()) {
+      toast({
+        title: "Missing Information",
+        description: "Please provide both a label and URL for your custom link.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      new URL(customLinkUrl.trim());
+    } catch {
+      toast({
+        title: "Invalid URL",
+        description: "Please enter a valid URL that starts with http or https.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setFormData(prev => ({
+      ...prev,
+      socialLinks: {
+        ...(prev.socialLinks || {}),
+        customLinks: [
+          ...(prev.socialLinks?.customLinks || []),
+          { label: customLinkName.trim(), url: customLinkUrl.trim() }
+        ]
+      }
+    }));
+    setCustomLinkName('');
+    setCustomLinkUrl('');
+  };
+
+  const handleRemoveCustomLink = (index: number) => {
+    setFormData(prev => {
+      const updatedLinks = (prev.socialLinks?.customLinks || []).filter((_, i) => i !== index);
+      return {
+        ...prev,
+        socialLinks: {
+          ...(prev.socialLinks || {}),
+          customLinks: updatedLinks
+        }
+      };
+    });
+  };
+
+  const extractCollegeEmail = (emailData: any) => {
+    if (!emailData) return undefined;
+    if (typeof emailData === 'string') {
+      return emailData.includes('@') ? emailData : undefined;
+    }
+    return emailData.college || undefined;
+  };
+
+  const buildProfilePayload = (sourceUser?: any) => {
+    // Get pendingSignupData from localStorage if needed
+    const pendingSignupDataStr = localStorage.getItem('pendingSignupData');
+    const pendingSignupData = pendingSignupDataStr ? JSON.parse(pendingSignupDataStr) : null;
+    
+    // Start with formData but ensure required fields
+    const payload: any = {
+      // REQUIRED: Backend requires 'name' field
+      name: sourceUser?.name || user?.name || (pendingSignupData ? `${pendingSignupData.firstName || ''} ${pendingSignupData.lastName || ''}`.trim() : '') || 'User',
+      // Basic profile fields
+      phone: formData.phone || undefined,
+      dateOfBirth: formData.dateOfBirth || undefined,
+      gender: formData.gender || undefined,
+      bio: formData.bio || undefined,
+      location: formData.location || undefined,
+      city: formData.city || undefined,
+      state: formData.state || undefined,
+      country: formData.country || undefined,
+      timezone: formData.timezone || undefined,
+      // Array fields - ensure they're arrays
+      skills: Array.isArray(formData.skills) ? formData.skills.filter(Boolean) : [],
+      languages: Array.isArray(formData.languages) ? formData.languages.filter(Boolean) : [],
+      extraCurricularActivities: Array.isArray(formData.extraCurricularActivities) ? formData.extraCurricularActivities.filter(Boolean) : [],
+      interests: Array.isArray(formData.interests) ? formData.interests.filter(Boolean) : [],
+      goals: Array.isArray(formData.goals) ? formData.goals.filter(Boolean) : [],
+      // Optional fields
+      resume: formData.resume || undefined,
+      portfolio: formData.portfolio || undefined,
+    };
+
+    // Handle email - backend expects { college: string, personal: string }
+    const trimmedPersonal = formData.personalEmail?.trim();
+    const emailPayload: Record<string, string> = {};
+    const collegeEmail = extractCollegeEmail(sourceUser?.email);
+
+    if (collegeEmail) {
+      emailPayload.college = collegeEmail;
+    }
+    if (trimmedPersonal) {
+      emailPayload.personal = trimmedPersonal;
+    }
+    if (Object.keys(emailPayload).length > 0) {
+      payload.email = emailPayload;
+    }
+
+    // Handle department - set at root level
+    if (formData.department || formData.studentInfo?.department || formData.facultyInfo?.department) {
+      payload.department = formData.department || formData.studentInfo?.department || formData.facultyInfo?.department;
+    }
+
+    // Handle type-specific information
+    if (formData.studentInfo && Object.keys(formData.studentInfo).length > 0) {
+      payload.studentInfo = {
+        ...formData.studentInfo,
+        department: payload.department || formData.studentInfo.department
+      };
+    }
+    if (formData.alumniInfo && Object.keys(formData.alumniInfo).length > 0) {
+      payload.alumniInfo = formData.alumniInfo;
+    }
+    if (formData.facultyInfo && Object.keys(formData.facultyInfo).length > 0) {
+      payload.facultyInfo = {
+        ...formData.facultyInfo,
+        department: payload.department || formData.facultyInfo.department
+      };
+    }
+
+    // Handle socialLinks - clean up empty values
+    if (formData.socialLinks) {
+      const socialLinks: any = {};
+      
+      // Add non-empty social links
+      if (formData.socialLinks.linkedin?.trim()) socialLinks.linkedin = formData.socialLinks.linkedin.trim();
+      if (formData.socialLinks.github?.trim()) socialLinks.github = formData.socialLinks.github.trim();
+      if (formData.socialLinks.personalWebsite?.trim()) socialLinks.personalWebsite = formData.socialLinks.personalWebsite.trim();
+      if (formData.socialLinks.twitter?.trim()) socialLinks.twitter = formData.socialLinks.twitter.trim();
+      if (formData.socialLinks.instagram?.trim()) socialLinks.instagram = formData.socialLinks.instagram.trim();
+      if (formData.socialLinks.facebook?.trim()) socialLinks.facebook = formData.socialLinks.facebook.trim();
+      if (formData.socialLinks.leetcode?.trim()) socialLinks.leetcode = formData.socialLinks.leetcode.trim();
+      
+      // Handle customLinks
+      if (Array.isArray(formData.socialLinks.customLinks) && formData.socialLinks.customLinks.length > 0) {
+        const validCustomLinks = formData.socialLinks.customLinks
+          .filter(link => link?.label?.trim() && link?.url?.trim())
+          .map(link => ({
+            label: link.label.trim(),
+            url: link.url.trim()
+          }));
+        if (validCustomLinks.length > 0) {
+          socialLinks.customLinks = validCustomLinks;
+        }
+      }
+      
+      // Only include socialLinks if it has at least one value
+      if (Object.keys(socialLinks).length > 0) {
+        payload.socialLinks = socialLinks;
+      }
+    }
+
+    // Remove undefined and null values
+    const cleanPayload: any = {};
+    Object.keys(payload).forEach(key => {
+      const value = payload[key];
+      if (value !== undefined && value !== null) {
+        // For objects, check if they have any properties
+        if (typeof value === 'object' && !Array.isArray(value) && value !== null) {
+          const hasProperties = Object.keys(value).length > 0;
+          if (hasProperties) {
+            cleanPayload[key] = value;
+          }
+        } else {
+          cleanPayload[key] = value;
+        }
+      }
+    });
+
+    return cleanPayload;
+  };
+
+  const handleResumeUpload = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
@@ -284,20 +606,17 @@ const ProfileCompletionPage: React.FC = () => {
   };
 
   const handleSubmit = async () => {
-    if (!user) {
-      toast({
-        title: "Authentication Error",
-        description: "Please log in again to complete your profile",
-        variant: "destructive",
-      });
-      return;
-    }
+    // Check for pending signup data (account not yet created)
+    const pendingSignupDataStr = localStorage.getItem('pendingSignupData');
+    const pendingSignupData = pendingSignupDataStr ? JSON.parse(pendingSignupDataStr) : null;
+    setSubmitError(null);
 
-    // Check if user has a valid token from context
-    if (!user?._id) {
+    // Validate mandatory fields based on user type and year
+    const validationErrors = validateMandatoryFields();
+    if (validationErrors.length > 0) {
       toast({
-        title: "Authentication Error",
-        description: "No user data found. Please log in again.",
+        title: "Missing Required Fields",
+        description: validationErrors.join(', '),
         variant: "destructive",
       });
       return;
@@ -305,29 +624,207 @@ const ProfileCompletionPage: React.FC = () => {
 
     setIsLoading(true);
     try {
-      console.log('Form data:', formData);
-      console.log('User ID:', user._id);
-      console.log('User authenticated:', !!user._id);
+      if (pendingSignupData) {
+        // Account not yet created - create account first, then update profile
+        console.log('Creating account with signup data:', pendingSignupData);
+        console.log('Profile form data:', formData);
 
-      // Test authentication first
-      try {
-        const authTest = await authService.testAuth();
-        console.log('Auth test successful:', authTest);
-      } catch (authError) {
-        console.error('Auth test failed:', authError);
+        // Create account first using the register API
+        let authResponse;
+        try {
+          authResponse = await api.post('/api/auth/register', pendingSignupData);
+        } catch (registerError: any) {
+          console.error('Registration error:', registerError);
+          // Check if user was actually created (data might be saved even if response failed)
+          // Try to login with the credentials to get the token
+          if (registerError.response?.status === 400) {
+            console.log('Registration returned 400, but checking if account was created...');
+            try {
+              // Try to login to see if account exists
+              const loginResponse = await api.post('/api/auth/login', {
+                email: pendingSignupData.email,
+                password: pendingSignupData.password
+              });
+              
+              if (loginResponse.data && loginResponse.data.token) {
+                console.log('✅ Account was created, got token via login');
+                authResponse = { data: loginResponse.data };
+              } else {
+                throw new Error('Account creation failed - could not verify account');
+              }
+            } catch (loginError) {
+              console.error('Could not verify account creation:', loginError);
+              throw new Error(registerError.response?.data?.message || registerError.response?.data?.error || 'Account creation failed');
+            }
+          } else {
+            throw registerError;
+          }
+        }
+        
+        if (!authResponse?.data || !authResponse.data.token || !authResponse.data.user) {
+          // If response is invalid but we have token, try to get user profile
+          if (authResponse?.data?.token) {
+            console.log('⚠️ Invalid response but token exists, fetching user profile...');
+            api.defaults.headers.common['Authorization'] = `Bearer ${authResponse.data.token}`;
+            try {
+              const profileResponse = await api.get('/api/users/profile');
+              if (profileResponse.data && profileResponse.data.user) {
+                authResponse.data.user = profileResponse.data.user;
+              }
+            } catch (profileError) {
+              console.error('Could not fetch user profile:', profileError);
+            }
+          }
+          
+          if (!authResponse?.data?.token) {
+            throw new Error('Account creation failed - no token received');
+          }
+        }
+
+        const authData = authResponse.data;
+        
+        // Store token
+        localStorage.setItem('authToken', authData.token);
+        if (authData.refreshToken) {
+          localStorage.setItem('refreshToken', authData.refreshToken);
+        }
+
+        // Set the token in api service for subsequent requests
+        api.defaults.headers.common['Authorization'] = `Bearer ${authData.token}`;
+
+        // Build profile payload - use authData.user if available, otherwise build from formData
+        const profilePayload = authData.user ? buildProfilePayload(authData.user) : buildProfilePayload();
+        
+        // Ensure name is set (required by backend)
+        if (!profilePayload.name) {
+          profilePayload.name = `${pendingSignupData.firstName} ${pendingSignupData.lastName}`.trim();
+        }
+        
+        // Ensure email is set if not in payload
+        if (!profilePayload.email && pendingSignupData.email) {
+          profilePayload.email = {
+            college: pendingSignupData.email,
+            ...(formData.personalEmail && { personal: formData.personalEmail.trim() })
+          };
+        }
+        
+        // Log the exact payload being sent
+        console.log('📤 PUT /api/users/profile - Request Details:');
+        console.log('📤 URL:', '/api/users/profile');
+        console.log('📤 Headers:', {
+          'Content-Type': 'application/json',
+          'Authorization': api.defaults.headers.common['Authorization'] ? 'Bearer [TOKEN_PRESENT]' : 'MISSING'
+        });
+        console.log('📤 Payload (full):', JSON.stringify(profilePayload, null, 2));
+        console.log('📤 Payload (summary):', {
+          name: profilePayload.name,
+          email: profilePayload.email,
+          hasStudentInfo: !!profilePayload.studentInfo,
+          hasAlumniInfo: !!profilePayload.alumniInfo,
+          hasFacultyInfo: !!profilePayload.facultyInfo,
+          skillsCount: profilePayload.skills?.length || 0,
+          hasSocialLinks: !!profilePayload.socialLinks,
+          department: profilePayload.department
+        });
+        
+        // Verify Authorization header
+        const token = localStorage.getItem('authToken') || api.defaults.headers.common['Authorization']?.toString().replace('Bearer ', '');
+        if (!token) {
+          throw new Error('No authentication token found. Please try again.');
+        }
+        
+        // Ensure Authorization header is set
+        if (!api.defaults.headers.common['Authorization']) {
+          api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+        }
+        
+        const updateResponse = await api.put('/api/users/profile', profilePayload);
+
+        const updateData = updateResponse.data;
+        
+        // Clear pending signup data
+        localStorage.removeItem('pendingSignupData');
+
+        // Update user in context - use the updated user from profile update
+        const transformedUser = {
+          ...updateData.user,
+          email: {
+            college: (() => {
+              if (updateData.user.email && typeof updateData.user.email === 'object' && updateData.user.email !== null) {
+                return (updateData.user.email as any).college || '';
+              }
+              return typeof updateData.user.email === 'string' ? updateData.user.email : '';
+            })(),
+            personal: (() => {
+              if (updateData.user.email && typeof updateData.user.email === 'object' && updateData.user.email !== null) {
+                return (updateData.user.email as any).personal || '';
+              }
+              return formData.personalEmail || '';
+            })()
+          }
+        };
+        
+        // Update user in context
+        updateUser(transformedUser);
+        
+        toast({
+          title: "✅ Account Created Successfully!",
+          description: "Welcome to the alumni network!",
+        });
+
+        // Redirect to dashboard without reloading the entire SPA
+        navigate('/dashboard', { replace: true });
+      } else {
+        // User already exists - just update profile
+        if (!user) {
         toast({
           title: "Authentication Error",
-          description: "Authentication failed. Please log in again.",
+            description: "Please log in again to complete your profile",
           variant: "destructive",
         });
-        navigate('/signin', { replace: true });
         return;
       }
 
-      const data = await authService.updateUserInfo(formData);
+        if (!user?._id) {
+          toast({
+            title: "Authentication Error",
+            description: "No user data found. Please log in again.",
+            variant: "destructive",
+          });
+        return;
+      }
+
+        const payload = buildProfilePayload(user);
+        
+        // Ensure name is set (required by backend)
+        if (!payload.name && user?.name) {
+          payload.name = user.name;
+        }
+        
+        // Log the exact payload being sent
+        console.log('📤 PUT /api/users/profile - Request Details (existing user):');
+        console.log('📤 URL:', '/api/users/profile');
+        console.log('📤 Payload (full):', JSON.stringify(payload, null, 2));
+        console.log('📤 Payload (summary):', {
+          name: payload.name,
+          email: payload.email,
+          hasStudentInfo: !!payload.studentInfo,
+          hasAlumniInfo: !!payload.alumniInfo,
+          hasFacultyInfo: !!payload.facultyInfo,
+          skillsCount: payload.skills?.length || 0,
+          hasSocialLinks: !!payload.socialLinks,
+          department: payload.department
+        });
+        
+        // Verify Authorization header
+        const token = localStorage.getItem('authToken');
+        if (!token) {
+          throw new Error('No authentication token found. Please log in again.');
+        }
+        
+        const data = await authService.updateUserInfo(payload);
       console.log('Success response:', data);
       
-      // Transform the response data to match the User interface structure
       const transformedUser = {
         ...data.user,
         email: {
@@ -353,39 +850,65 @@ const ProfileCompletionPage: React.FC = () => {
         description: "Welcome to the alumni network!",
       });
 
-      // Redirect to dashboard
       navigate('/dashboard', { replace: true });
+      }
     } catch (error) {
       console.error('Submit error:', error);
       
-      // Handle specific error types
       if (error instanceof Error) {
-        if (error.message.includes('No authentication token found')) {
+        if (error.message.includes('No authentication token found') || error.message.includes('401') || error.message.includes('Unauthorized')) {
+          const authMessage = "Please try again or log in";
+          setSubmitError(authMessage);
           toast({
             title: "Authentication Error",
-            description: "Please log in again to complete your profile",
+            description: authMessage,
             variant: "destructive",
           });
-          // Redirect to login
-          navigate('/signin', { replace: true });
-          return;
-        }
-        
-        if (error.message.includes('401') || error.message.includes('Unauthorized')) {
-          toast({
-            title: "Session Expired",
-            description: "Your session has expired. Please log in again.",
-            variant: "destructive",
-          });
-          // Redirect to login
-          navigate('/signin', { replace: true });
           return;
         }
       }
       
+      let errorTitle = "Error";
+      let errorDescription = "Failed to create account or update profile";
+      
+      if (axios.isAxiosError(error)) {
+        const responseData = error.response?.data as any;
+        console.error('Submit error response:', responseData);
+        const messages: string[] = [];
+        if (responseData?.error && typeof responseData.error === 'string') {
+          errorTitle = responseData.error;
+          messages.push(responseData.error);
+        }
+        if (responseData?.message && typeof responseData.message === 'string' && responseData.message !== responseData.error) {
+          messages.push(responseData.message);
+        }
+        if (responseData?.details && typeof responseData.details === 'string') {
+          messages.push(responseData.details);
+        }
+        if (Array.isArray(responseData?.missingFields) && responseData.missingFields.length > 0) {
+          messages.push(`Missing fields: ${responseData.missingFields.join(', ')}`);
+        }
+        if (responseData?.validationErrors && typeof responseData.validationErrors === 'object') {
+          const validationMessages = Object.values(responseData.validationErrors)
+            .map((item: any) => item?.message)
+            .filter(Boolean);
+          if (validationMessages.length > 0) {
+            messages.push(validationMessages.join(', '));
+          }
+        }
+        if (messages.length > 0) {
+          errorDescription = messages.join(' • ');
+        } else if (error.response?.status) {
+          errorDescription = `Request failed with status ${error.response.status}`;
+        }
+      } else if (error instanceof Error && error.message) {
+        errorDescription = error.message;
+      }
+      
+      setSubmitError(errorDescription);
       toast({
-        title: "Update failed",
-        description: error instanceof Error ? error.message : "Failed to update user information",
+        title: errorTitle,
+        description: errorDescription,
         variant: "destructive",
       });
     } finally {
@@ -393,14 +916,29 @@ const ProfileCompletionPage: React.FC = () => {
     }
   };
 
-  if (!user) {
-    return null;
+  // Check for pending signup data (user not yet created)
+  const pendingSignupDataStr = localStorage.getItem('pendingSignupData');
+  const pendingSignupData = pendingSignupDataStr ? JSON.parse(pendingSignupDataStr) : null;
+  
+  // Determine user type from pending signup data or existing user
+  const userType = user?.type || pendingSignupData?.userType || 'student';
+  
+  // Allow rendering if there's pending signup data OR if user exists
+  if (!user && !pendingSignupData) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center">
+        <div className="text-center text-white">
+          <p className="text-lg mb-4">No signup data found</p>
+          <Button onClick={() => navigate('/signup')}>Go to Sign Up</Button>
+        </div>
+      </div>
+    );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 relative overflow-hidden">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 relative">
       {/* Animated Background Elements */}
-      <div className="absolute inset-0 overflow-hidden">
+      <div className="absolute inset-0">
         {/* Floating Geometric Shapes */}
         <motion.div
           className="absolute top-20 left-10 w-32 h-32 bg-blue-500/10 rounded-full blur-xl"
@@ -503,7 +1041,13 @@ const ProfileCompletionPage: React.FC = () => {
               animate={{ opacity: 1 }}
               transition={{ duration: 0.8, delay: 0.4 }}
             >
-              Welcome, <span className="text-blue-400 font-semibold">{user.name}</span>! Let's set up your profile to connect with the alumni network.
+              {user ? (
+                <>Welcome, <span className="text-blue-400 font-semibold">{user.name}</span>! Let's set up your profile to connect with the alumni network.</>
+              ) : pendingSignupData ? (
+                <>Welcome, <span className="text-blue-400 font-semibold">{pendingSignupData.firstName} {pendingSignupData.lastName}</span>! Let's complete your profile to create your account.</>
+              ) : (
+                <>Let's set up your profile to connect with the alumni network.</>
+              )}
             </motion.p>
           </motion.div>
 
@@ -512,6 +1056,11 @@ const ProfileCompletionPage: React.FC = () => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.6 }}
           >
+            {submitError && (
+              <div className="mb-6 rounded-lg border border-red-500/40 bg-red-500/10 p-4 text-sm text-red-200">
+                {submitError}
+              </div>
+            )}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
               <TabsList className="grid w-full grid-cols-5 bg-gray-800/50 backdrop-blur-sm border border-gray-700/50">
                 <TabsTrigger value="basic" className="data-[state=active]:bg-blue-600/20 data-[state=active]:text-blue-300">Basic Info</TabsTrigger>
@@ -577,18 +1126,6 @@ const ProfileCompletionPage: React.FC = () => {
                   />
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="areaOfInterest" className="text-gray-300">Area of Interest</Label>
-                    <Input
-                      id="areaOfInterest"
-                      placeholder="e.g., Software Development, AI/ML, Data Science"
-                      value={formData.areaOfInterest || ''}
-                      onChange={(e) => handleInputChange('areaOfInterest', e.target.value)}
-                      className="bg-gray-700/50 border-gray-600 text-white placeholder-gray-400 focus:border-blue-500"
-                    />
-                  </div>
-                </div>
               </CardContent>
             </Card>
             </motion.div>
@@ -611,7 +1148,7 @@ const ProfileCompletionPage: React.FC = () => {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                {user.type === 'student' && (
+                {userType === 'student' && (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <Label htmlFor="department" className="text-gray-300">Department</Label>
@@ -658,6 +1195,17 @@ const ProfileCompletionPage: React.FC = () => {
                         className="bg-gray-700/50 border-gray-600 text-white placeholder-gray-400 focus:border-purple-500"
                       />
                     </div>
+
+                    <div>
+                      <Label htmlFor="specialization" className="text-gray-300">Specialization</Label>
+                      <Input
+                        id="specialization"
+                        placeholder="e.g., AI/ML, Web Development, Data Science"
+                        value={formData.studentInfo?.specialization || ''}
+                        onChange={(e) => handleInputChange('specialization', e.target.value, 'studentInfo')}
+                        className="bg-gray-700/50 border-gray-600 text-white placeholder-gray-400 focus:border-purple-500"
+                      />
+                    </div>
                     <div>
                       <Label htmlFor="placementStatus" className="text-gray-300">Placement Status</Label>
                       <Select value={formData.studentInfo?.placementStatus || ''} onValueChange={(value) => handleInputChange('placementStatus', value, 'studentInfo')}>
@@ -675,7 +1223,7 @@ const ProfileCompletionPage: React.FC = () => {
                     </div>
                   </div>
                 )}
-                {user.type === 'faculty' && (
+                {userType === 'faculty' && (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <Label htmlFor="facultyDepartment" className="text-gray-300">Department</Label>
@@ -709,10 +1257,67 @@ const ProfileCompletionPage: React.FC = () => {
                     </div>
                   </div>
                 )}
-                {user.type === 'alumni' && (
-                  <p className="text-gray-400">
-                    Academic information is not required for alumni. Please proceed to the Professional tab.
-                  </p>
+                {userType === 'alumni' && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="alumniDepartment" className="text-gray-300">Department (Graduated)</Label>
+                      <Select value={formData.studentInfo?.department || ''} onValueChange={(value) => handleInputChange('department', value, 'studentInfo')}>
+                        <SelectTrigger className="bg-gray-700/50 border-gray-600 text-white focus:border-purple-500">
+                          <SelectValue placeholder="Select your department" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-gray-800 border-gray-600">
+                          {departments.map((dept) => (
+                            <SelectItem key={dept} value={dept} className="hover:bg-purple-500 text-white focus:bg-purple-600 focus:text-white">
+                              {dept}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label htmlFor="alumniGraduationYear" className="text-gray-300">Graduation Year</Label>
+                      <Input
+                        id="alumniGraduationYear"
+                        placeholder="2024"
+                        value={formData.studentInfo?.graduationYear || ''}
+                        onChange={(e) => handleInputChange('graduationYear', e.target.value, 'studentInfo')}
+                        className="bg-gray-700/50 border-gray-600 text-white placeholder-gray-400 focus:border-purple-500"
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="alumniJobTitle" className="text-gray-300">Current Job Title</Label>
+                      <Input
+                        id="alumniJobTitle"
+                        placeholder="e.g., Software Engineer, Data Scientist"
+                        value={formData.alumniInfo?.jobTitle || ''}
+                        onChange={(e) => handleInputChange('jobTitle', e.target.value, 'alumniInfo')}
+                        className="bg-gray-700/50 border-gray-600 text-white placeholder-gray-400 focus:border-purple-500"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="alumniCompany" className="text-gray-300">Current Company</Label>
+                      <Input
+                        id="alumniCompany"
+                        placeholder="e.g., Google, Microsoft"
+                        value={formData.alumniInfo?.currentCompany || ''}
+                        onChange={(e) => handleInputChange('currentCompany', e.target.value, 'alumniInfo')}
+                        className="bg-gray-700/50 border-gray-600 text-white placeholder-gray-400 focus:border-purple-500"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="alumniExperience" className="text-gray-300">Years of Experience</Label>
+                      <Input
+                        id="alumniExperience"
+                        type="number"
+                        min="0"
+                        placeholder="2"
+                        value={formData.alumniInfo?.experience || ''}
+                        onChange={(e) => handleInputChange('experience', e.target.value, 'alumniInfo')}
+                        className="bg-gray-700/50 border-gray-600 text-white placeholder-gray-400 focus:border-purple-500"
+                      />
+                    </div>
+                  </div>
                 )}
               </CardContent>
             </Card>
@@ -768,6 +1373,7 @@ const ProfileCompletionPage: React.FC = () => {
                       className="bg-gray-700/50 border-gray-600 text-white"
                     />
                   </div>
+
                 </CardContent>
               </Card>
             </motion.div>
@@ -789,7 +1395,7 @@ const ProfileCompletionPage: React.FC = () => {
                     Connect your social and professional profiles
                   </CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-4">
+                <CardContent className="space-y-6">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <Label htmlFor="linkedin" className="text-gray-300">LinkedIn Profile</Label>
@@ -813,6 +1419,68 @@ const ProfileCompletionPage: React.FC = () => {
                         className="bg-gray-700/50 border-gray-600 text-white placeholder-gray-400 focus:border-orange-500"
                       />
                     </div>
+                    <div>
+                      <Label htmlFor="leetcode" className="text-gray-300">LeetCode Profile</Label>
+                      <Input
+                        id="leetcode"
+                        type="url"
+                        placeholder="https://leetcode.com/yourusername"
+                        value={formData.socialLinks?.leetcode || ''}
+                        onChange={(e) => handleInputChange('leetcode', e.target.value, 'socialLinks')}
+                        className="bg-gray-700/50 border-gray-600 text-white placeholder-gray-400 focus:border-orange-500"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-gray-300">Custom Social & Professional Links</Label>
+                      <span className="text-xs text-gray-400">Add any other platforms (Behance, Medium, etc.)</span>
+                    </div>
+                    <div className="flex flex-col md:flex-row gap-2">
+                      <Input
+                        placeholder="Label (e.g., Portfolio, Blog)"
+                        value={customLinkName}
+                        onChange={(e) => setCustomLinkName(e.target.value)}
+                        className="bg-gray-700/50 border-gray-600 text-white placeholder-gray-400 focus:border-orange-500"
+                      />
+                      <Input
+                        placeholder="https://example.com/your-link"
+                        value={customLinkUrl}
+                        onChange={(e) => setCustomLinkUrl(e.target.value)}
+                        className="bg-gray-700/50 border-gray-600 text-white placeholder-gray-400 focus:border-orange-500"
+                      />
+                      <Button type="button" onClick={handleAddCustomLink} className="bg-orange-600 hover:bg-orange-700">
+                        <Link2 className="h-4 w-4 mr-2" />
+                        Add Link
+                      </Button>
+                    </div>
+                    {formData.socialLinks?.customLinks && formData.socialLinks.customLinks.length > 0 && (
+                      <div className="space-y-2">
+                        {formData.socialLinks.customLinks.map((link, index) => (
+                          <div key={`${link.label}-${index}`} className="flex items-center justify-between bg-gray-800/60 border border-gray-700 rounded-md px-3 py-2">
+                            <a
+                              href={link.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center text-orange-300 hover:text-orange-200 gap-2"
+                            >
+                              <Link2 className="h-4 w-4" />
+                              <span className="font-medium">{link.label}</span>
+                            </a>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleRemoveCustomLink(index)}
+                              className="text-red-400 hover:text-red-300"
+                            >
+                              <CloseIcon className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -837,7 +1505,10 @@ const ProfileCompletionPage: React.FC = () => {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div>
-                    <Label htmlFor="resume-upload" className="text-gray-300">Resume Upload</Label>
+                    <Label htmlFor="resume-upload" className="text-gray-300 flex items-center gap-2">
+                      Resume Upload
+                      <span className="text-xs text-gray-400">(optional)</span>
+                    </Label>
                     <div className="mt-2">
                       <input
                         type="file"
@@ -878,7 +1549,10 @@ const ProfileCompletionPage: React.FC = () => {
                   </div>
 
                   <div>
-                    <Label htmlFor="portfolio-url" className="text-gray-300">Portfolio URL</Label>
+                    <Label htmlFor="portfolio-url" className="text-gray-300 flex items-center gap-2">
+                      Portfolio URL
+                      <span className="text-xs text-gray-400">(optional)</span>
+                    </Label>
                     <Input
                       id="portfolio-url"
                       type="url"
@@ -917,6 +1591,22 @@ const ProfileCompletionPage: React.FC = () => {
           </Button>
 
           <div className="flex gap-2">
+            {userType === 'student' && (user?.studentInfo?.currentYear === '1' || user?.studentInfo?.currentYear === '2') && (
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  toast({
+                    title: "Profile Completion Skipped",
+                    description: "You can complete your profile later from the dashboard",
+                  });
+                  navigate('/dashboard', { replace: true });
+                }}
+                className="text-gray-400 hover:text-white"
+              >
+                Skip for Now
+              </Button>
+            )}
+            
             {activeTab !== 'resume' && (
               <Button
                 onClick={() => {
@@ -940,10 +1630,10 @@ const ProfileCompletionPage: React.FC = () => {
                 {isLoading ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                    Saving...
+                    {localStorage.getItem('pendingSignupData') ? 'Creating Account...' : 'Saving...'}
                   </>
                 ) : (
-                  'Complete Profile'
+                  localStorage.getItem('pendingSignupData') ? 'Create Account' : 'Complete Profile'
                 )}
               </Button>
             )}

@@ -36,6 +36,10 @@ const conversationSchema = new mongoose.Schema({
     ref: 'User',
     default: null
   },
+  groupAdmins: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  }],
   isActive: {
     type: Boolean,
     default: true

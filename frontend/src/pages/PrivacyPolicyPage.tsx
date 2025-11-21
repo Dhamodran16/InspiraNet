@@ -7,7 +7,7 @@ import Footer from '@/components/Footer';
 const PrivacyPolicyPage = () => {
   return (
     <div className="min-h-screen bg-white">
-      <CollegeHeader />
+      <CollegeHeader showNav={false} />
 
       {/* Main Content */}
       <div className="container mx-auto px-4 py-12">
@@ -173,27 +173,7 @@ const PrivacyPolicyPage = () => {
             </CardContent>
           </Card>
 
-          {/* Contact Information */}
-          <Card className="border border-gray-200">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-blue-800">
-                <Users className="h-5 w-5 text-blue-600" />
-                Contact Us
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <p className="text-gray-600">
-                If you have any questions about this Privacy Policy or our data practices, please contact us:
-              </p>
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <p className="text-gray-700">
-                  <strong>Email:</strong> privacy@kec.edu<br />
-                  <strong>Phone:</strong> +91-422-2574077<br />
-                  <strong>Address:</strong> Kongu Engineering College, Perundurai, Erode - 638060, Tamil Nadu, India
-                </p>
-              </div>
-            </CardContent>
-          </Card>
+
         </div>
       </div>
 

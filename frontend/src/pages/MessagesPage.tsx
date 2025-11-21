@@ -18,13 +18,16 @@ import {
   Paperclip, 
   Image as ImageIcon,
   Mic,
-  MoreVertical
+  MoreVertical,
+  Shield,
+  Lock
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { socketService } from '@/services/socketService';
 import api from '@/services/api';
-import { encryptMessage, decryptMessage } from '@/utils/messageEncryption';
+import { AdvancedMessageEncryption, EncryptedMessage } from '@/utils/messageEncryption';
+import SecureKeyService from '@/services/secureKeyService';
 
 interface User {
     _id: string;
@@ -47,6 +50,10 @@ interface Message {
   content: string;
   createdAt: string;
   isRead: boolean;
+  encryptedData?: string;
+  iv?: string;
+  authTag?: string;
+  messageType?: 'message' | 'comment';
 }
 
 interface Conversation {
@@ -68,8 +75,10 @@ const MessagesPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [isEncrypted, setIsEncrypted] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const secureKeyService = SecureKeyService.getInstance();
 
   useEffect(() => {
     if (user) {
@@ -100,7 +109,7 @@ const MessagesPage: React.FC = () => {
     // Avoid duplicate bindings on rerenders
     socketService.offMessage();
     // Listen for new messages
-    socketService.onMessage((payload: any) => {
+    socketService.onMessage(async (payload: any) => {
       // Payload can be { message, conversationId } or the message itself
       const incoming = payload?.message || payload;
       const senderId = incoming?.senderId?._id || incoming?.senderId; // backend may populate senderId object
@@ -108,12 +117,41 @@ const MessagesPage: React.FC = () => {
 
       // If we're viewing this chat, reload it
       if (selectedUser && (senderId === selectedUser._id)) {
+        // Decrypt the message if it's encrypted
+        let decryptedContent = incoming.content;
+        if (incoming.encryptedData && incoming.iv && incoming.authTag) {
+          try {
+            const conversationId = secureKeyService.getConversationId(user!._id, selectedUser._id);
+            const sharedSecret = await secureKeyService.getSharedSecret([user!._id, selectedUser._id], conversationId);
+            
+            const encryptedMessage: EncryptedMessage = {
+              encryptedData: incoming.encryptedData,
+              iv: incoming.iv,
+              authTag: incoming.authTag,
+              senderId: incoming.senderId,
+              recipientId: user!._id,
+              timestamp: Date.now(),
+              messageType: 'message',
+              conversationId
+            };
+            
+            decryptedContent = await AdvancedMessageEncryption.decryptMessage(
+              encryptedMessage,
+              sharedSecret,
+              conversationId
+            );
+          } catch (error) {
+            console.error('Failed to decrypt incoming message:', error);
+            decryptedContent = '[Encrypted Message - Decryption Failed]';
+          }
+        }
+
         // Append immediately for instant UX
         const newMsg = {
           _id: incoming._id || `${Date.now()}`,
           senderId: typeof incoming.senderId === 'object' ? incoming.senderId._id : incoming.senderId,
           senderName: incoming.senderName || '',
-          content: incoming.content || '',
+          content: decryptedContent,
           createdAt: incoming.createdAt || new Date().toISOString(),
           isRead: false,
         } as Message;
@@ -283,16 +321,31 @@ const MessagesPage: React.FC = () => {
           _id: tempId,
           senderId: user._id,
           senderName: user.name,
-          content: messageContent,
+          content: newMessage,
           createdAt: new Date().toISOString(),
           isRead: true,
         } as any;
         setMessages(prev => [...prev, optimistic]);
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
 
-        // Send plain content; server will encrypt and store securely
+        // Encrypt the message
+        const convId = secureKeyService.getConversationId(user._id, selectedUser._id);
+        const sharedSecret = await secureKeyService.getSharedSecret([user._id, selectedUser._id], convId);
+        
+        const encryptedMessage = await AdvancedMessageEncryption.encryptMessage(
+          newMessage,
+          user._id,
+          selectedUser._id,
+          convId,
+          sharedSecret
+        );
+
+        // Send encrypted content
         const messageResponse = await api.post(`/api/conversations/${conversationId}/messages`, {
-          content: messageContent
+          encryptedData: encryptedMessage.encryptedData,
+          iv: encryptedMessage.iv,
+          authTag: encryptedMessage.authTag,
+          messageType: 'message'
         });
 
         console.log('✅ Encrypted message sent successfully:', messageResponse.data);
@@ -382,7 +435,7 @@ const MessagesPage: React.FC = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* User List - Instagram Style */}
           <div className="lg:col-span-1">
-            <Card className="h-[calc(100vh-8rem)]">
+            <Card className="h-[calc(100vh-12rem)]">
               <CardHeader className="border-b">
                 <CardTitle className="flex items-center gap-2">
                   <Users className="h-5 w-5" />
@@ -396,30 +449,30 @@ const MessagesPage: React.FC = () => {
                 />
               </CardHeader>
               <CardContent className="p-0">
-                <div className="max-h-[calc(100vh-8rem)] overflow-y-auto">
+                <div className="max-h-[calc(100vh-12rem)] overflow-y-auto">
                   {filteredUsers.map((user) => (
                     <div
                       key={user._id}
                       onClick={() => setSelectedUser(user)}
-                      className={`flex items-center space-x-3 p-4 cursor-pointer transition-colors border-b border-gray-100 hover:bg-gray-50 ${
+                      className={`flex items-center space-x-3 p-4 cursor-pointer transition-colors border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 ${
                         selectedUser?._id === user._id
-                          ? 'bg-blue-50 border-l-4 border-l-blue-500'
+                          ? 'bg-blue-50 dark:bg-blue-900/20 border-l-4 border-l-blue-500'
                           : ''
                       }`}
                     >
                       <Avatar className="h-12 w-12">
                         <AvatarImage src={user.avatar} />
-                        <AvatarFallback className="bg-blue-100 text-blue-600">
-                          {user.name?.charAt(0) || 'U'}
+                        <AvatarFallback className="bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400">
+                          {user.name?.charAt(0)?.toUpperCase() || 'U'}
                           </AvatarFallback>
                         </Avatar>
                         <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-gray-900 truncate">{user.name}</p>
-                        <p className="text-sm text-gray-500 truncate">
+                        <p className="font-semibold text-gray-900 dark:text-gray-100 truncate">{user.name}</p>
+                        <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
                           {user.department} • {user.batch}
                         </p>
                         {user.isMutual && (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200">
                             Mutual
                           </span>
                         )}
@@ -433,21 +486,21 @@ const MessagesPage: React.FC = () => {
 
           {/* Chat Area - Instagram Style */}
           <div className="lg:col-span-2">
-            <Card className="h-[calc(100vh-8rem)]">
+            <Card className="h-[calc(100vh-12rem)]">
               {selectedUser ? (
             <>
               {/* Chat Header */}
-                  <CardHeader className="border-b bg-gray-50">
+                  <CardHeader className="border-b bg-gray-50 dark:bg-gray-800 dark:border-gray-700">
                 <div className="flex items-center space-x-3">
                       <Avatar className="h-10 w-10">
                         <AvatarImage src={selectedUser.avatar} />
-                        <AvatarFallback className="bg-blue-100 text-blue-600">
-                          {selectedUser.name?.charAt(0) || 'U'}
+                        <AvatarFallback className="bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400">
+                          {selectedUser.name?.charAt(0)?.toUpperCase() || 'U'}
                     </AvatarFallback>
                   </Avatar>
                       <div className="flex-1">
-                        <CardTitle className="text-lg">{selectedUser.name}</CardTitle>
-                        <p className="text-sm text-gray-500">
+                        <CardTitle className="text-lg dark:text-gray-100">{selectedUser.name}</CardTitle>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">
                           {selectedUser.department} • {selectedUser.batch}
                     </p>
                   </div>
@@ -455,7 +508,7 @@ const MessagesPage: React.FC = () => {
                   </CardHeader>
 
                   {/* Messages Area */}
-                  <div className="flex-1 h-[calc(100vh-20rem)] overflow-y-auto p-4 bg-gray-50">
+                  <div className="flex-1 h-[calc(100vh-24rem)] overflow-y-auto p-4 bg-gray-50 dark:bg-gray-900">
                     <div className="space-y-4">
                       {messages.map((message) => {
                         const rawSender = (message as any).senderId;
@@ -470,14 +523,14 @@ const MessagesPage: React.FC = () => {
                               className={`max-w-xs lg:max-w-md px-4 py-2 rounded-2xl ${
                                 isSelf
                                   ? 'bg-blue-500 text-white rounded-br-md'
-                                  : 'bg-white text-gray-900 rounded-bl-md border border-gray-200'
+                                  : 'bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded-bl-md border border-gray-200 dark:border-gray-600'
                               }`}
                             >
-                              <p className={`text-xs mb-1 ${isSelf ? 'text-blue-100' : 'text-gray-600'}`}>
+                              <p className={`text-xs mb-1 ${isSelf ? 'text-blue-100' : 'text-gray-600 dark:text-gray-400'}`}>
                                 {message.senderName || (isSelf ? user?.name : selectedUser?.name)}
                               </p>
                               <p className="text-sm">{message.content}</p>
-                              <p className={`text-xs mt-1 ${isSelf ? 'text-blue-100' : 'text-gray-500'}`}>
+                              <p className={`text-xs mt-1 ${isSelf ? 'text-blue-100' : 'text-gray-500 dark:text-gray-400'}`}>
                                 {new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                               </p>
                             </div>
@@ -489,20 +542,20 @@ const MessagesPage: React.FC = () => {
               </div>
 
                   {/* Message Input - Instagram Style */}
-                  <div className="border-t bg-white p-4">
+                  <div className="border-t dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
                 <div className="flex items-center space-x-2">
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="p-2 hover:bg-gray-100 rounded-full"
+                        className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full"
                         onClick={() => setShowEmojiPicker(!showEmojiPicker)}
                       >
-                        <Smile className="h-5 w-5 text-gray-500" />
+                        <Smile className="h-5 w-5 text-gray-500 dark:text-gray-400" />
                   </Button>
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="p-2 hover:bg-gray-100 rounded-full"
+                        className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full"
                         onClick={() => {
                           // File upload functionality
                           const input = document.createElement('input');
@@ -518,7 +571,7 @@ const MessagesPage: React.FC = () => {
                           input.click();
                         }}
                       >
-                        <Paperclip className="h-5 w-5 text-gray-500" />
+                        <Paperclip className="h-5 w-5 text-gray-500 dark:text-gray-400" />
                   </Button>
                   <div className="flex-1 relative">
                     <Input
@@ -527,7 +580,7 @@ const MessagesPage: React.FC = () => {
                           onChange={handleInputChange}
                           onKeyPress={(e) => e.key === 'Enter' && !e.shiftKey && handleSendMessage()}
                           placeholder="Message..."
-                          className="rounded-full border-gray-300 focus:border-blue-500 focus:ring-blue-500 pr-12"
+                          className="rounded-full border-gray-300 dark:border-gray-600 focus:border-blue-500 focus:ring-blue-500 pr-12 dark:bg-gray-700 dark:text-gray-100"
                         />
                       </div>
                     <Button
@@ -541,13 +594,13 @@ const MessagesPage: React.FC = () => {
                     
                     {/* Emoji Picker */}
                     {showEmojiPicker && (
-                      <div className="mt-2 p-2 bg-white border border-gray-200 rounded-lg shadow-lg">
+                      <div className="mt-2 p-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-lg">
                         <div className="grid grid-cols-8 gap-1">
                           {['😀', '😃', '😄', '😁', '😆', '😅', '😂', '🤣', '😊', '😇', '🙂', '🙃', '😉', '😌', '😍', '🥰', '😘', '😗', '😙', '😚', '😋', '😛', '😝', '😜', '🤪', '🤨', '🧐', '🤓', '😎', '🤩', '🥳', '😏'].map((emoji) => (
                             <button
                               key={emoji}
                               onClick={() => addEmoji(emoji)}
-                              className="p-1 hover:bg-gray-100 rounded text-lg"
+                              className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded text-lg"
                             >
                               {emoji}
                             </button>
@@ -560,9 +613,9 @@ const MessagesPage: React.FC = () => {
           ) : (
                 <div className="flex items-center justify-center h-full">
               <div className="text-center">
-                    <MessageSquare className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">Select a conversation</h3>
-                    <p className="text-gray-500">Choose a user from the list to start messaging</p>
+                    <MessageSquare className="h-16 w-16 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
+                    <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">Select a conversation</h3>
+                    <p className="text-gray-500 dark:text-gray-400">Choose a user from the list to start messaging</p>
               </div>
             </div>
           )}

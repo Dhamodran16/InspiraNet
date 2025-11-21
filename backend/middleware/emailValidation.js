@@ -1,4 +1,5 @@
 const User = require('../models/User');
+const { isEmailExpired, getExpirationDate } = require('../utils/emailExpiration');
 
 /**
  * Middleware to check email validity and prevent login with expired college emails
@@ -11,33 +12,45 @@ const checkEmailValidity = async (req, res, next) => {
       return next();
     }
 
-    // Check if user is a student with expired college email
-    if (user.type === 'student' && user.email?.college) {
-      const currentYear = new Date().getFullYear();
-      const joinYear = user.studentInfo?.joinYear;
+    // Check if user has expired Kongu email
+    if (user.email?.college) {
+      const expired = isEmailExpired(user.email.college);
       
-      if (joinYear && currentYear - joinYear >= 4) {
-        return res.status(403).json({
-          error: 'College email expired. Use personal email to login.',
-          code: 'COLLEGE_EMAIL_EXPIRED',
-          details: {
-            joinYear: joinYear,
-            expiryYear: joinYear + 4,
-            currentYear: currentYear
-          }
-        });
+      if (expired) {
+        // If email is expired and user has personal email, allow login but show warning
+        if (user.email.personal) {
+          // Email is expired but personal email exists - migration should happen
+          // Allow access but add warning header
+          res.set('X-Email-Expired', 'true');
+          res.set('X-Personal-Email-Available', 'true');
+        } else {
+          // Email expired and no personal email - block access
+          const expirationDate = getExpirationDate(user.email.college);
+          return res.status(403).json({
+            error: 'Kongu email expired. Please add a personal email in Settings to continue using your account.',
+            code: 'COLLEGE_EMAIL_EXPIRED',
+            details: {
+              expiredEmail: user.email.college,
+              expirationDate: expirationDate,
+              requiresPersonalEmail: true
+            }
+          });
+        }
       }
     }
 
     // Check if user is an alumni with deactivated college email
-    if (user.type === 'alumni' && user.email?.college) {
-      return res.status(403).json({
-        error: 'College email deactivated. Use personal email to login.',
-        code: 'COLLEGE_EMAIL_DEACTIVATED',
-        details: {
-          message: 'Your account has been converted to alumni status. Please use your personal email.'
-        }
-      });
+    if (user.type === 'alumni' && user.email?.college && !user.emailMigration?.migrated) {
+      // Alumni should have been migrated, but if not, check if email is expired
+      if (isEmailExpired(user.email.college)) {
+        return res.status(403).json({
+          error: 'College email expired. Please use your personal email to login.',
+          code: 'COLLEGE_EMAIL_EXPIRED',
+          details: {
+            message: 'Your Kongu email has expired. Please use your personal email or add one in Settings.'
+          }
+        });
+      }
     }
 
     next();

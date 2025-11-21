@@ -5,6 +5,9 @@ interface ProductionConfig {
   backendUrl: string;
   frontendUrl: string;
   socketUrl: string;
+  meetingUrl: string;
+  // 🚀 Dev Tunnel URL for external access
+  devTunnelUrl: string;
   cloudinary: {
     cloudName: string;
     uploadPreset: string;
@@ -18,6 +21,7 @@ interface ProductionConfig {
     timeout: number;
     retryAttempts: number;
   };
+  environment: string;
 }
 
 // Validate and get environment variables with fallbacks
@@ -50,9 +54,11 @@ const getNumberEnvVar = (key: string, fallback: number): number => {
 };
 
 export const productionConfig: ProductionConfig = {
-  backendUrl: getEnvVar('VITE_BACKEND_URL', 'https://your-backend-api.com'),
-  frontendUrl: getEnvVar('VITE_FRONTEND_URL', 'https://your-frontend.vercel.app'),
-  socketUrl: getEnvVar('VITE_SOCKET_URL', 'https://your-backend-api.com'),
+  backendUrl: getEnvVar('VITE_BACKEND_URL', 'https://inspiranet-backend.onrender.com'),
+  frontendUrl: getEnvVar('VITE_FRONTEND_URL', 'https://inspiranet.onrender.com'),
+  socketUrl: getEnvVar('VITE_SOCKET_URL', 'https://inspiranet-backend.onrender.com'),
+  meetingUrl: getEnvVar('VITE_MEETING_URL', 'https://inspiranet-backend.onrender.com'),
+
   cloudinary: {
     cloudName: getEnvVar('VITE_CLOUDINARY_CLOUD_NAME', ''),
     uploadPreset: getEnvVar('VITE_CLOUDINARY_UPLOAD_PRESET', ''),
@@ -66,6 +72,7 @@ export const productionConfig: ProductionConfig = {
     timeout: getNumberEnvVar('VITE_API_TIMEOUT', 30000),
     retryAttempts: getNumberEnvVar('VITE_API_RETRY_ATTEMPTS', 3),
   },
+  environment: 'production'
 };
 
 // Validation function
@@ -74,6 +81,7 @@ export const validateProductionConfig = (): boolean => {
     'VITE_BACKEND_URL',
     'VITE_FRONTEND_URL',
     'VITE_SOCKET_URL',
+    'VITE_MEETING_URL',
   ];
 
   const missingVars = requiredVars.filter(

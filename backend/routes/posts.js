@@ -1,4 +1,5 @@
 const express = require('express');
+const mongoose = require('mongoose');
 const router = express.Router();
 const { authenticateToken } = require('../middleware/auth');
 const Post = require('../models/Post');
@@ -70,7 +71,7 @@ router.get('/', authenticateToken, async (req, res) => {
     }
 
     const posts = await Post.find(query)
-      .populate('author', 'name avatar type batch department')
+      .populate('author', 'name avatar type batch department studentInfo facultyInfo')
       .populate('comments.author', 'name avatar')
       .populate('likes', 'name avatar')
       .sort({ createdAt: -1 })
@@ -102,7 +103,7 @@ router.get('/', authenticateToken, async (req, res) => {
 router.get('/:id', authenticateToken, async (req, res) => {
   try {
     const post = await Post.findById(req.params.id)
-      .populate('author', 'name avatar type batch department')
+      .populate('author', 'name avatar type batch department studentInfo facultyInfo')
       .populate('comments.author', 'name avatar')
       .populate('likes', 'name avatar');
 
@@ -242,7 +243,10 @@ router.post('/', authenticateToken, upload.array('media', 5), async (req, res) =
       author: userId,
       userType: user.type,
       batch: user.batch,
-      department: user.department,
+      department: user.department || 
+                  user.studentInfo?.department || 
+                  user.facultyInfo?.department || 
+                  'Unknown Department',
       postType,
       title: title?.trim(),
       content: content.trim(),
@@ -418,7 +422,7 @@ router.post('/', authenticateToken, upload.array('media', 5), async (req, res) =
     }
 
     // Populate author info before sending response
-    await post.populate('author', 'name avatar type batch department');
+    await post.populate('author', 'name avatar type batch department studentInfo facultyInfo');
 
     // realtime broadcast
     const io = req.app.get('io');
@@ -454,7 +458,7 @@ router.put('/:id', authenticateToken, async (req, res) => {
       return res.status(404).json({ error: 'Post not found' });
     }
 
-    if (post.author.toString() !== userId) {
+    if (post.author.toString() !== userId.toString()) {
       return res.status(403).json({ error: 'You can only edit your own posts' });
     }
 
@@ -833,26 +837,114 @@ router.delete('/:postId/comments/:commentId', authenticateToken, async (req, res
     const { postId, commentId } = req.params;
     const userId = req.user._id;
 
+    console.log('🗑️ Deleting comment:', { postId, commentId, userId });
+    console.log('🔍 Comment ID type:', typeof commentId);
+    console.log('🔍 Comment ID length:', commentId?.length);
+    console.log('🔍 Comment ID value:', commentId);
+    console.log('🔍 User ID type:', typeof userId);
+    console.log('🔍 User ID value:', userId);
+
     const post = await Post.findById(postId);
     if (!post) {
+      console.log('❌ Post not found:', postId);
       return res.status(404).json({ error: 'Post not found' });
     }
 
-    const comment = post.comments.id(commentId);
-    if (!comment) {
+    console.log('📝 Post found, comments count:', post.comments.length);
+    console.log('🔍 Looking for comment ID:', commentId);
+    console.log('📋 Available comment IDs:', post.comments.map(c => ({ id: c._id.toString(), type: typeof c._id })));
+
+    // Find the comment index using multiple methods
+    let commentIndex = -1;
+    let comment = null;
+    
+    // Method 1: Try using .id() method (handles both _id and commentId)
+    try {
+      comment = post.comments.id(commentId);
+      commentIndex = post.comments.findIndex(c => c._id.toString() === comment._id.toString());
+      console.log('✅ Found comment using .id() method, index:', commentIndex);
+    } catch (error) {
+      console.log('❌ .id() method failed:', error.message);
+    }
+
+    // Method 2: Try finding by _id (MongoDB default field)
+    if (commentIndex === -1) {
+      commentIndex = post.comments.findIndex(c => c._id.toString() === commentId);
+      if (commentIndex !== -1) {
+        comment = post.comments[commentIndex];
+        console.log('✅ Found comment by _id, index:', commentIndex);
+      } else {
+        console.log('❌ Comment not found by _id');
+      }
+    }
+
+    // Method 3: Try finding by commentId field (custom field)
+    if (commentIndex === -1) {
+      commentIndex = post.comments.findIndex(c => c.commentId && c.commentId.toString() === commentId);
+      if (commentIndex !== -1) {
+        comment = post.comments[commentIndex];
+        console.log('✅ Found comment by commentId field, index:', commentIndex);
+      } else {
+        console.log('❌ Comment not found by commentId field');
+      }
+    }
+
+    // Method 4: Try finding by ObjectId conversion (handle malformed IDs)
+    if (commentIndex === -1) {
+      try {
+        const objectId = new mongoose.Types.ObjectId(commentId);
+        commentIndex = post.comments.findIndex(c => 
+          c._id.equals(objectId) || 
+          (c.commentId && c.commentId.equals(objectId))
+        );
+        if (commentIndex !== -1) {
+          comment = post.comments[commentIndex];
+          console.log('✅ Found comment by ObjectId conversion, index:', commentIndex);
+        } else {
+          console.log('❌ Comment not found by ObjectId conversion');
+        }
+      } catch (error) {
+        console.log('❌ ObjectId conversion failed:', error.message);
+      }
+    }
+
+    // Method 5: Try partial match
+    if (commentIndex === -1) {
+      commentIndex = post.comments.findIndex(c => 
+        c._id.toString().includes(commentId) || 
+        (c.commentId && c.commentId.toString().includes(commentId))
+      );
+      if (commentIndex !== -1) {
+        comment = post.comments[commentIndex];
+        console.log('✅ Found comment by partial match, index:', commentIndex);
+      } else {
+        console.log('❌ Comment not found by partial match');
+      }
+    }
+
+    if (commentIndex === -1 || !comment) {
+      console.log('❌ Comment not found with any method:', commentId);
+      console.log('🔍 Available comment IDs (_id):', post.comments.map(c => c._id.toString()));
+      console.log('🔍 Available comment IDs (commentId):', post.comments.map(c => c.commentId ? c.commentId.toString() : 'No commentId'));
       return res.status(404).json({ error: 'Comment not found' });
     }
 
-    if (comment.author.toString() !== userId) {
+    console.log('✅ Comment found, author:', comment.author.toString());
+    console.log('👤 User ID:', userId.toString());
+
+    if (comment.author.toString() !== userId.toString()) {
+      console.log('❌ Unauthorized: User cannot delete this comment');
       return res.status(403).json({ error: 'You can only delete your own comments' });
     }
 
-    comment.remove();
+    // Remove the comment by index using splice
+    post.comments.splice(commentIndex, 1);
     await post.save();
 
+    console.log('✅ Comment deleted successfully');
     res.json({ message: 'Comment deleted successfully' });
   } catch (error) {
-    console.error('Error deleting comment:', error);
+    console.error('❌ Error deleting comment:', error);
     res.status(500).json({ error: 'Failed to delete comment' });
   }
 });

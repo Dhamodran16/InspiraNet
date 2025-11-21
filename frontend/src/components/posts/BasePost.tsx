@@ -1,12 +1,74 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Heart, MessageCircle, Edit, Trash2 } from 'lucide-react';
+import { Heart, MessageCircle, Edit, Trash2, MoreVertical, X, Share2 } from 'lucide-react';
 import { Post } from '@/services/postsApi';
 import { useAuth } from '@/contexts/AuthContext';
 import { Input } from '@/components/ui/input';
+
+// Comment Menu Component
+const CommentMenu = ({ commentId, onDelete }: { commentId: string; onDelete: (commentId: string) => void }) => {
+  const [showMenu, setShowMenu] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  // Close menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setShowMenu(false);
+      }
+    };
+
+    if (showMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showMenu]);
+
+  return (
+    <div className="relative ml-auto" ref={menuRef}>
+      <Button 
+        variant="ghost" 
+        size="icon" 
+        className="h-6 w-6 p-0 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
+        onClick={() => setShowMenu(!showMenu)}
+      >
+        <MoreVertical className="h-3 w-3" />
+      </Button>
+      
+      {showMenu && (
+        <div className="absolute right-0 top-6 w-40 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-lg z-20">
+          <div className="p-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                onDelete(commentId);
+                setShowMenu(false);
+              }}
+              className="w-full justify-start text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/20"
+            >
+              <Trash2 className="h-3 w-3 mr-2" /> Delete comment
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-full justify-start hover:bg-gray-50 dark:hover:bg-gray-800"
+              onClick={() => setShowMenu(false)}
+            >
+              <X className="h-3 w-3 mr-2" /> Close
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
 
 type User = {
   _id: string;
@@ -24,11 +86,14 @@ interface BasePostProps {
   onComment: (postId: string, commentContent: string) => void;
   onEdit?: (postId: string) => void;
   onDelete: (postId: string) => void;
+  onDeleteComment?: (postId: string, commentId: string) => void;
+  onShare?: (postId: string) => void;
   showComments: boolean;
   onToggleComments: () => void;
   commentsCount: number;
   isLiked: boolean;
   showDeleteButton?: boolean;
+  showShareButton?: boolean;
   postTypeLabel: string;
   postTypeIcon: React.ReactNode;
   children?: React.ReactNode;
@@ -41,20 +106,43 @@ export default function BasePost({
   onComment,
   onEdit,
   onDelete,
+  onDeleteComment,
+  onShare,
   showComments,
   onToggleComments,
   commentsCount,
   isLiked: initialIsLiked,
   showDeleteButton = false,
+  showShareButton = true,
   postTypeLabel,
   postTypeIcon,
   children
 }: BasePostProps) {
   const [commentText, setCommentText] = useState('');
+  const [showAllComments, setShowAllComments] = useState(false);
+  const [showPostMenu, setShowPostMenu] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
   
   // Local like state management - rely on server state
   const [isLiked, setIsLiked] = useState(initialIsLiked);
   const [isDisabled, setIsDisabled] = useState(false);
+
+  // Close menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setShowPostMenu(false);
+      }
+    };
+
+    if (showPostMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showPostMenu]);
 
   // Update local state when props change (server state)
   useEffect(() => {
@@ -92,6 +180,23 @@ export default function BasePost({
     }
   };
 
+  const handleDeleteComment = async (commentId: string) => {
+    if (!onDeleteComment) return;
+    
+    // Find the comment to check if user is the author
+    const comment = post.comments?.find(c => c._id === commentId);
+    if (!comment || comment.author?._id?.toString() !== user?._id?.toString()) {
+      console.warn('User is not the author of this comment, deletion not allowed');
+      return;
+    }
+    
+    try {
+      await onDeleteComment(post._id, commentId);
+    } catch (error) {
+      console.error('Error deleting comment:', error);
+    }
+  };
+
   const formatTimeAgo = (dateString: string) => {
     const date = new Date(dateString);
     const now = new Date();
@@ -104,8 +209,23 @@ export default function BasePost({
     return date.toLocaleDateString();
   };
 
+  // Function to deduplicate comments based on comment ID
+  const getUniqueComments = (comments: any[]) => {
+    if (!comments || !Array.isArray(comments)) return [];
+    
+    const seen = new Set();
+    return comments.filter(comment => {
+      if (seen.has(comment._id)) {
+        console.warn(`Duplicate comment detected: ${comment._id}`);
+        return false;
+      }
+      seen.add(comment._id);
+      return true;
+    });
+  };
+
   return (
-    <Card className="post-card border border-gray-200 dark:border-gray-700 shadow-sm max-w-2xl mx-auto">
+    <Card className="post-card border border-gray-200 dark:border-gray-700 shadow-sm max-w-4xl mx-auto">
       {/* Post Header */}
       <div className="post-header p-4 border-b border-gray-100 dark:border-gray-800">
         <div className="flex items-center justify-between">
@@ -128,7 +248,12 @@ export default function BasePost({
                 )}
               </div>
               <div className="flex items-center space-x-2 text-sm text-gray-500 dark:text-gray-400">
-                <span>{post.author?.department || 'Unknown Department'}</span>
+                <span>
+                  {post.author?.department || 
+                   post.author?.studentInfo?.department || 
+                   post.author?.facultyInfo?.department || 
+                   'Unknown Department'}
+                </span>
                 {post.author?.batch && (
                   <>
                     <span>•</span>
@@ -141,29 +266,70 @@ export default function BasePost({
             </div>
           </div>
           
-          {/* Post Actions Menu */}
+          {/* Post Actions Menu - Three dot menu */}
           <div className="flex items-center space-x-2">
-            {showDeleteButton && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => onDelete?.(post._id)}
-                className="text-gray-500 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400"
+            <div className="relative" ref={menuRef}>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="h-8 w-8 text-gray-500 dark:text-gray-400"
+                onClick={() => setShowPostMenu(!showPostMenu)}
               >
-                <Trash2 className="h-4 w-4" />
+                <MoreVertical className="h-4 w-4" />
               </Button>
-            )}
+              
+              {showPostMenu && (
+                <div className="absolute right-0 mt-2 w-40 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-lg z-10">
+                  <div className="p-1">
+                    {showShareButton && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          onShare?.(post._id);
+                          setShowPostMenu(false);
+                        }}
+                        className="w-full justify-start text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+                      >
+                        <Share2 className="h-4 w-4 mr-2" /> Share
+                      </Button>
+                    )}
+                    {showDeleteButton && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          onDelete?.(post._id);
+                          setShowPostMenu(false);
+                        }}
+                        className="w-full justify-start text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
+                      >
+                        <Trash2 className="h-4 w-4 mr-2" /> Delete
+                      </Button>
+                    )}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="w-full justify-start"
+                      onClick={() => setShowPostMenu(false)}
+                    >
+                      <X className="h-4 w-4 mr-2" /> Close
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Post Content */}
-      <div className="post-content p-4">
+      {/* Post Content - Images First, then other content */}
+      <div className="post-content">
         {children}
       </div>
 
       {/* Post Actions */}
-      <div className="px-4 pb-4">
+      <div className="px-4 pb-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
             <Button
@@ -196,38 +362,56 @@ export default function BasePost({
 
         {/* Comments Section */}
         {showComments && (
-          <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-800">
-            <div className="space-y-3">
-              {post.comments?.slice(0, 3).map((comment) => (
-                <div key={comment._id} className="flex space-x-2">
-                  <Avatar className="h-6 w-6">
-                    <AvatarImage src={comment.author?.avatar} />
-                    <AvatarFallback className="bg-gray-300 dark:bg-gray-600 text-gray-700 dark:text-gray-300 text-xs font-medium">
-                      {comment.author?.name?.charAt(0) || 'U'}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1 min-w-0">
-                    <div className="bg-gray-50 dark:bg-gray-800 rounded-lg px-3 py-2">
-                      <p className="text-sm">
-                        <span className="font-medium text-gray-900 dark:text-gray-100">
-                          {comment.author?.name || 'Unknown User'}
-                        </span>
-                        <span className="text-gray-700 dark:text-gray-300 ml-2">
-                          {comment.content}
-                        </span>
-                      </p>
+          <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-800">
+            <div className="space-y-2">
+              {(() => {
+                const uniqueComments = getUniqueComments(post.comments);
+                const commentsToShow = showAllComments ? uniqueComments : uniqueComments.slice(0, 3);
+                
+                return commentsToShow.map((comment, index) => {
+                  // Ensure unique key by combining comment ID with index
+                  const uniqueKey = `${comment._id}-${index}`;
+                  return (
+                    <div key={uniqueKey} className="flex space-x-2">
+                      <Avatar className="h-6 w-6">
+                        <AvatarImage src={comment.author?.avatar} />
+                        <AvatarFallback className="bg-gray-300 dark:bg-gray-600 text-gray-700 dark:text-gray-300 text-xs font-medium">
+                          {comment.author?.name?.charAt(0) || 'U'}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 min-w-0">
+                        <div className="bg-gray-50 dark:bg-gray-800 rounded-lg px-3 py-2">
+                          <div className="flex items-center justify-between">
+                            <p className="text-sm">
+                              <span className="font-medium text-gray-900 dark:text-gray-100">
+                                {comment.author?.name || 'Unknown User'}
+                              </span>
+                              <span className="text-gray-700 dark:text-gray-300 ml-2">
+                                {comment.content}
+                              </span>
+                            </p>
+                            {comment.author?._id?.toString() === user?._id?.toString() && (
+                              <CommentMenu commentId={comment._id} onDelete={handleDeleteComment} />
+                            )}
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                </div>
-              ))}
+                  );
+                });
+              })()}
               
-              {post.comments && post.comments.length > 3 && (
+              {getUniqueComments(post.comments).length > 3 && (
                 <Button
                   variant="ghost"
                   size="sm"
+                  onClick={() => setShowAllComments(!showAllComments)}
                   className="text-blue-600 dark:text-blue-400 text-sm"
                 >
-                  View all {post.comments.length} comments
+                  {showAllComments 
+                    ? `Hide comments` 
+                    : `View all ${getUniqueComments(post.comments).length} comments`
+                  }
                 </Button>
               )}
               

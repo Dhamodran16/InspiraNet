@@ -20,19 +20,45 @@ export default function EnhancedNotificationSystem() {
     
     // Socket listeners for real-time updates
     const handleNewNotification = (notification: any) => {
+      console.log('🔔 New notification received:', notification);
       loadUnreadCount();
+      
+      // Show toast for new notifications
+      toast({
+        title: notification.title || "New Notification",
+        description: notification.message,
+        duration: 5000,
+      });
     };
 
     const handleNotificationRead = (notificationId: string) => {
+      console.log('🔔 Notification marked as read:', notificationId);
       loadUnreadCount();
-      };
+    };
 
-      socketService.onNewNotification(handleNewNotification);
-      socketService.onNotificationRead(handleNotificationRead);
+    const handleNotificationUpdated = (notification: any) => {
+      console.log('🔔 Notification updated:', notification);
+      loadUnreadCount();
+    };
 
-      return () => {
-        socketService.offNewNotification();
-        socketService.offNotificationRead();
+    // Enhanced real-time listeners
+    socketService.onNewNotification(handleNewNotification);
+    socketService.onNotificationRead(handleNotificationRead);
+    socketService.onNotificationUpdated?.(handleNotificationUpdated);
+
+    // Listen for follow status updates that might affect notifications
+    const handleFollowStatusUpdate = () => {
+      console.log('🔔 Follow status updated, refreshing notifications');
+      loadUnreadCount();
+    };
+
+    socketService.onFollowStatusUpdate(handleFollowStatusUpdate);
+
+    return () => {
+      socketService.offNewNotification();
+      socketService.offNotificationRead();
+      socketService.offNotificationUpdated?.();
+      socketService.offFollowStatusUpdate();
     };
   }, []);
 

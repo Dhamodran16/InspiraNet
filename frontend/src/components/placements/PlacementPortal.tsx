@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Building, Calendar, MapPin, DollarSign, Users, Star, Clock, CheckCircle, Plus, Loader2, Search, Filter } from "lucide-react";
+import { Building, Calendar, MapPin, DollarSign, Users, Star, Clock, CheckCircle, Plus, Loader2, Search, Filter, FileText } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { uploadResumeToCloudinary } from "@/services/cloudinary";
@@ -56,11 +56,7 @@ export default function PlacementPortal() {
   const [filterCompany, setFilterCompany] = useState("");
   const [filterResult, setFilterResult] = useState("");
   const [filterCompanyType, setFilterCompanyType] = useState("");
-  const [filterWorkMode, setFilterWorkMode] = useState("");
-  const [filterDifficulty, setFilterDifficulty] = useState("");
   const [filterPackage, setFilterPackage] = useState("");
-  const [filterLocation, setFilterLocation] = useState("");
-  const [filterSkills, setFilterSkills] = useState("");
   const [filterBatch, setFilterBatch] = useState("");
   const [sortBy, setSortBy] = useState("date");
   const [sortOrder, setSortOrder] = useState("desc");
@@ -69,13 +65,15 @@ export default function PlacementPortal() {
     studentName: user?.name || "",
     company: "",
     position: "",
-    rounds: "",
+    rounds: [],
+    interviewDate: "",
     result: "",
     package: "",
     feedback: "",
     skills: "",
     resume: undefined,
     batch: user?.batch || "",
+    department: user?.department || user?.studentInfo?.department || "",
     // Enhanced fields
     companyType: "enterprise",
     companySize: "1000+",
@@ -101,15 +99,15 @@ export default function PlacementPortal() {
     loadPlacementExperiences();
   }, []);
 
-  // Enhanced filtering and sorting will be defined later
+  // Real-time filtering - trigger when any filter changes
+  useEffect(() => {
+    // This will trigger re-render with filtered results
+    // The filtering logic is already in the render function
+  }, [searchTerm, filterCompany, filterResult, filterCompanyType, filterPackage, filterBatch]);
 
   const loadPlacementExperiences = async () => {
     try {
       setIsLoading(true);
-      // TODO: Replace with actual API call when backend is ready
-      // const response = await api.getPlacementExperiences();
-      // setInterviewHistory(response.experiences);
-      
       // Load from MongoDB via API
       const response = await api.get('/api/placements');
       
@@ -150,8 +148,11 @@ export default function PlacementPortal() {
         ...newExperience,
         studentName: user.name,
         batch: user.batch || "2024",
-        department: user.department,
-        rounds: newExperience.rounds.split(',').map(round => round.trim()),
+        department: user.department || 
+                   user.studentInfo?.department || 
+                   user.facultyInfo?.department || 
+                   "Unknown Department",
+        rounds: newExperience.rounds,
         interviewDate: new Date().toISOString().split('T')[0],
         createdAt: new Date().toISOString()
       };
@@ -171,13 +172,15 @@ export default function PlacementPortal() {
         studentName: user.name,
         company: "",
         position: "",
-        rounds: "",
+        rounds: [],
+        interviewDate: "",
         result: "",
         package: "",
         feedback: "",
         skills: "",
         resume: undefined,
-        batch: user.batch || ""
+        batch: user.batch || "",
+        department: user.department || user.studentInfo?.department || ""
       });
       
       toast({
@@ -231,8 +234,7 @@ export default function PlacementPortal() {
         experience.company.toLowerCase().includes(searchTerm.toLowerCase()) ||
         experience.position.toLowerCase().includes(searchTerm.toLowerCase()) ||
         experience.studentName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        experience.skills.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        experience.location?.toLowerCase().includes(searchTerm.toLowerCase());
+        experience.skills.toLowerCase().includes(searchTerm.toLowerCase());
       
       // Company filter
       const matchesCompany = !filterCompany || 
@@ -246,33 +248,16 @@ export default function PlacementPortal() {
       const matchesCompanyType = !filterCompanyType || 
         experience.companyType === filterCompanyType;
       
-      // Work mode filter
-      const matchesWorkMode = !filterWorkMode || 
-        experience.workMode === filterWorkMode;
-      
-      // Difficulty filter
-      const matchesDifficulty = !filterDifficulty || 
-        experience.interviewDifficulty === filterDifficulty;
-      
       // Package filter
       const matchesPackage = !filterPackage || 
         experience.package.toLowerCase().includes(filterPackage.toLowerCase());
-      
-      // Location filter
-      const matchesLocation = !filterLocation || 
-        experience.location?.toLowerCase().includes(filterLocation.toLowerCase());
-      
-      // Skills filter
-      const matchesSkills = !filterSkills || 
-        experience.skills.toLowerCase().includes(filterSkills.toLowerCase());
       
       // Batch filter
       const matchesBatch = !filterBatch || 
         experience.batch === filterBatch;
       
       return matchesSearch && matchesCompany && matchesResult && 
-             matchesCompanyType && matchesWorkMode && matchesDifficulty && matchesPackage &&
-             matchesLocation && matchesSkills && matchesBatch;
+             matchesCompanyType && matchesPackage && matchesBatch;
     })
     .sort((a, b) => {
       let comparison = 0;
@@ -288,11 +273,6 @@ export default function PlacementPortal() {
           break;
         case 'company':
           comparison = a.company.localeCompare(b.company);
-          break;
-        case 'difficulty':
-          const difficultyOrder = { 'easy': 1, 'medium': 2, 'hard': 3, 'very-hard': 4 };
-          comparison = (difficultyOrder[a.interviewDifficulty || 'medium'] || 2) - 
-                      (difficultyOrder[b.interviewDifficulty || 'medium'] || 2);
           break;
         default:
           comparison = 0;
@@ -388,57 +368,6 @@ export default function PlacementPortal() {
               </select>
             </div>
             <div>
-              <Label htmlFor="work-mode-filter">Work Mode</Label>
-              <select
-                id="work-mode-filter"
-                className="w-full p-2 border rounded-md bg-background text-foreground border-border"
-                value={filterWorkMode}
-                onChange={(e) => setFilterWorkMode(e.target.value)}
-              >
-                <option value="">All Modes</option>
-                <option value="on-site">On-Site</option>
-                <option value="remote">Remote</option>
-                <option value="hybrid">Hybrid</option>
-              </select>
-            </div>
-            <div>
-              <Label htmlFor="difficulty-filter">Difficulty</Label>
-              <select
-                id="difficulty-filter"
-                className="w-full p-2 border rounded-md bg-background text-foreground border-border"
-                value={filterDifficulty}
-                onChange={(e) => setFilterDifficulty(e.target.value)}
-              >
-                <option value="">All Difficulties</option>
-                <option value="easy">Easy</option>
-                <option value="medium">Medium</option>
-                <option value="hard">Hard</option>
-                <option value="very-hard">Very Hard</option>
-              </select>
-            </div>
-          </div>
-          
-          {/* Additional Advanced Filters */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-            <div>
-              <Label htmlFor="location-filter">Location</Label>
-              <Input
-                id="location-filter"
-                placeholder="Filter by location..."
-                value={filterLocation || ''}
-                onChange={(e) => setFilterLocation(e.target.value)}
-              />
-            </div>
-            <div>
-              <Label htmlFor="skills-filter">Skills</Label>
-              <Input
-                id="skills-filter"
-                placeholder="Filter by skills..."
-                value={filterSkills || ''}
-                onChange={(e) => setFilterSkills(e.target.value)}
-              />
-            </div>
-            <div>
               <Label htmlFor="batch-filter">Batch</Label>
               <select
                 id="batch-filter"
@@ -452,10 +381,19 @@ export default function PlacementPortal() {
                 ))}
               </select>
             </div>
+            <div>
+              <Label htmlFor="package-filter">Package Range</Label>
+              <Input
+                id="package-filter"
+                placeholder="e.g., 15 LPA"
+                value={filterPackage}
+                onChange={(e) => setFilterPackage(e.target.value)}
+              />
+            </div>
           </div>
           
-          {/* Sorting and Package Filter */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          {/* Sorting and Clear Filters */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <Label htmlFor="sort-by">Sort By</Label>
               <select
@@ -467,7 +405,6 @@ export default function PlacementPortal() {
                 <option value="date">Interview Date</option>
                 <option value="package">Package</option>
                 <option value="company">Company</option>
-                <option value="difficulty">Difficulty</option>
               </select>
             </div>
             <div>
@@ -482,15 +419,6 @@ export default function PlacementPortal() {
                 <option value="asc">Ascending</option>
               </select>
             </div>
-            <div>
-              <Label htmlFor="package-filter">Package Range</Label>
-              <Input
-                id="package-filter"
-                placeholder="e.g., 15 LPA"
-                value={filterPackage}
-                onChange={(e) => setFilterPackage(e.target.value)}
-              />
-            </div>
             <div className="flex items-end">
               <Button 
                 variant="outline" 
@@ -499,11 +427,7 @@ export default function PlacementPortal() {
                   setFilterCompany("");
                   setFilterResult("");
                   setFilterCompanyType("");
-                  setFilterWorkMode("");
-                  setFilterDifficulty("");
                   setFilterPackage("");
-                  setFilterLocation("");
-                  setFilterSkills("");
                   setFilterBatch("");
                 }}
                 className="w-full"
@@ -515,11 +439,15 @@ export default function PlacementPortal() {
         </CardContent>
       </Card>
 
+      {/* Experience Display Section */}
       <Card>
         <CardHeader>
           <div className="flex justify-between items-center">
             <div>
-              <CardTitle>Interview History & Experiences</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                <Users className="h-5 w-5" />
+                Interview Experiences
+              </CardTitle>
               <CardDescription>
                 Learn from previous interview experiences and success stories
               </CardDescription>
@@ -532,171 +460,172 @@ export default function PlacementPortal() {
         </CardHeader>
         <CardContent>
           {isLoading ? (
-            <div className="flex items-center justify-center h-32">
-              <Loader2 className="h-8 w-8 animate-spin" />
+            <div className="flex justify-center items-center h-64">
+              <Loader2 className="h-12 w-12 animate-spin text-primary" />
+            </div>
+          ) : filteredAndSortedExperiences.length === 0 ? (
+            <div className="text-center py-12">
+              <Building className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+              <h3 className="text-lg font-medium">No experiences found</h3>
+              <p className="text-muted-foreground">
+                {searchTerm || filterCompany || filterResult || filterCompanyType || filterPackage || filterBatch
+                  ? "Try adjusting your search or filters" 
+                  : "Be the first to share your interview experience!"}
+              </p>
             </div>
           ) : (
             <div className="space-y-4">
-              {filteredAndSortedExperiences.length === 0 ? (
-                <div className="text-center py-12">
-                  <Building className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                  <h3 className="text-lg font-medium">No experiences found</h3>
-                  <p className="text-muted-foreground">
-                    {searchTerm || filterCompany || filterResult || filterCompanyType || filterWorkMode || filterDifficulty || filterPackage
-                      ? "Try adjusting your search or filters" 
-                      : "Be the first to share your interview experience!"}
-                  </p>
-                </div>
-              ) : (
-                filteredAndSortedExperiences.map((record) => (
-                  <Card key={record._id} className="p-4">
-                    <div className="flex justify-between items-start mb-3">
-                      <div>
-                        <h3 className="font-semibold text-lg">{record.studentName}</h3>
-                        <p className="text-sm text-muted-foreground">Batch {record.batch}</p>
-                      </div>
-                      <Badge variant={record.result === "Selected" ? "default" : "secondary"}>
-                        {record.result === "Selected" ? (
-                          <CheckCircle className="h-3 w-3 mr-1" />
-                        ) : null}
-                        {record.result}
-                      </Badge>
-                    </div>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-3">
-                      <div className="flex items-center space-x-2">
-                        <Building className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-sm">{record.company}</span>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Users className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-sm">{record.position}</span>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Calendar className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-sm">{record.interviewDate}</span>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <DollarSign className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-sm font-medium">{record.package}</span>
-                      </div>
-                    </div>
-
-                    {/* Enhanced Information Grid */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-3 p-3 bg-muted/30 rounded-lg">
-                      {record.companyType && (
-                        <div className="flex items-center space-x-2">
-                          <Badge variant="outline" className="text-xs">
-                            {record.companyType}
-                          </Badge>
-                          <span className="text-xs text-muted-foreground">Company Type</span>
-                        </div>
-                      )}
-                      {record.workMode && (
-                        <div className="flex items-center space-x-2">
-                          <Badge variant="outline" className="text-xs">
-                            {record.workMode}
-                          </Badge>
-                          <span className="text-xs text-muted-foreground">Work Mode</span>
-                        </div>
-                      )}
-                      {record.interviewDifficulty && (
-                        <div className="flex items-center space-x-2">
-                          <Badge 
-                            variant={record.interviewDifficulty === 'easy' ? 'default' : 
-                                   record.interviewDifficulty === 'medium' ? 'secondary' :
-                                   record.interviewDifficulty === 'hard' ? 'destructive' : 'destructive'}
-                            className="text-xs"
-                          >
-                            {record.interviewDifficulty}
-                          </Badge>
-                          <span className="text-xs text-muted-foreground">Difficulty</span>
-                        </div>
-                      )}
-                      {record.location && (
-                        <div className="flex items-center space-x-2">
-                          <MapPin className="h-3 w-3 text-muted-foreground" />
-                          <span className="text-xs text-muted-foreground">{record.location}</span>
-                        </div>
-                      )}
-                      {record.experienceRequired && (
-                        <div className="flex items-center space-x-2">
-                          <Clock className="h-3 w-3 text-muted-foreground" />
-                          <span className="text-xs text-muted-foreground">{record.experienceRequired}</span>
-                        </div>
-                      )}
-                      {record.selectionRate && (
-                        <div className="flex items-center space-x-2">
-                          <Star className="h-3 w-3 text-muted-foreground" />
-                          <span className="text-xs text-muted-foreground">{record.selectionRate}% selection rate</span>
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="mb-3">
-                      <h4 className="font-medium mb-2">Interview Rounds:</h4>
-                      <div className="flex flex-wrap gap-1">
-                        {record.rounds.map((round, index) => (
-                          <Badge key={index} variant="outline">
-                            {round}
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
-
-                    {record.skills && (
-                      <div className="mb-3">
-                        <h4 className="font-medium mb-1">Skills Required:</h4>
-                        <p className="text-sm text-muted-foreground">{record.skills}</p>
-                      </div>
-                    )}
-
+              {filteredAndSortedExperiences.map((record) => (
+                <Card key={record._id} className="p-4">
+                  <div className="flex justify-between items-start mb-3">
                     <div>
-                      <h4 className="font-medium mb-1">Feedback:</h4>
-                      <p className="text-sm text-muted-foreground">{record.feedback}</p>
+                      <h3 className="font-semibold text-lg">{record.studentName}</h3>
+                      <p className="text-sm text-muted-foreground">Batch {record.batch}</p>
+                      {record.department && (
+                        <p className="text-sm text-muted-foreground">{record.department}</p>
+                      )}
                     </div>
+                    <Badge variant={record.result === "Selected" ? "default" : "secondary"}>
+                      {record.result === "Selected" ? (
+                        <CheckCircle className="h-3 w-3 mr-1" />
+                      ) : null}
+                      {record.result}
+                    </Badge>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-3">
+                    <div className="flex items-center space-x-2">
+                      <Building className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-sm">{record.company}</span>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Users className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-sm">{record.position}</span>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Calendar className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-sm">{record.interviewDate}</span>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <DollarSign className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-sm font-medium">{record.package}</span>
+                    </div>
+                  </div>
 
-                    {/* Additional Useful Information */}
-                    {(record.benefits?.length || record.workCulture || record.growthOpportunities || record.challenges || record.tips) && (
-                      <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg">
-                        <h4 className="font-medium mb-2 text-blue-700 dark:text-blue-300">Additional Insights</h4>
-                        <div className="space-y-2">
-                          {record.benefits && record.benefits.length > 0 && (
-                            <div>
-                              <span className="text-xs font-medium text-blue-600 dark:text-blue-400">Benefits: </span>
-                              <span className="text-xs text-muted-foreground">{record.benefits.join(', ')}</span>
-                            </div>
-                          )}
-                          {record.workCulture && (
-                            <div>
-                              <span className="text-xs font-medium text-blue-600 dark:text-blue-400">Work Culture: </span>
-                              <span className="text-xs text-muted-foreground">{record.workCulture}</span>
-                            </div>
-                          )}
-                          {record.growthOpportunities && (
-                            <div>
-                              <span className="text-xs font-medium text-blue-600 dark:text-blue-400">Growth: </span>
-                              <span className="text-xs text-muted-foreground">{record.growthOpportunities}</span>
-                            </div>
-                          )}
-                          {record.challenges && (
-                            <div>
-                              <span className="text-xs font-medium text-blue-600 dark:text-blue-400">Challenges: </span>
-                              <span className="text-xs text-muted-foreground">{record.challenges}</span>
-                            </div>
-                          )}
-                          {record.tips && (
-                            <div>
-                              <span className="text-xs font-medium text-blue-600 dark:text-blue-400">Tips: </span>
-                              <span className="text-xs text-muted-foreground">{record.tips}</span>
-                            </div>
-                          )}
-                        </div>
+                  {/* Enhanced Information Grid */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-3 p-3 bg-muted/30 rounded-lg">
+                    {record.companyType && (
+                      <div className="flex items-center space-x-2">
+                        <Badge variant="outline" className="text-xs">
+                          {record.companyType}
+                        </Badge>
+                        <span className="text-xs text-muted-foreground">Company Type</span>
                       </div>
                     )}
-                  </Card>
-                ))
-              )}
+                    {record.workMode && (
+                      <div className="flex items-center space-x-2">
+                        <Badge variant="outline" className="text-xs">
+                          {record.workMode}
+                        </Badge>
+                        <span className="text-xs text-muted-foreground">Work Mode</span>
+                      </div>
+                    )}
+                    {record.interviewDifficulty && (
+                      <div className="flex items-center space-x-2">
+                        <Badge 
+                          variant={record.interviewDifficulty === 'easy' ? 'default' : 
+                                 record.interviewDifficulty === 'medium' ? 'secondary' :
+                                 record.interviewDifficulty === 'hard' ? 'destructive' : 'destructive'}
+                          className="text-xs"
+                        >
+                          {record.interviewDifficulty}
+                        </Badge>
+                        <span className="text-xs text-muted-foreground">Difficulty</span>
+                      </div>
+                    )}
+                    {record.location && (
+                      <div className="flex items-center space-x-2">
+                        <MapPin className="h-3 w-3 text-muted-foreground" />
+                        <span className="text-xs text-muted-foreground">{record.location}</span>
+                      </div>
+                    )}
+                    {record.experienceRequired && (
+                      <div className="flex items-center space-x-2">
+                        <Clock className="h-3 w-3 text-muted-foreground" />
+                        <span className="text-xs text-muted-foreground">{record.experienceRequired}</span>
+                      </div>
+                    )}
+                    {record.selectionRate && (
+                      <div className="flex items-center space-x-2">
+                        <Star className="h-3 w-3 text-muted-foreground" />
+                        <span className="text-xs text-muted-foreground">{record.selectionRate}% selection rate</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="mb-3">
+                    <h4 className="font-medium mb-2">Interview Rounds:</h4>
+                    <div className="flex flex-wrap gap-1">
+                      {record.rounds.map((round, index) => (
+                        <Badge key={index} variant="outline">
+                          {round}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+
+                  {record.skills && (
+                    <div className="mb-3">
+                      <h4 className="font-medium mb-1">Skills Required:</h4>
+                      <p className="text-sm text-muted-foreground">{record.skills}</p>
+                    </div>
+                  )}
+
+                  <div>
+                    <h4 className="font-medium mb-1">Feedback:</h4>
+                    <p className="text-sm text-muted-foreground">{record.feedback}</p>
+                  </div>
+
+                  {/* Additional Useful Information */}
+                  {(record.benefits?.length || record.workCulture || record.growthOpportunities || record.challenges || record.tips) && (
+                    <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg">
+                      <h4 className="font-medium mb-2 text-blue-700 dark:text-blue-300">Additional Insights</h4>
+                      <div className="space-y-2">
+                        {record.benefits && record.benefits.length > 0 && (
+                          <div>
+                            <span className="text-xs font-medium text-blue-600 dark:text-blue-400">Benefits: </span>
+                            <span className="text-xs text-muted-foreground">{record.benefits.join(', ')}</span>
+                          </div>
+                        )}
+                        {record.workCulture && (
+                          <div>
+                            <span className="text-xs font-medium text-blue-600 dark:text-blue-400">Work Culture: </span>
+                            <span className="text-xs text-muted-foreground">{record.workCulture}</span>
+                          </div>
+                        )}
+                        {record.growthOpportunities && (
+                          <div>
+                            <span className="text-xs font-medium text-blue-600 dark:text-blue-400">Growth: </span>
+                            <span className="text-xs text-muted-foreground">{record.growthOpportunities}</span>
+                          </div>
+                        )}
+                        {record.challenges && (
+                          <div>
+                            <span className="text-xs font-medium text-blue-600 dark:text-blue-400">Challenges: </span>
+                            <span className="text-xs text-muted-foreground">{record.challenges}</span>
+                          </div>
+                        )}
+                        {record.tips && (
+                          <div>
+                            <span className="text-xs font-medium text-blue-600 dark:text-blue-400">Tips: </span>
+                            <span className="text-xs text-muted-foreground">{record.tips}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </Card>
+              ))}
             </div>
           )}
         </CardContent>
@@ -705,7 +634,7 @@ export default function PlacementPortal() {
       {/* Add Experience Dialog */}
       {showAddExperience && (
         <Dialog open={showAddExperience} onOpenChange={setShowAddExperience}>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-w-2xl">
             <DialogHeader>
               <DialogTitle>Add Interview Experience</DialogTitle>
             </DialogHeader>
@@ -740,8 +669,8 @@ export default function PlacementPortal() {
                   id="rounds" 
                   placeholder="e.g., Technical, HR, System Design" 
                   required
-                  value={newExperience.rounds}
-                  onChange={(e) => setNewExperience(prev => ({ ...prev, rounds: e.target.value }))}
+                  value={newExperience.rounds.join(', ')}
+                  onChange={(e) => setNewExperience(prev => ({ ...prev, rounds: e.target.value.split(',').map(r => r.trim()) }))}
                 />
               </div>
               

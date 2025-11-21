@@ -10,7 +10,7 @@ import { Plus, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { socketService } from '@/services/socketService';
 
-const PostFeed: React.FC = () => {
+const PostFeed: React.FC<{ showDeleteButton?: boolean }> = ({ showDeleteButton = false }) => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [posts, setPosts] = useState<Post[]>([]);
@@ -183,6 +183,62 @@ const PostFeed: React.FC = () => {
       setRefreshing(false);
     }
   }, [user, loadPosts]);
+
+  // Handle comment deletion (guard against non-authors)
+  const handleDeleteComment = async (postId: string, commentId: string) => {
+    try {
+      // Authorship guard: ensure current user owns the comment before API call
+      const targetPost = posts.find(p => p._id === postId);
+      const targetComment: any | undefined = targetPost?.comments?.find((c: any) => c._id === commentId);
+      const currentUserId = user?._id?.toString();
+
+      if (!targetComment || targetComment?.author?._id?.toString() !== currentUserId) {
+        toast({
+          title: "Not allowed",
+          description: "You can only delete your own comments.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      await postsApi.deleteComment(postId, commentId);
+      
+      // Update the posts state to remove the deleted comment
+      setPosts(prevPosts => 
+        prevPosts.map(post => 
+          post._id === postId 
+            ? {
+                ...post,
+                comments: post.comments?.filter(comment => comment._id !== commentId) || []
+              }
+            : post
+        )
+      );
+      
+      setOriginalPosts(prevPosts => 
+        prevPosts.map(post => 
+          post._id === postId 
+            ? {
+                ...post,
+                comments: post.comments?.filter(comment => comment._id !== commentId) || []
+              }
+            : post
+        )
+      );
+      
+      toast({
+        title: "Comment deleted",
+        description: "Your comment has been deleted successfully.",
+      });
+    } catch (error) {
+      console.error('Error deleting comment:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete comment. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
 
   // Handle post deletion
   const handlePostDeleted = useCallback(async (postId: string) => {
@@ -400,6 +456,27 @@ const PostFeed: React.FC = () => {
     console.log('Edit post:', postId);
   }, []);
 
+  // Handle post share
+  const handlePostShare = useCallback((postId: string) => {
+    const post = posts.find(p => p._id === postId);
+    if (post) {
+      const shareUrl = `${window.location.origin}/post/${postId}`;
+      if (navigator.share) {
+        navigator.share({
+          title: `${post.author?.name} - ${post.postType} Post`,
+          text: post.content || 'Check out this post!',
+          url: shareUrl
+        });
+      } else {
+        navigator.clipboard.writeText(shareUrl);
+        toast({
+          title: "Link copied!",
+          description: "Post link has been copied to clipboard.",
+        });
+      }
+    }
+  }, [posts, toast]);
+
   // Handle comments toggle
   const handleToggleComments = useCallback((postId: string) => {
     setShowComments(prev => ({
@@ -464,13 +541,23 @@ const PostFeed: React.FC = () => {
           <p className="text-gray-600 dark:text-gray-400 mb-6">
             Be the first to share something with your alumni network!
           </p>
-                              <Button
-            onClick={handleRefresh}
-                            className="w-full"
-                          >
-                            <Plus className="h-4 w-4 mr-2" />
-            Refresh Posts
-                          </Button>
+          <div className="flex flex-col sm:flex-row gap-3">
+            <Button
+              onClick={() => navigate('/create-post')}
+              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Create Your First Post
+            </Button>
+            <Button
+              onClick={handleRefresh}
+              variant="outline"
+              className="flex-1"
+            >
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Refresh Posts
+            </Button>
+          </div>
                       </div>
                     </div>
     );
@@ -560,12 +647,15 @@ const PostFeed: React.FC = () => {
                 onComment={handleCommentAdded}
                 onEdit={undefined}
                 onDelete={handlePostDeleted}
+                onDeleteComment={handleDeleteComment}
+                onShare={handlePostShare}
                 showComments={showCommentsForPost}
                 onToggleComments={() => handleToggleComments(post._id)}
                 commentsCount={commentsCount}
                 isLiked={isLiked}
                 onPollVote={handlePollVote}
-                showDeleteButton={post.author?._id === user?._id}
+                showDeleteButton={showDeleteButton && post.author?._id === user?._id}
+                showShareButton={true}
               />
             </div>
           );
@@ -585,6 +675,9 @@ const PostFeed: React.FC = () => {
         <div className="text-center py-4">
           <p className="text-gray-500 dark:text-gray-400">
             You've reached the end of all posts
+          </p>
+          <p className="text-sm text-gray-400 dark:text-gray-500 mt-1">
+            Scroll up to see more posts
           </p>
         </div>
       )}

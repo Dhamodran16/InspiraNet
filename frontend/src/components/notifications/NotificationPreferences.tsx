@@ -1,15 +1,26 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Bell, MessageCircle, Calendar, Users, Briefcase, Mail, Smartphone, Globe } from 'lucide-react';
-import { notificationService, NotificationPreferences } from '@/services/notificationService';
+import notificationService, { NotificationSettings } from '@/services/notificationService';
+import { socketService } from '@/services/socketService';
 import { toast } from '@/hooks/use-toast';
 
+type NotificationPreferencesType = {
+  browserNotifications: boolean;
+  emailNotifications: boolean;
+  pushNotifications: boolean;
+  messageNotifications: boolean;
+  eventReminders: boolean;
+  placementUpdates: boolean;
+  connectionRequests: boolean;
+};
+
 export default function NotificationPreferences() {
-  const [preferences, setPreferences] = useState<NotificationPreferences>({
+  const [preferences, setPreferences] = useState<NotificationPreferencesType>({
     browserNotifications: true,
     emailNotifications: true,
     pushNotifications: true,
@@ -19,41 +30,161 @@ export default function NotificationPreferences() {
     connectionRequests: true
   });
   const [isLoading, setIsLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [permissionStatus, setPermissionStatus] = useState<NotificationPermission>('default');
+  const [settings, setSettings] = useState<NotificationSettings | null>(null);
+
+  // Load settings from backend
+  const loadSettings = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      const response = await notificationService.getSettings();
+      // Handle both response structures: { settings } or { success: true, settings }
+      const userSettings = (response as any).settings || response;
+      
+      if (userSettings) {
+        setSettings(userSettings as NotificationSettings);
+        
+        // Map backend settings to local preferences
+        setPreferences({
+          browserNotifications: userSettings.communication?.pushNotifications || false,
+          emailNotifications: userSettings.communication?.emailNotifications || false,
+          pushNotifications: userSettings.communication?.pushNotifications || false,
+          messageNotifications: userSettings.notifications?.newMessages || false,
+          eventReminders: userSettings.notifications?.eventReminders || false,
+          placementUpdates: userSettings.notifications?.jobUpdates || false,
+          connectionRequests: userSettings.notifications?.followRequests || false
+        });
+      }
+    } catch (error: any) {
+      console.error('Error loading notification settings:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load notification preferences",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    // Load current preferences
-    const currentPreferences = notificationService.getPreferences();
-    setPreferences(currentPreferences);
+    loadSettings();
 
     // Check notification permission status
     if ('Notification' in window) {
       setPermissionStatus(Notification.permission);
     }
-  }, []);
 
-  const handlePreferenceChange = (key: keyof NotificationPreferences, value: boolean) => {
+    // Listen for real-time settings updates
+    const handleSettingsUpdate = (data: { settings: NotificationSettings }) => {
+      if (data.settings) {
+        setSettings(data.settings);
+        // Update local preferences from real-time update
+        setPreferences({
+          browserNotifications: data.settings.communication.pushNotifications || false,
+          emailNotifications: data.settings.communication.emailNotifications || false,
+          pushNotifications: data.settings.communication.pushNotifications || false,
+          messageNotifications: data.settings.notifications.newMessages || false,
+          eventReminders: data.settings.notifications.eventReminders || false,
+          placementUpdates: data.settings.notifications.jobUpdates || false,
+          connectionRequests: data.settings.notifications.followRequests || false
+        });
+        toast({
+          title: "Settings Updated",
+          description: "Notification preferences updated in real-time",
+        });
+      }
+    };
+
+    socketService.on('settings_updated', handleSettingsUpdate);
+
+    return () => {
+      socketService.off('settings_updated', handleSettingsUpdate);
+    };
+  }, [loadSettings]);
+
+  const handlePreferenceChange = async (key: keyof NotificationPreferencesType, value: boolean) => {
     const newPreferences = { ...preferences, [key]: value };
     setPreferences(newPreferences);
-    notificationService.updatePreferences(newPreferences);
+    
+    try {
+      setIsSaving(true);
+      
+      // Map local preferences to backend settings structure
+      const updateData: Partial<NotificationSettings> = {};
+      
+      if (key === 'emailNotifications') {
+        updateData.communication = {
+          ...(settings?.communication || {}),
+          emailNotifications: value
+        } as any;
+      } else if (key === 'pushNotifications' || key === 'browserNotifications') {
+        updateData.communication = {
+          ...(settings?.communication || {}),
+          pushNotifications: value
+        } as any;
+      } else if (key === 'messageNotifications') {
+        updateData.notifications = {
+          ...(settings?.notifications || {}),
+          newMessages: value
+        } as any;
+      } else if (key === 'eventReminders') {
+        updateData.notifications = {
+          ...(settings?.notifications || {}),
+          eventReminders: value
+        } as any;
+      } else if (key === 'placementUpdates') {
+        updateData.notifications = {
+          ...(settings?.notifications || {}),
+          jobUpdates: value
+        } as any;
+      } else if (key === 'connectionRequests') {
+        updateData.notifications = {
+          ...(settings?.notifications || {}),
+          followRequests: value
+        } as any;
+      }
+
+      await notificationService.updateSettings(updateData);
+      
+      toast({
+        title: "Success",
+        description: "Notification preferences updated",
+      });
+    } catch (error: any) {
+      console.error('Error updating preferences:', error);
+      toast({
+        title: "Error",
+        description: error.response?.data?.error || "Failed to update preferences",
+        variant: "destructive"
+      });
+      // Revert on error
+      setPreferences(preferences);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleRequestPermission = async () => {
     setIsLoading(true);
     try {
-      const granted = await notificationService.requestPermission();
-      if (granted) {
-        setPermissionStatus('granted');
-        toast({
-          title: "Permission Granted",
-          description: "You can now receive browser notifications",
-        });
-      } else {
-        toast({
-          title: "Permission Denied",
-          description: "Browser notifications are disabled. You can enable them in your browser settings.",
-          variant: "destructive"
-        });
+      if ('Notification' in window) {
+        const permission = await Notification.requestPermission();
+        setPermissionStatus(permission);
+        
+        if (permission === 'granted') {
+          toast({
+            title: "Permission Granted",
+            description: "You can now receive browser notifications",
+          });
+        } else {
+          toast({
+            title: "Permission Denied",
+            description: "Browser notifications are disabled. You can enable them in your browser settings.",
+            variant: "destructive"
+          });
+        }
       }
     } catch (error) {
       toast({
@@ -68,16 +199,22 @@ export default function NotificationPreferences() {
 
   const handleTestNotification = async () => {
     try {
-      await notificationService.sendNotification({
-        title: "Test Notification",
-        message: "This is a test notification to verify your settings are working correctly.",
-        type: "info",
-        category: "system"
-      });
-      toast({
-        title: "Test Sent",
-        description: "Test notification sent successfully",
-      });
+      if ('Notification' in window && Notification.permission === 'granted') {
+        new Notification("Test Notification", {
+          body: "This is a test notification to verify your settings are working correctly.",
+          icon: "/favicon.ico"
+        });
+        toast({
+          title: "Test Sent",
+          description: "Test notification sent successfully",
+        });
+      } else {
+        toast({
+          title: "Permission Required",
+          description: "Please grant notification permission first",
+          variant: "destructive"
+        });
+      }
     } catch (error) {
       toast({
         title: "Error",

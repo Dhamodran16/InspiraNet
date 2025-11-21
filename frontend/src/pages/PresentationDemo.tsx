@@ -1,5 +1,4 @@
 import React from 'react';
-import RealTimeCounters from '../components/RealTimeCounters';
 
 const PresentationDemo: React.FC = () => {
   return (
@@ -20,8 +19,11 @@ const PresentationDemo: React.FC = () => {
           </div>
         </div>
 
-        {/* Real-time Counters */}
-        <RealTimeCounters />
+        {/* Real-time Counters - Component removed */}
+        <div className="text-center p-8 bg-white rounded-lg shadow-md">
+          <h2 className="text-2xl font-bold mb-4">Real-time Statistics</h2>
+          <p className="text-gray-600">Component temporarily unavailable</p>
+        </div>
 
         {/* Features Section */}
         <div className="mt-16 grid grid-cols-1 md:grid-cols-3 gap-8">

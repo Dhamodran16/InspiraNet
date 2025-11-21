@@ -13,12 +13,15 @@ interface EventPostProps {
   onComment: (postId: string, commentContent: string) => void;
   onEdit?: (postId: string) => void;
   onDelete: (postId: string) => void;
+  onDeleteComment?: (postId: string, commentId: string) => void;
+  onShare?: (postId: string) => void;
   showComments: boolean;
   onToggleComments: () => void;
   commentsCount: number;
   likesCount: number;
   isLiked: boolean;
   showDeleteButton?: boolean;
+  showShareButton?: boolean;
 }
 
 // Utility function to determine Instagram-style aspect ratio
@@ -41,12 +44,15 @@ export default function EventPost({
   onComment,
   onEdit,
   onDelete,
+  onDeleteComment,
+  onShare,
   showComments,
   onToggleComments,
   commentsCount,
   likesCount,
   isLiked,
-  showDeleteButton = false
+  showDeleteButton = false,
+  showShareButton = true
 }: EventPostProps) {
   const [imageDimensions, setImageDimensions] = useState<{ [key: string]: { width: number; height: number } }>({});
 
@@ -83,7 +89,7 @@ export default function EventPost({
       const aspectRatio = getImageAspectRatio(mediaUrl);
       
       return (
-        <div className={`w-full max-w-[1080px] ${aspectRatio} overflow-hidden rounded-xl mx-auto`}>
+        <div className={`w-full max-w-4xl ${aspectRatio} overflow-hidden rounded-xl mx-auto`}>
           <img 
             src={mediaUrl} 
             alt="Event image"
@@ -95,7 +101,7 @@ export default function EventPost({
       );
     } else if (['mp4', 'avi', 'mov', 'webm'].includes(fileExtension || '')) {
       return (
-        <div className="w-full max-w-[1080px] aspect-video overflow-hidden rounded-xl mx-auto">
+        <div className="w-full max-w-4xl aspect-video overflow-hidden rounded-xl mx-auto">
           <video 
             src={mediaUrl} 
             controls
@@ -106,7 +112,7 @@ export default function EventPost({
       );
     } else if (['pdf'].includes(fileExtension || '')) {
       return (
-        <div className="w-full max-w-[1080px] aspect-[4/5] overflow-hidden rounded-xl mx-auto">
+        <div className="w-full max-w-4xl aspect-[4/5] overflow-hidden rounded-xl mx-auto">
           <div className="w-full h-full bg-muted rounded-xl flex items-center justify-center border-2 border-dashed border-border hover:border-primary transition-colors">
             <div className="text-center">
               <File className="mx-auto mb-2 text-foreground" size={32} />
@@ -222,126 +228,141 @@ export default function EventPost({
   };
 
   return (
-    <BasePost
-      post={post}
-      user={user}
-      onLike={onLike}
-      onComment={onComment}
-      onEdit={onEdit}
-      onDelete={onDelete}
-      showComments={showComments}
-      onToggleComments={onToggleComments}
-      commentsCount={commentsCount}
-      likesCount={likesCount}
-      isLiked={isLiked}
-      showDeleteButton={showDeleteButton}
-      postTypeLabel="📅 Event"
-      postTypeIcon="📅"
-    >
-      {/* Event Details */}
-      {post.eventDetails && (
-        <div className="space-y-4 p-4 bg-blue-50 dark:bg-blue-900/10 rounded-lg border border-blue-200 dark:border-blue-800">
-          {/* Event Status */}
-        <div className="flex items-center justify-between">
-            <Badge className={getEventStatusColor()}>
-                {getEventStatusText()}
-            </Badge>
-            {post.eventDetails.recurring && (
-              <Badge variant="outline" className="flex items-center gap-1">
-                <Repeat className="h-3 w-3" />
-                Recurring
-              </Badge>
-            )}
+            <BasePost
+              post={post}
+              user={user}
+              onLike={onLike}
+              onComment={onComment}
+              onEdit={onEdit}
+              onDelete={onDelete}
+              onDeleteComment={onDeleteComment}
+              onShare={onShare}
+              showComments={showComments}
+              onToggleComments={onToggleComments}
+              commentsCount={commentsCount}
+              isLiked={isLiked}
+              showDeleteButton={showDeleteButton}
+              showShareButton={showShareButton}
+              postTypeLabel="📅 Event"
+              postTypeIcon="📅"
+            >
+      {/* Images First - Media Content */}
+      {post.media && post.media.length > 0 && (
+        <div className="px-4 pt-4">
+          <div className="space-y-3">
+            {post.media.map((mediaItem, index) => (
+              <div key={index} className="w-full">
+                {renderMedia(mediaItem)}
+              </div>
+            ))}
           </div>
+        </div>
+      )}
 
-          {/* Event Date and Time */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="flex items-center space-x-2">
-              <Calendar className="h-5 w-5 text-blue-600" />
-                  <div>
-                <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Date</p>
-                <p className="text-sm text-gray-600 dark:text-gray-400">{formatEventDate(post.eventDetails.date)}</p>
-                  </div>
-                </div>
-                
-                {post.eventDetails.time && (
-                  <div className="flex items-center space-x-2">
-                <Clock className="h-5 w-5 text-blue-600" />
-                    <div>
-                  <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Time</p>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">{formatEventTime(post.eventDetails.time)}</p>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-          {/* Event Location and Attendance */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {post.eventDetails.location && (
-                  <div className="flex items-center space-x-2">
-                <MapPin className="h-5 w-5 text-blue-600" />
-                    <div>
-                  <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Location</p>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">{post.eventDetails.location}</p>
-                    </div>
-                  </div>
-                )}
-                
-                  <div className="flex items-center space-x-2">
-              <Users className="h-5 w-5 text-blue-600" />
-              <div>
-                <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Attendance</p>
-                <div className="text-sm text-gray-600 dark:text-gray-400">
-                  {post.eventDetails.attendanceMode ? (
-                    <Badge className={getAttendanceModeColor(post.eventDetails.attendanceMode)}>
-                    {getAttendanceModeIcon(post.eventDetails.attendanceMode)}
-                      {post.eventDetails.attendanceMode.charAt(0).toUpperCase() + post.eventDetails.attendanceMode.slice(1)}
-                    </Badge>
-                  ) : 'Not specified'}
-                    </div>
-                  </div>
-              </div>
+      {/* Event Details Below Images */}
+      {post.eventDetails && (
+        <div className="px-4 py-3">
+          <div className="space-y-4 p-4 bg-blue-50 dark:bg-blue-900/10 rounded-lg border border-blue-200 dark:border-blue-800">
+            {/* Event Status */}
+            <div className="flex items-center justify-between">
+              <Badge className={getEventStatusColor()}>
+                {getEventStatusText()}
+              </Badge>
+              {post.eventDetails.recurring && (
+                <Badge variant="outline" className="flex items-center gap-1">
+                  <Repeat className="h-3 w-3" />
+                  Recurring
+                </Badge>
+              )}
             </div>
 
-          {/* Max Attendees */}
-              {post.eventDetails.maxAttendees && (
+            {/* Event Date and Time */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="flex items-center space-x-2">
+                <Calendar className="h-5 w-5 text-blue-600" />
+                <div>
+                  <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Date</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">{formatEventDate(post.eventDetails.date)}</p>
+                </div>
+              </div>
+              
+              {post.eventDetails.time && (
                 <div className="flex items-center space-x-2">
-              <Users2 className="h-5 w-5 text-blue-600" />
+                  <Clock className="h-5 w-5 text-blue-600" />
                   <div>
-                <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Max Attendees</p>
-                <p className="text-sm text-gray-600 dark:text-gray-400">{post.eventDetails.maxAttendees}</p>
+                    <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Time</p>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">{formatEventTime(post.eventDetails.time)}</p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Event Location and Attendance */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {post.eventDetails.location && (
+                <div className="flex items-center space-x-2">
+                  <MapPin className="h-5 w-5 text-blue-600" />
+                  <div>
+                    <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Location</p>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">{post.eventDetails.location}</p>
                   </div>
                 </div>
               )}
               
-          {/* Registration Form */}
-          {post.eventDetails.registrationForm && (
-                <div className="flex items-center space-x-2">
-              <Link className="h-5 w-5 text-blue-600" />
-              <div>
-                <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Registration</p>
-                <a 
-                  href={post.eventDetails.registrationForm}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 text-sm underline"
-                >
-                  Register for Event
-                </a>
+              <div className="flex items-center space-x-2">
+                <Users className="h-5 w-5 text-blue-600" />
+                <div>
+                  <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Attendance</p>
+                  <div className="text-sm text-gray-600 dark:text-gray-400">
+                    {post.eventDetails.attendanceMode ? (
+                      <Badge className={getAttendanceModeColor(post.eventDetails.attendanceMode)}>
+                        {getAttendanceModeIcon(post.eventDetails.attendanceMode)}
+                        {post.eventDetails.attendanceMode.charAt(0).toUpperCase() + post.eventDetails.attendanceMode.slice(1)}
+                      </Badge>
+                    ) : 'Not specified'}
+                  </div>
+                </div>
               </div>
+            </div>
+
+            {/* Max Attendees */}
+            {post.eventDetails.maxAttendees && (
+              <div className="flex items-center space-x-2">
+                <Users2 className="h-5 w-5 text-blue-600" />
+                <div>
+                  <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Max Attendees</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">{post.eventDetails.maxAttendees}</p>
+                </div>
+              </div>
+            )}
+            
+            {/* Registration Form */}
+            {post.eventDetails.registrationForm && (
+              <div className="flex items-center space-x-2">
+                <Link className="h-5 w-5 text-blue-600" />
+                <div>
+                  <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Registration</p>
+                  <a 
+                    href={post.eventDetails.registrationForm}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 text-sm underline"
+                  >
+                    Register for Event
+                  </a>
+                </div>
+              </div>
+            )}
           </div>
-        )}
         </div>
       )}
 
-      {/* Media Content */}
-      {post.media && post.media.length > 0 && (
-        <div className="space-y-3">
-          {post.media.map((mediaItem, index) => (
-            <div key={index} className="w-full">
-              {renderMedia(mediaItem)}
-            </div>
-          ))}
+      {/* Post Content Below Event Details */}
+      {post.content && (
+        <div className="px-4 py-3">
+          <p className="text-gray-900 dark:text-gray-100 whitespace-pre-wrap">
+            {post.content}
+          </p>
         </div>
       )}
     </BasePost>

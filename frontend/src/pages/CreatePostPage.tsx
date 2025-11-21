@@ -208,6 +208,36 @@ const CreatePostPage: React.FC = () => {
     }));
   };
 
+  // Calculate form completion percentage
+  const getFormCompletionPercentage = (): number => {
+    let completed = 0;
+    let total = 0;
+
+    // Content is always required
+    total += 1;
+    if (getCurrentContent().trim()) completed += 1;
+
+    // Type-specific requirements
+    if (postType === 'event') {
+      total += 3;
+      if (eventDetails.title.trim()) completed += 1;
+      if (eventDetails.date) completed += 1;
+      if (eventDetails.location.trim()) completed += 1;
+    } else if (postType === 'job') {
+      total += 3;
+      if (jobDetails.title.trim()) completed += 1;
+      if (jobDetails.company.trim()) completed += 1;
+      if (jobDetails.location.trim()) completed += 1;
+    } else if (postType === 'poll') {
+      total += 2;
+      if (pollDetails.question.trim()) completed += 1;
+      const validOptions = pollDetails.options.filter(opt => opt.trim());
+      if (validOptions.length >= 2) completed += 1;
+    }
+
+    return total > 0 ? Math.round((completed / total) * 100) : 0;
+  };
+
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files || []);
     
@@ -386,6 +416,7 @@ const CreatePostPage: React.FC = () => {
   };
 
   const validateForm = (): boolean => {
+    // Content validation
     if (!getCurrentContent().trim()) {
       toast({
         title: "Content required",
@@ -395,33 +426,87 @@ const CreatePostPage: React.FC = () => {
       return false;
     }
 
+    // Content length validation
+    if (getCurrentContent().length > 2000) {
+      toast({
+        title: "Content too long",
+        description: "Please keep your post under 2000 characters.",
+        variant: "destructive"
+      });
+      return false;
+    }
+
+    // Event validation
     if (postType === 'event') {
-      if (!eventDetails.title.trim() || !eventDetails.date || !eventDetails.location) {
+      if (!eventDetails.title.trim()) {
         toast({
-          title: "Event details required",
-          description: "Please fill in all required event fields.",
+          title: "Event title required",
+          description: "Please enter an event title.",
+          variant: "destructive"
+        });
+        return false;
+      }
+      if (!eventDetails.date) {
+        toast({
+          title: "Event date required",
+          description: "Please select an event date.",
+          variant: "destructive"
+        });
+        return false;
+      }
+      if (!eventDetails.location.trim()) {
+        toast({
+          title: "Event location required",
+          description: "Please enter the event location.",
           variant: "destructive"
         });
         return false;
       }
     }
 
+    // Job validation
     if (postType === 'job') {
-      if (!jobDetails.title.trim() || !jobDetails.company || !jobDetails.location) {
+      if (!jobDetails.title.trim()) {
         toast({
-          title: "Job details required",
-          description: "Please fill in all required job fields.",
+          title: "Job title required",
+          description: "Please enter a job title.",
+          variant: "destructive"
+        });
+        return false;
+      }
+      if (!jobDetails.company.trim()) {
+        toast({
+          title: "Company name required",
+          description: "Please enter the company name.",
+          variant: "destructive"
+        });
+        return false;
+      }
+      if (!jobDetails.location.trim()) {
+        toast({
+          title: "Job location required",
+          description: "Please enter the job location.",
           variant: "destructive"
         });
         return false;
       }
     }
 
+    // Poll validation
     if (postType === 'poll') {
-      if (!pollDetails.question.trim() || pollDetails.options.some(opt => !opt.trim())) {
+      if (!pollDetails.question.trim()) {
         toast({
-          title: "Poll details required",
-          description: "Please fill in the question and all options.",
+          title: "Poll question required",
+          description: "Please enter a poll question.",
+          variant: "destructive"
+        });
+        return false;
+      }
+      const validOptions = pollDetails.options.filter(opt => opt.trim());
+      if (validOptions.length < 2) {
+        toast({
+          title: "Poll options required",
+          description: "Please provide at least 2 poll options.",
           variant: "destructive"
         });
         return false;
@@ -493,8 +578,8 @@ const CreatePostPage: React.FC = () => {
       });
       
       toast({
-        title: "Post created successfully!",
-        description: "Your post has been published.",
+        title: "🎉 Post created successfully!",
+        description: `Your ${postType} post has been shared with the network.`,
       });
       
       navigate('/dashboard');
@@ -570,7 +655,7 @@ const CreatePostPage: React.FC = () => {
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 sm:gap-6 lg:gap-8">
           {/* Main Form */}
           <div ref={formRef} className="lg:col-span-3">
-            <Card className="backdrop-blur-sm bg-white/80 dark:bg-slate-800/80 border-0 shadow-2xl max-h-[calc(100vh-280px)] overflow-y-auto create-post-scroll">
+            <Card className="backdrop-blur-sm bg-white/80 dark:bg-slate-800/80 border-0 shadow-2xl create-post-scroll">
               <CardHeader className="pb-6">
                 <CardTitle className="flex flex-col sm:flex-row items-start sm:items-center gap-3 text-xl sm:text-2xl">
                   <div className="flex items-center gap-3">
@@ -605,15 +690,15 @@ const CreatePostPage: React.FC = () => {
                               : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600'
                           }`}
                         >
-                          <div className="flex flex-col items-center gap-2">
+                          <div className="flex flex-col items-center gap-2 relative z-10">
                             <div className={`p-3 rounded-lg transition-all duration-300 ${isSelected ? `bg-${type.color}-500 scale-110` : 'bg-slate-100 dark:bg-slate-700 group-hover:scale-105'}`}>
                               <Icon className={`h-6 w-6 transition-colors ${isSelected ? 'text-white' : 'text-slate-600 dark:text-slate-400'}`} />
                             </div>
                             <div className="text-center">
-                              <span className={`font-semibold text-sm block ${isSelected ? `text-${type.color}-700 dark:text-${type.color}-300` : 'text-slate-700 dark:text-slate-300'}`}>
+                              <span className={`font-semibold text-sm block transition-colors duration-300 ${isSelected ? `text-${type.color}-700 dark:text-${type.color}-300` : 'text-slate-700 dark:text-slate-300'}`}>
                                 {type.label}
                               </span>
-                              <span className={`text-xs ${isSelected ? `text-${type.color}-600 dark:text-${type.color}-400` : 'text-slate-500 dark:text-slate-400'}`}>
+                              <span className={`text-xs transition-colors duration-300 ${isSelected ? `text-${type.color}-600 dark:text-${type.color}-400` : 'text-slate-500 dark:text-slate-400'}`}>
                                 {type.desc}
                               </span>
                             </div>
@@ -655,14 +740,34 @@ const CreatePostPage: React.FC = () => {
                       <Zap className="h-4 w-4 text-yellow-500" />
                       <span>Make it engaging and meaningful for your network</span>
                     </div>
-                                         <div className="flex items-center gap-2">
-                       {getCurrentContent().length > 0 && (
-                         <div className="flex items-center gap-1 text-xs text-green-600 dark:text-green-400">
-                           <CheckCircle className="h-3 w-3" />
-                           <span>Ready to post</span>
-                         </div>
-                       )}
-                     </div>
+                    <div className="flex items-center gap-2">
+                      {/* Content length indicator */}
+                      <div className={`flex items-center gap-1 text-xs ${
+                        getCurrentContent().length > 1800 
+                          ? 'text-red-600 dark:text-red-400' 
+                          : getCurrentContent().length > 1500 
+                            ? 'text-yellow-600 dark:text-yellow-400'
+                            : 'text-slate-500 dark:text-slate-400'
+                      }`}>
+                        <span>{getCurrentContent().length}/2000</span>
+                      </div>
+                      
+                      {/* Ready to post indicator */}
+                      {getCurrentContent().length > 0 && getCurrentContent().length <= 2000 && (
+                        <div className="flex items-center gap-1 text-xs text-green-600 dark:text-green-400">
+                          <CheckCircle className="h-3 w-3" />
+                          <span>Ready to post</span>
+                        </div>
+                      )}
+                      
+                      {/* Content too long warning */}
+                      {getCurrentContent().length > 2000 && (
+                        <div className="flex items-center gap-1 text-xs text-red-600 dark:text-red-400">
+                          <AlertCircle className="h-3 w-3" />
+                          <span>Too long</span>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
 
@@ -1099,7 +1204,7 @@ const CreatePostPage: React.FC = () => {
                                      <Button
                      type="button"
                      onClick={handleSubmit}
-                     disabled={isLoading || !getCurrentContent().trim()}
+                     disabled={isLoading || getFormCompletionPercentage() < 100 || getCurrentContent().length > 2000}
                      className="submit-button flex-1 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold py-3 sm:py-4 text-base sm:text-lg shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none relative overflow-hidden group"
                    >
                     <div className="absolute inset-0 bg-gradient-to-r from-blue-400 to-purple-400 opacity-0 group-hover:opacity-20 transition-opacity duration-300"></div>
@@ -1132,16 +1237,18 @@ const CreatePostPage: React.FC = () => {
                                  <div className="mt-4 space-y-2">
                    <div className="flex items-center justify-between text-sm text-slate-600 dark:text-slate-400">
                      <span>Post Progress</span>
-                     <span>{getCurrentContent().trim() ? 'Ready' : 'Add content to continue'}</span>
+                     <span>{getFormCompletionPercentage()}% Complete</span>
                    </div>
                    <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2">
                      <div 
                        className={`h-2 rounded-full transition-all duration-500 ${
-                         getCurrentContent().trim() 
+                         getFormCompletionPercentage() === 100
                            ? 'bg-gradient-to-r from-green-500 to-blue-500' 
-                           : 'bg-slate-300 dark:bg-slate-600'
+                           : getFormCompletionPercentage() > 50
+                             ? 'bg-gradient-to-r from-yellow-500 to-orange-500'
+                             : 'bg-gradient-to-r from-slate-400 to-slate-500'
                        }`}
-                       style={{ width: getCurrentContent().trim() ? '100%' : '0%' }}
+                       style={{ width: `${getFormCompletionPercentage()}%` }}
                      ></div>
                    </div>
                  </div>
@@ -1172,7 +1279,7 @@ const CreatePostPage: React.FC = () => {
           </div>
 
           {/* Sidebar */}
-          <div ref={sidebarRef} className="lg:col-span-1 space-y-4 lg:space-y-6 max-h-[calc(100vh-280px)] overflow-y-auto create-post-scroll">
+          <div ref={sidebarRef} className="lg:col-span-1 space-y-4 lg:space-y-6 create-post-scroll">
             {/* User Info */}
             <Card className="backdrop-blur-sm bg-white/80 dark:bg-slate-800/80 border-0 shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:scale-105 hidden lg:block">
               <CardHeader>

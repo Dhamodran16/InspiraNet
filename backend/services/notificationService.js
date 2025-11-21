@@ -336,12 +336,43 @@ class NotificationService {
     try {
       const notification = await Notification.findOneAndUpdate(
         { _id: notificationId, recipientId: userId },
-        { isRead: true },
+        { isRead: true, readAt: new Date() },
         { new: true }
-      );
+      ).populate('senderId', 'name avatar type department');
+
       return notification;
     } catch (error) {
       console.error('Error marking notification as read:', error);
+      throw error;
+    }
+  }
+
+  // Mark all notifications as read
+  static async markAllAsRead(userId) {
+    try {
+      const result = await Notification.updateMany(
+        { recipientId: userId, isRead: false },
+        { isRead: true, readAt: new Date() }
+      );
+
+      return result;
+    } catch (error) {
+      console.error('Error marking all notifications as read:', error);
+      throw error;
+    }
+  }
+
+  // Delete notification
+  static async deleteNotification(notificationId, userId) {
+    try {
+      const notification = await Notification.findOneAndDelete({
+        _id: notificationId,
+        recipientId: userId
+      });
+
+      return notification;
+    } catch (error) {
+      console.error('Error deleting notification:', error);
       throw error;
     }
   }

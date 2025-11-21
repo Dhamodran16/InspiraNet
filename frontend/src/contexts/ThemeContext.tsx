@@ -16,10 +16,14 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [isDark, setIsDark] = useState(false);
 
   useEffect(() => {
-    // Load theme from localStorage
+    // Load theme from localStorage, but default to 'system' if not set
     const savedTheme = localStorage.getItem('theme') as Theme;
     if (savedTheme && ['light', 'dark', 'system'].includes(savedTheme)) {
       setTheme(savedTheme);
+    } else {
+      // Default to 'system' (Auto) on first load
+      setTheme('system');
+      localStorage.setItem('theme', 'system');
     }
   }, []);
 

@@ -10,7 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { ArrowLeft, Building, MapPin, Briefcase, GraduationCap, Calendar, Globe, Github, Linkedin, Twitter, Users, MessageSquare, Save, X, Mail, Edit } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from '@/hooks/use-toast';
-import PostFeed from '@/components/posts/PostFeed';
+import UserPostsFeed from '@/components/posts/UserPostsFeed';
 import api, { getUserStats } from '@/services/api';
 import { socketService } from '@/services/socketService';
 
@@ -18,7 +18,7 @@ interface UserProfile {
   _id: string;
   name: string;
 	email: { college?: string; personal?: string };
-  type: 'alumni' | 'student' | 'teacher';
+  type: 'alumni' | 'student' | 'teacher' | 'faculty';
 	batch?: string;
 	department?: string;
 	company?: string;
@@ -31,20 +31,30 @@ interface UserProfile {
 	socialLinks?: { linkedin?: string; github?: string; twitter?: string; website?: string };
 	skills?: string[];
 	interests?: string[];
-	achievements?: Array<{ title: string; description: string; date: string; certificate?: string }>;
+	studentInfo?: {
+		batch?: string;
+		department?: string;
+		graduationYear?: string;
+	};
+	alumniInfo?: {
+		graduationYear?: number;
+		currentCompany?: string;
+		jobTitle?: string;
+	};
+	
 	education?: Array<{ degree: string; institution: string; year: string; gpa?: string }>;
 	workExperience?: Array<{ company: string; position: string; startDate: string; endDate?: string; current: boolean; description?: string }>;
 	createdAt?: string;
 }
 
-interface ProfileStats { posts: number; connections: number; events: number; achievements: number }
+interface ProfileStats { posts: number; connections: number; events: number }
 
 interface ProfileViewProps { profileUserId?: string }
 
 export default function ProfileView({ profileUserId }: ProfileViewProps) {
   const { user: currentUser } = useAuth();
   const [profile, setProfile] = useState<UserProfile | null>(null);
-	const [stats, setStats] = useState<ProfileStats>({ posts: 0, connections: 0, events: 0, achievements: 0 });
+	const [stats, setStats] = useState<ProfileStats>({ posts: 0, connections: 0, events: 0 });
   const [isLoading, setIsLoading] = useState(true);
   const [isOwnProfile, setIsOwnProfile] = useState(true);
 	const [isFollowing, setIsFollowing] = useState(false);
@@ -62,9 +72,27 @@ export default function ProfileView({ profileUserId }: ProfileViewProps) {
 
 	useEffect(() => {
 		if (!targetUserId) return;
+		console.log('🚀 ProfileView useEffect triggered');
+		console.log('👤 Current user:', currentUser?._id);
+		console.log('🎯 Target user ID:', targetUserId);
+		console.log('🔐 Is own profile:', isOwnProfileCheck);
+		console.log('🔗 API URL will be:', `/api/users/${targetUserId}/connections`);
+		
+		// Force refresh by clearing previous data
+		setStats({ posts: 0, connections: 0, events: 0 });
+		setConnections([]);
+		
 		loadProfile(targetUserId);
 		loadStats(targetUserId);
-		loadConnections(targetUserId);
+		// Load connections first, then stats will be updated based on actual connections
+		loadConnections(targetUserId).then(() => {
+			// Reload stats after connections are loaded to ensure consistency
+			setTimeout(() => {
+				loadStats(targetUserId);
+			}, 100);
+		}).catch((error) => {
+			console.error('❌ Error in loadConnections promise:', error);
+		});
 		if (!isOwnProfileCheck) checkFollowStatus(targetUserId);
 	}, [targetUserId, isOwnProfileCheck]);
 
@@ -72,8 +100,25 @@ export default function ProfileView({ profileUserId }: ProfileViewProps) {
 		if (!currentUser?._id) return;
 		const handleStatsUpdate = (updated: ProfileStats) => setStats(updated);
       socketService.onStatsUpdate(handleStatsUpdate);
-		return () => { socketService.offStatsUpdate(); };
-  }, [currentUser]);
+      
+      // Listen for follow status updates
+      const handleFollowStatusUpdate = (data: any) => {
+        console.log('🔄 Follow status update received:', data);
+        if (data.followerId === targetUserId || data.followeeId === targetUserId) {
+          console.log('🔄 Refreshing profile data due to follow status change');
+          // Refresh connections and stats
+          loadConnections(targetUserId);
+          loadStats(targetUserId);
+        }
+      };
+      
+      socketService.onFollowStatusUpdate(handleFollowStatusUpdate);
+      
+		return () => { 
+          socketService.offStatsUpdate();
+          socketService.offFollowStatusUpdate();
+        };
+  }, [currentUser, targetUserId]);
 
 	const loadProfile = async (id: string) => {
 		try {
@@ -88,17 +133,93 @@ export default function ProfileView({ profileUserId }: ProfileViewProps) {
 
 	const loadStats = async (id: string) => {
 		try {
+			console.log('📊 Loading stats for user:', id);
 			const data = await getUserStats(id);
+			console.log('📊 Stats received:', data);
 			setStats(data);
-		} catch {}
+		} catch (error) {
+			console.error('❌ Error loading stats:', error);
+		}
 	};
 
 	const loadConnections = async (id: string) => {
 		try {
 			setLoadingConnections(true);
+			console.log('🔍 Loading connections for user ID:', id);
+			console.log('🌐 API Base URL:', window.location.origin);
+			console.log('🔗 Full API URL:', `/api/users/${id}/connections`);
+			console.log('🔐 Auth token exists:', !!localStorage.getItem('authToken'));
+			
+			// Test the API call with more detailed error handling
 			const res = await api.get(`/api/users/${id}/connections`);
-			setConnections(res.data?.connections || []);
-		} catch { setConnections([]); } finally { setLoadingConnections(false); }
+			console.log('📡 Full API response:', res);
+			console.log('📊 Response data:', res.data);
+			console.log('👥 Mutual connections array:', res.data?.mutual);
+			console.log('📈 Mutual count:', res.data?.mutual?.length);
+			console.log('🔢 Counts object:', res.data?.counts);
+			console.log('✅ Response status:', res.status);
+			console.log('📋 Response headers:', res.headers);
+			
+			// Use mutual connections from the response
+			const mutualConnections = res.data?.mutual || [];
+			console.log('✅ Setting connections state with:', mutualConnections);
+			console.log('🔢 Final connections length:', mutualConnections.length);
+			
+			// Additional debugging for the data structure
+			if (res.data) {
+				console.log('📋 Full response structure:', JSON.stringify(res.data, null, 2));
+			}
+			
+			// If no mutual connections found, let's check if we have followers/following data
+			if (mutualConnections.length === 0) {
+				console.log('⚠️ No mutual connections found, checking followers/following data:');
+				console.log('👥 Followers:', res.data?.followers?.length || 0);
+				console.log('👤 Following:', res.data?.following?.length || 0);
+				console.log('🔢 Counts:', res.data?.counts);
+				
+				// Let's also check if the data structure is different
+				console.log('🔍 Checking alternative data paths:');
+				console.log('📊 res.data.mutual:', res.data?.mutual);
+				console.log('📊 res.data.mutualConnections:', res.data?.mutualConnections);
+				console.log('📊 res.data.connections:', res.data?.connections);
+				console.log('📊 res.data.data:', res.data?.data);
+				
+				// Try alternative data paths
+				const altMutual = res.data?.mutualConnections || res.data?.connections?.mutual || res.data?.data?.mutual || [];
+				if (altMutual.length > 0) {
+					console.log('✅ Found mutual connections in alternative path:', altMutual);
+					setConnections(altMutual);
+					return;
+				}
+			} else {
+				console.log('✅ Found mutual connections:', mutualConnections.length);
+				// Update stats to match the actual connections count
+				setStats(prevStats => ({
+					...prevStats,
+					connections: mutualConnections.length
+				}));
+				console.log('🔄 Updated stats with connections count:', mutualConnections.length);
+				
+				// Also update the stats in the backend to ensure consistency
+				if (mutualConnections.length !== res.data?.counts?.mutual) {
+					console.log('⚠️ Count mismatch detected:', {
+						frontend: mutualConnections.length,
+						backend: res.data?.counts?.mutual
+					});
+				}
+			}
+			
+			setConnections(mutualConnections);
+		} catch (error) { 
+			console.error('❌ Error loading connections:', error);
+			console.error('❌ Error details:', error.response?.data);
+			console.error('❌ Error status:', error.response?.status);
+			console.error('❌ Error config:', error.config);
+			console.error('❌ Full error object:', error);
+			setConnections([]); 
+		} finally { 
+			setLoadingConnections(false); 
+		}
 	};
 
 	const checkFollowStatus = async (id: string) => {
@@ -189,7 +310,11 @@ export default function ProfileView({ profileUserId }: ProfileViewProps) {
 								{/* Edit Profile functionality removed as requested */}
 								<h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">{profile.name}</h1>
 								<Badge variant="secondary" className="text-sm">{profile.type?.charAt(0).toUpperCase() + profile.type?.slice(1)}</Badge>
-								{profile.batch && <Badge variant="outline" className="text-sm">{profile.batch}</Badge>}
+								{(profile.batch || profile.studentInfo?.batch || (profile.type === 'alumni' && profile.alumniInfo?.graduationYear)) && (
+									<Badge variant="outline" className="text-sm">
+										Batch {profile.batch || profile.studentInfo?.batch || (profile.type === 'alumni' ? profile.alumniInfo?.graduationYear : '')}
+									</Badge>
+								)}
 							</div>
 
 							<div className="text-gray-600 dark:text-gray-400 space-y-1 mb-4">
@@ -247,16 +372,14 @@ export default function ProfileView({ profileUserId }: ProfileViewProps) {
 				<Card><CardContent className="p-4 text-center"><div className="text-2xl font-bold text-primary">{stats.posts}</div><p className="text-sm text-muted-foreground">Posts</p></CardContent></Card>
 				<Card><CardContent className="p-4 text-center"><div className="text-2xl font-bold text-primary">{stats.connections}</div><p className="text-sm text-muted-foreground">Connections</p></CardContent></Card>
 				<Card><CardContent className="p-4 text-center"><div className="text-2xl font-bold text-primary">{stats.events}</div><p className="text-sm text-muted-foreground">Events</p></CardContent></Card>
-				<Card><CardContent className="p-4 text-center"><div className="text-2xl font-bold text-primary">{stats.achievements}</div><p className="text-sm text-muted-foreground">Achievements</p></CardContent></Card>
+				
       </div>
 
       <Tabs defaultValue="overview" className="space-y-6">
-				<TabsList className="grid w-full grid-cols-5">
+				<TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="posts">Posts</TabsTrigger>
 					<TabsTrigger value="connections">Connections</TabsTrigger>
-          <TabsTrigger value="experience">Experience</TabsTrigger>
-          <TabsTrigger value="education">Education</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6">
@@ -313,7 +436,9 @@ export default function ProfileView({ profileUserId }: ProfileViewProps) {
           )}
         </TabsContent>
 
-				<TabsContent value="posts" className="space-y-4"><PostFeed /></TabsContent>
+				<TabsContent value="posts" className="space-y-4">
+          <UserPostsFeed userId={targetUserId || ''} showDeleteButton={isOwnProfile} />
+        </TabsContent>
 
 				<TabsContent value="connections" className="space-y-4">
           <Card>
@@ -326,66 +451,50 @@ export default function ProfileView({ profileUserId }: ProfileViewProps) {
 								</div>
 							) : connections.length > 0 ? (
 								<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-									{connections.map((c) => (
+									{connections.map((c) => {
+										console.log('🎨 Rendering connection:', c);
+										return (
 										<div key={c._id} className="flex items-center space-x-3 p-3 border rounded-lg">
 											<Avatar className="h-10 w-10"><AvatarImage src={c.avatar} alt={c.name} /><AvatarFallback>{c.name?.charAt(0)?.toUpperCase()}</AvatarFallback></Avatar>
 											<div className="flex-1 min-w-0">
 												<p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{c.name}</p>
-												<p className="text-xs text-gray-500 dark:text-gray-400 truncate">{c.designation} at {c.company}</p>
-												<p className="text-xs text-gray-500 dark:text-gray-400 truncate">{c.department} • {c.batch}</p>
+												<p className="text-xs text-gray-500 dark:text-gray-400 truncate capitalize">{c.type}</p>
+												{c.department && (
+													<p className="text-xs text-gray-500 dark:text-gray-400 truncate">{c.department}</p>
+												)}
+												{c.batch && (
+													<p className="text-xs text-gray-500 dark:text-gray-400 truncate">Batch {c.batch}</p>
+												)}
+												{c.company && (
+													<p className="text-xs text-gray-500 dark:text-gray-400 truncate">{c.company}</p>
+												)}
+												{(c.city || c.state || c.country) && (
+													<p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+														{[c.city, c.state, c.country].filter(Boolean).join(', ')}
+													</p>
+												)}
+												{c.skills && c.skills.length > 0 && (
+													<p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+														Skills: {c.skills.slice(0, 2).join(', ')}{c.skills.length > 2 ? '...' : ''}
+													</p>
+												)}
 											</div>
 											<Button variant="outline" size="sm" onClick={() => navigate(`/profile/${c._id}`)}>View Profile</Button>
 										</div>
-									))}
+										);
+									})}
 								</div>
 							) : (
-								<div className="text-center py-8">
+																	<div className="text-center py-8">
 									<Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
 									<p className="text-gray-500 dark:text-gray-400">{isOwnProfile ? "You haven't made any connections yet." : "This user hasn't made any connections yet."}</p>
-									{isOwnProfile && (<Button onClick={() => navigate('/dashboard?section=network')} className="mt-4">Explore Network</Button>)}
+									<p className="text-xs text-gray-400 mt-2">Debug: connections.length = {connections.length}</p>
 								</div>
 							)}
             </CardContent>
           </Card>
         </TabsContent>
 
-        <TabsContent value="experience" className="space-y-6">
-					{(profile.workExperience?.length || 0) > 0 ? (
-            <div className="space-y-4">
-							{profile.workExperience!.map((exp, i) => (
-								<Card key={i}>
-                  <CardContent className="p-6">
-                    <div className="flex justify-between items-start mb-4">
-                      <div>
-                        <h3 className="text-lg font-semibold">{exp.position}</h3>
-                        <p className="text-muted-foreground">{exp.company}</p>
-                      </div>
-                      <div className="text-right">
-												<p className="text-sm text-muted-foreground">{formatDate(exp.startDate)} - {exp.current ? 'Present' : exp.endDate ? formatDate(exp.endDate) : ''}</p>
-												{exp.current && (<Badge className="bg-green-100 text-green-800">Current</Badge>)}
-                      </div>
-                    </div>
-										{exp.description && (<p className="text-muted-foreground">{exp.description}</p>)}
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          ) : (
-						<Card><CardContent className="p-8 text-center text-muted-foreground"><Briefcase className="w-12 h-12 mx-auto mb-4 opacity-50" /><p>No work experience added yet.</p></CardContent></Card>
-          )}
-        </TabsContent>
-
-        <TabsContent value="education" className="space-y-6">
-					{(profile.education?.length || 0) > 0 ? (
-            <div className="space-y-4">
-							{profile.education!.map((edu, i) => (
-								<Card key={i}><CardContent className="p-6"><div className="flex justify-between items-start"><div><h3 className="text-lg font-semibold">{edu.degree}</h3><p className="text-muted-foreground">{edu.institution}</p>{edu.gpa && (<p className="text-sm text-muted-foreground">GPA: {edu.gpa}</p>)}</div><div className="text-right"><p className="text-muted-foreground">{edu.year}</p></div></div></CardContent></Card>
-              ))}
-            </div>
-          ) : (
-						<Card><CardContent className="p-8 text-center text-muted-foreground"><GraduationCap className="w-12 h-12 mx-auto mb-4 opacity-50" /><p>No education information added yet.</p></CardContent></Card>
-          )}
-        </TabsContent>
       </Tabs>
     </div>
   );

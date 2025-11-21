@@ -52,17 +52,17 @@ router.get('/departments', async (req, res) => {
     if (!departments) {
       // If departments don't exist, create them
       const defaultDepartments = [
-        'Civil Engineering',
         'Mechanical Engineering',
+        'Artificial Intelligence and Data Science',
+        'Artificial Intelligence and Machine Learning',
         'Mechatronics Engineering',
         'Automobile Engineering',
-        'Electrical and Electronics Engineering (EEE)',
-        'Electronics and Communication Engineering (ECE)',
-        'Electronics and Instrumentation Engineering (EIE)',
-        'Computer Science and Engineering (CSE)',
-        'Information Technology (IT)',
-        'Artificial Intelligence and Machine Learning (AIML)',
-        'Food Technology'
+        'Electrical and Electronics Engineering',
+        'Electronics and Communication Engineering',
+        'Electronics and Instrumentation Engineering',
+        'Computer Science and Engineering',
+        'Information Technology',
+        'Computer Science and Design'
       ];
       
       const newDepartments = new Configuration({

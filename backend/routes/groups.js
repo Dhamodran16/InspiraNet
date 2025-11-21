@@ -273,7 +273,10 @@ router.post('/:groupId/posts', authenticateToken, async (req, res) => {
       author: currentUser._id,
       userType: currentUser.type,
       batch: currentUser.batch,
-      department: currentUser.department,
+      department: currentUser.department || 
+                  currentUser.studentInfo?.department || 
+                  currentUser.facultyInfo?.department || 
+                  'Unknown Department',
       postType: 'general',
       content,
       media,
@@ -288,7 +291,7 @@ router.post('/:groupId/posts', authenticateToken, async (req, res) => {
     await group.save();
 
     // Populate author info
-    await post.populate('author', 'name avatar type department');
+    await post.populate('author', 'name avatar type department studentInfo facultyInfo');
 
     res.status(201).json({
       message: 'Post created successfully in group',
@@ -324,8 +327,8 @@ router.get('/:groupId/posts', authenticateToken, async (req, res) => {
 
     // Get posts for this group
     const posts = await Post.find({ groupId })
-      .populate('author', 'name avatar type department')
-      .populate('comments.author', 'name avatar type department')
+      .populate('author', 'name avatar type department studentInfo facultyInfo')
+      .populate('comments.author', 'name avatar type department studentInfo facultyInfo')
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(parseInt(limit))

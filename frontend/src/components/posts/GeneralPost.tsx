@@ -12,11 +12,14 @@ interface GeneralPostProps {
   onComment: (postId: string, commentContent: string) => void;
   onEdit?: (postId: string) => void;
   onDelete: (postId: string) => void;
+  onDeleteComment?: (postId: string, commentId: string) => void;
+  onShare?: (postId: string) => void;
   showComments: boolean;
   onToggleComments: () => void;
   commentsCount: number;
   isLiked: boolean;
   showDeleteButton?: boolean;
+  showShareButton?: boolean;
 }
 
 // Utility function to determine Instagram-style aspect ratio
@@ -39,11 +42,14 @@ export default function GeneralPost({
   onComment,
   onEdit,
   onDelete,
+  onDeleteComment,
+  onShare,
   showComments,
   onToggleComments,
   commentsCount,
   isLiked,
-  showDeleteButton = false
+  showDeleteButton = false,
+  showShareButton = true
 }: GeneralPostProps) {
   const [imageDimensions, setImageDimensions] = useState<{ [key: string]: { width: number; height: number } }>({});
 
@@ -80,7 +86,7 @@ export default function GeneralPost({
       const aspectRatio = getImageAspectRatio(mediaUrl);
       
       return (
-        <div className={`w-full max-w-[1080px] ${aspectRatio} overflow-hidden rounded-xl mx-auto`}>
+        <div className={`w-full max-w-4xl ${aspectRatio} overflow-hidden rounded-xl mx-auto`}>
           <img 
             src={mediaUrl} 
             alt="Post image"
@@ -92,7 +98,7 @@ export default function GeneralPost({
       );
     } else if (['mp4', 'avi', 'mov', 'webm'].includes(fileExtension || '')) {
       return (
-        <div className="w-full max-w-[1080px] aspect-video overflow-hidden rounded-xl mx-auto">
+        <div className="w-full max-w-4xl aspect-video overflow-hidden rounded-xl mx-auto">
           <video 
             src={mediaUrl} 
             controls
@@ -103,7 +109,7 @@ export default function GeneralPost({
       );
     } else if (['pdf'].includes(fileExtension || '')) {
       return (
-        <div className="w-full max-w-[1080px] aspect-[4/5] overflow-hidden rounded-xl mx-auto">
+        <div className="w-full max-w-4xl aspect-[4/5] overflow-hidden rounded-xl mx-auto">
           <div className="w-full h-full bg-muted rounded-xl flex items-center justify-center border-2 border-dashed border-border hover:border-primary transition-colors">
             <div className="text-center">
               <File className="mx-auto mb-2 text-foreground" size={32} />
@@ -126,23 +132,27 @@ export default function GeneralPost({
   };
 
   return (
-    <BasePost
-      post={post}
-      user={user}
-      onLike={onLike}
-      onComment={onComment}
-      onEdit={onEdit}
-      onDelete={onDelete}
-      showComments={showComments}
-      onToggleComments={onToggleComments}
-      commentsCount={commentsCount}
-      isLiked={isLiked}
-      showDeleteButton={showDeleteButton}
-      postTypeLabel="📝 General Post"
-      postTypeIcon="📝"
-    >
-        {/* Enhanced Media Display */}
-        {post.media && post.media.length > 0 && (
+            <BasePost
+              post={post}
+              user={user}
+              onLike={onLike}
+              onComment={onComment}
+              onEdit={onEdit}
+              onDelete={onDelete}
+              onDeleteComment={onDeleteComment}
+              onShare={onShare}
+              showComments={showComments}
+              onToggleComments={onToggleComments}
+              commentsCount={commentsCount}
+              isLiked={isLiked}
+              showDeleteButton={showDeleteButton}
+              showShareButton={showShareButton}
+              postTypeLabel="📝 General Post"
+              postTypeIcon="📝"
+            >
+      {/* Images First - Enhanced Media Display */}
+      {post.media && post.media.length > 0 && (
+        <div className="px-4 pt-4">
           <div className="space-y-3">
             {post.media.length === 1 ? (
               <div className="rounded-lg overflow-hidden">
@@ -166,7 +176,17 @@ export default function GeneralPost({
               </div>
             )}
           </div>
-        )}
+        </div>
+      )}
+
+      {/* Post Content Below Images */}
+      {post.content && (
+        <div className="px-4 py-3">
+          <p className="text-gray-900 dark:text-gray-100 whitespace-pre-wrap">
+            {post.content}
+          </p>
+        </div>
+      )}
     </BasePost>
   );
 }

@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
-import { Users, Briefcase, MessageSquare, Video, GraduationCap, Award } from "lucide-react";
+import { Users, Briefcase, MessageSquare, GraduationCap, Award } from "lucide-react";
 
 const EnhancedFeatureShowcase = () => {
   const navigate = useNavigate();
@@ -9,7 +9,6 @@ const EnhancedFeatureShowcase = () => {
     { title: "Alumni Network", description: "Connect with 15,000+ KEC alumni worldwide across industries", color: "#3b82f6", icon: Users, gradient: "from-blue-500 to-blue-600" },
     { title: "Career Opportunities", description: "Access exclusive job openings and placement drives", color: "#10b981", icon: Briefcase, gradient: "from-green-500 to-green-600" },
     { title: "Community Posts", description: "Share updates, achievements, and stay connected", color: "#8b5cf6", icon: MessageSquare, gradient: "from-purple-500 to-purple-600" },
-    { title: "Virtual Meetings", description: "Join career guidance sessions and networking events", color: "#f97316", icon: Video, gradient: "from-orange-500 to-orange-600" },
     { title: "Mentorship Program", description: "Get guidance from experienced alumni in your field", color: "#6366f1", icon: GraduationCap, gradient: "from-indigo-500 to-indigo-600" },
     { title: "Success Stories", description: "Read inspiring journeys of successful alumni", color: "#ef4444", icon: Award, gradient: "from-red-500 to-red-600" },
   ];
@@ -18,7 +17,6 @@ const EnhancedFeatureShowcase = () => {
     "Alumni Network": "network",
     "Career Opportunities": "placements",
     "Community Posts": "home",
-    "Virtual Meetings": "meetings",
     "Mentorship Program": "network",
     "Success Stories": "home",
   };

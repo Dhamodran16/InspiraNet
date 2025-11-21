@@ -22,17 +22,39 @@ router.get('/users', authenticateToken, async (req, res) => {
         { 'email.college': { $regex: search, $options: 'i' } },
         { 'email.personal': { $regex: search, $options: 'i' } },
         { department: { $regex: search, $options: 'i' } },
-        { batch: { $regex: search, $options: 'i' } }
+        { 'studentInfo.department': { $regex: search, $options: 'i' } },
+        { 'facultyInfo.department': { $regex: search, $options: 'i' } },
+        { batch: { $regex: search, $options: 'i' } },
+        { 'studentInfo.batch': { $regex: search, $options: 'i' } },
+        { bio: { $regex: search, $options: 'i' } },
+        { skills: { $regex: search, $options: 'i' } }
       ];
     }
     
-    if (batch && batch !== 'all') query.batch = batch;
-    if (department && department !== 'all') query.department = department;
+    if (batch && batch !== 'all') {
+      query.$and = query.$and || [];
+      query.$and.push({
+        $or: [
+          { batch: batch },
+          { 'studentInfo.batch': batch }
+        ]
+      });
+    }
+    if (department && department !== 'all') {
+      query.$and = query.$and || [];
+      query.$and.push({
+        $or: [
+          { department: { $regex: new RegExp(`^${department}$`, 'i') } },
+          { 'studentInfo.department': { $regex: new RegExp(`^${department}$`, 'i') } },
+          { 'facultyInfo.department': { $regex: new RegExp(`^${department}$`, 'i') } }
+        ]
+      });
+    }
     if (type && type !== 'all') query.type = type;
     
     // Get all users except current user with pagination
     const users = await User.find(query)
-      .select('name email type batch department avatar bio currentCompany designation location skills interests followers following accountType messagePolicy')
+      .select('name email type batch department avatar bio currentCompany designation location skills interests followers following accountType messagePolicy studentInfo facultyInfo alumniInfo')
       .populate('followers', 'name avatar')
       .populate('following', 'name avatar')
       .skip(skip)
@@ -217,13 +239,24 @@ router.post('/request/:userId', authenticateToken, async (req, res) => {
           io.to(`user_${targetUserId}`).emit('new_follow_request', {
             requesterId: currentUser._id,
             requesterName: currentUser.name,
-            message: `${currentUser.name} sent you a follow request`
+            message: `${currentUser.name} sent you a follow request`,
+            timestamp: new Date()
           });
 
           // Emit to current user about pending request
           io.to(`user_${currentUser._id}`).emit('follow_request_sent', {
             targetUserId: targetUserId,
-            message: `Follow request sent to ${result.targetName}`
+            message: `Follow request sent to ${result.targetName}`,
+            timestamp: new Date()
+          });
+
+          // Emit to all users for real-time network updates
+          io.emit('follow_status_updated', {
+            requesterId: currentUser._id,
+            targetId: targetUserId,
+            action: 'request_sent',
+            status: 'pending',
+            timestamp: new Date()
           });
         }
       }
@@ -280,7 +313,7 @@ router.post('/request/:userId', authenticateToken, async (req, res) => {
   }
 });
 
-// Accept follow request
+// Accept follow request (Step 1 of two-step mutual follow)
 router.post('/accept/:requestId', authenticateToken, async (req, res) => {
   try {
     const currentUser = req.user;
@@ -299,37 +332,137 @@ router.post('/accept/:requestId', authenticateToken, async (req, res) => {
       // Emit real-time updates
       const io = req.app.get('io');
       if (io) {
-        io.to(`user_${requesterId}`).emit('follow_request_accepted', {
-          followeeId: currentUser._id,
-          followeeName: currentUser.name,
-          message: `${currentUser.name} accepted your follow request! ✨ You can now message each other.`
-        });
+        if (result.reverseRequestSent) {
+          // Step 1: One-way follow established, reverse request sent
+          io.to(`user_${requesterId}`).emit('follow_request_accepted_with_reverse', {
+            followeeId: currentUser._id,
+            followeeName: currentUser.name,
+            message: `${currentUser.name} accepted your follow request and sent you a follow request back! Accept it to become mutual connections.`,
+            requestId: requestId,
+            hasReverseRequest: true,
+            timestamp: new Date()
+          });
 
-        io.to(`user_${currentUser._id}`).emit('follow_request_accepted', {
-          followerId: requesterId,
-          message: `You accepted ${result.requesterName}'s follow request! ✨ You can now message each other.`
-        });
+          io.to(`user_${currentUser._id}`).emit('follow_request_accepted_reverse_sent', {
+            followerId: requesterId,
+            message: `You accepted ${result.requesterName}'s follow request and sent them a follow request back. Wait for their acceptance to become mutual connections.`,
+            requestId: requestId,
+            reverseRequestSent: true,
+            timestamp: new Date()
+          });
+        } else {
+          // Fallback: One-way follow only
+          io.to(`user_${requesterId}`).emit('follow_request_accepted', {
+            followeeId: currentUser._id,
+            followeeName: currentUser.name,
+            message: `${currentUser.name} accepted your follow request`,
+            requestId: requestId,
+            timestamp: new Date()
+          });
+
+          io.to(`user_${currentUser._id}`).emit('follow_request_accepted', {
+            followerId: requesterId,
+            message: `You accepted ${result.requesterName}'s follow request`,
+            requestId: requestId,
+            timestamp: new Date()
+          });
+        }
 
         // Emit to all users for real-time network updates
         io.emit('follow_status_updated', {
           followerId: requesterId,
           followeeId: currentUser._id,
           action: 'accept',
-          status: 'mutual',
+          status: result.reverseRequestSent ? 'one_way_with_reverse_request' : 'one_way',
           timestamp: new Date()
         });
       }
 
       res.json({ 
+        success: true,
         message: result.message,
-        status: 'accepted'
+        requesterName: result.requesterName,
+        targetName: result.targetName,
+        reverseRequestSent: result.reverseRequestSent,
+        nextStep: result.nextStep
       });
     } else {
-      res.status(400).json({ error: result.message });
+      res.status(400).json({ 
+        success: false,
+        error: result.reason || 'Failed to accept follow request' 
+      });
     }
   } catch (error) {
     console.error('Error accepting follow request:', error);
     res.status(500).json({ error: 'Failed to accept follow request' });
+  }
+});
+
+// Accept reverse follow request (Step 2 of two-step mutual follow)
+router.post('/accept-reverse/:requestId', authenticateToken, async (req, res) => {
+  try {
+    const currentUser = req.user;
+    const requestId = req.params.requestId;
+
+    // Find the follow request to get requester info for notifications
+    const followRequest = await FollowRequest.findById(requestId);
+    if (!followRequest) {
+      return res.status(404).json({ error: 'Follow request not found' });
+    }
+    const requesterId = followRequest.requesterId?.toString();
+
+    const result = await FollowService.acceptReverseFollowRequest(requestId, currentUser._id);
+
+    if (result.success) {
+      // Emit real-time updates for mutual connection
+      const io = req.app.get('io');
+      if (io) {
+        // Notify both users about mutual connection
+        io.to(`user_${requesterId}`).emit('mutual_connection_established', {
+          mutualUserId: currentUser._id,
+          mutualUserName: currentUser.name,
+          message: `You and ${currentUser.name} are now mutual connections! 🎉 You can message each other freely.`,
+          requestId: requestId,
+          connectionType: 'mutual',
+          timestamp: new Date()
+        });
+
+        io.to(`user_${currentUser._id}`).emit('mutual_connection_established', {
+          mutualUserId: requesterId,
+          mutualUserName: result.targetName,
+          message: `You and ${result.targetName} are now mutual connections! 🎉 You can message each other freely.`,
+          requestId: requestId,
+          connectionType: 'mutual',
+          timestamp: new Date()
+        });
+
+        // Emit to all users for real-time network updates
+        io.emit('follow_status_updated', {
+          followerId: requesterId,
+          followeeId: currentUser._id,
+          action: 'mutual_connection',
+          status: 'mutual',
+          timestamp: new Date()
+        });
+      }
+
+      res.json({
+        success: true,
+        message: result.message,
+        requesterName: result.requesterName,
+        targetName: result.targetName,
+        connectionType: result.connectionType,
+        canMessage: result.canMessage
+      });
+    } else {
+      res.status(400).json({
+        success: false,
+        error: result.reason || 'Failed to accept reverse follow request'
+      });
+    }
+  } catch (error) {
+    console.error('Error accepting reverse follow request:', error);
+    res.status(500).json({ error: 'Failed to accept reverse follow request' });
   }
 });
 
@@ -392,12 +525,25 @@ router.post('/reject/:requestId', authenticateToken, async (req, res) => {
         io.to(`user_${requesterId}`).emit('follow_request_rejected', {
           followeeId: currentUser._id,
           followeeName: currentUser.name,
-          message: `${currentUser.name} rejected your follow request`
+          message: `${currentUser.name} rejected your follow request`,
+          requestId: requestId,
+          timestamp: new Date()
         });
 
         io.to(`user_${currentUser._id}`).emit('follow_request_rejected', {
           requesterId: requesterId,
-          message: `You rejected ${result.requesterName}'s follow request`
+          message: `You rejected ${result.requesterName}'s follow request`,
+          requestId: requestId,
+          timestamp: new Date()
+        });
+
+        // Emit to all users for real-time network updates
+        io.emit('follow_status_updated', {
+          requesterId: requesterId,
+          targetId: currentUser._id,
+          action: 'rejected',
+          status: 'rejected',
+          timestamp: new Date()
         });
       }
 

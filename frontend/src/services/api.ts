@@ -1,10 +1,23 @@
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse, AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { getAuthToken, removeAuthToken } from '@/contexts/AuthContext';
 import { toast } from '@/hooks/use-toast';
+import { getBackendUrl } from '../utils/urlConfig';
+
+// 🚀 Dynamic API base URL based on environment
+const API_BASE_URL = getBackendUrl();
+
+// API service configuration
+export const apiConfig = {
+  baseURL: API_BASE_URL,
+  timeout: 30000,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+};
 
 // Create axios instance with base configuration
 const api: AxiosInstance = axios.create({
-  baseURL: import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000',
+  baseURL: API_BASE_URL, // Use the dynamic URL from urlConfig
   timeout: 60000, // Increased to 60s to handle slower backend responses
   headers: {
     'Content-Type': 'application/json',
@@ -18,6 +31,12 @@ api.interceptors.request.use(
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    
+    // If FormData is being sent, remove Content-Type header to let axios set it with boundary
+    if (config.data instanceof FormData) {
+      delete config.headers['Content-Type'];
+    }
+    
     return config;
   },
   (error: AxiosError) => {
@@ -57,7 +76,7 @@ api.interceptors.response.use(
         
         if (token) {
           const refreshResponse = await axios.post(
-            `${import.meta.env.VITE_BACKEND_URL}/api/auth/refresh`,
+            `${API_BASE_URL}/api/auth/refresh`,
             {},
             {
               headers: {

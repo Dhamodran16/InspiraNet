@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>InspiraNet - Video Conference</title>
+    <link rel="stylesheet" href="meeting-app.css">
+</head>
+<body>
+    <div id="joinForm">
+        <div class="join-container">
+            <h1>InspiraNet</h1>
+            <p>Real-time video conferencing platform</p>
+        </div>
+    </div>
+    
+    <div id="permissionHelp" class="permission-help" style="display:none;">
+        <div class="permission-help-content">
+            <strong>Allow camera and microphone</strong>
+            <ol>
+                <li>Click the camera icon in the address bar.</li>
+                <li>Select <em>Allow</em> for Camera and Microphone.</li>
+                <li>Then click <em>Join Room</em> again.</li>
+            </ol>
+            <button id="dismissHelp">Got it</button>
+        </div>
+    </div>
+    
+    <div id="join-section">
+        <input type="text" id="room" placeholder="Enter Room ID">
+        <button onclick="joinRoom()" id="joinButton">Join Room</button>
+    </div>
+
+    <div id="videos">
+        <video id="localVideo" autoplay playsinline muted></video>
+    </div>
+    <div class="video-container">
+        <video autoplay></video>
+        <div class="username"></div>
+    </div>
+    
+
+    <div id="controls" style="display: none;">
+        <button id="micButton" onclick="toggleMic()">
+            <svg id="micIcon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                <line x1="12" y1="19" x2="12" y2="23"/>
+                <line x1="8" y1="23" x2="16" y2="23"/>
+            </svg>
+        </button>
+        <button id="cameraButton" onclick="toggleCamera()">
+            <svg id="cameraIcon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                <circle cx="12" cy="13" r="4"/>
+            </svg>
+        </button>
+        <button id="screenShareButton" onclick="toggleScreenShare()">
+            <svg id="screenShareIcon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
+                <line x1="8" y1="21" x2="16" y2="21"/>
+                <line x1="12" y1="17" x2="12" y2="21"/>
+            </svg>
+        </button>
+        <button id="leaveButton" onclick="endCall()">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M10.68 13.31a16 16 0 0 0 3.41 2.6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7 2 2 0 0 1 1.72 2v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-3.33-2.67m-2.67-3.34a19.79 19.79 0 0 1-3.07-8.63A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.7 9.9a16 16 0 0 0 2.6 3.41z"/>
+            </svg>
+        </button>
+        <button id="raiseHandButton" onclick="toggleRaiseHand()" title="Raise hand">✋</button>
+        <div id="moreMenuWrapper">
+            <button id="moreButton" title="More">⋯</button>
+            <div id="reactionsMenu" class="menu">
+                <button class="reaction" onclick="sendReaction('👍')">👍</button>
+                <button class="reaction" onclick="sendReaction('👏')">👏</button>
+                <button class="reaction" onclick="sendReaction('🎉')">🎉</button>
+                <button class="reaction" onclick="sendReaction('❤️')">❤️</button>
+                <button class="reaction" onclick="sendReaction('😂')">😂</button>
+                <button class="reaction" onclick="sendReaction('😮')">😮</button>
+                <button class="reaction" onclick="sendReaction('😢')">😢</button>
+                <button class="reaction" onclick="sendReaction('😡')">😡</button>
+                <button class="reaction" onclick="sendReaction('👀')">👀</button>
+                <button class="reaction" onclick="sendReaction('🔥')">🔥</button>
+                <button class="reaction" onclick="sendReaction('💯')">💯</button>
+                <button class="reaction" onclick="sendReaction('✨')">✨</button>
+            </div>
+        </div>
+        <button id="muteAllButton" style="display:none" onclick="hostMuteAll()" title="Mute all">🔇</button>
+        <button id="chatToggleButton" onclick="toggleChat()" title="Toggle chat">
+            <img src="https://cdn-icons-png.flaticon.com/128/2190/2190552.png" alt="Chat" style="width: 24px; height: 24px; filter: brightness(0) invert(1);">
+        </button>
+        <button id="participantsButton" onclick="toggleParticipants()" title="Participants">
+            <svg width="24" height="24" viewBox="0 0 24 24" role="img" aria-label="Participants" fill="white" xmlns="http://www.w3.org/2000/svg">
+                <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5s-3 1.34-3 3 1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5C15 14.17 10.33 13 8 13zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/>
+            </svg>
+        </button>
+    </div>
+
+    <div id="chat" style="display: none;">
+        <div id="chatbox"></div>
+        <div id="typingIndicator" style="display:none">Someone is typing...</div>
+        <div id="inputArea">
+            <input type="text" id="messageInput" placeholder="Type a message">
+            <button onclick="sendMessage()" id="sendButton">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="22" y1="2" x2="11" y2="13"/>
+                    <polygon points="22,2 15,22 11,13 2,9"/>
+                </svg>
+            </button>
+        </div>
+    </div>
+
+    <div id="participantsPanel" style="display: none;">
+        <div id="participantsHeader">
+            <h3>👥 Participants (<span id="participantCount">0</span>)</h3>
+            <button id="closeParticipants" onclick="toggleParticipants()">✕</button>
+        </div>
+        <div id="participantsList"></div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="meeting-app.js"></script>
+</body>
+</html>

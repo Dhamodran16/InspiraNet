@@ -87,6 +87,9 @@ const UserInfo: React.FC = () => {
   const [uploadingResume, setUploadingResume] = useState(false);
   const [activeTab, setActiveTab] = useState('basic');
 
+  // Get current year for placeholders and validation
+  const currentYear = new Date().getFullYear();
+
   const [formData, setFormData] = useState<UserInfoData>({
     // Don't initialize empty arrays/objects - only add them when user actually inputs data
   });
@@ -510,9 +513,10 @@ const UserInfo: React.FC = () => {
                       <Label htmlFor="batch">Batch</Label>
                       <Input
                         id="batch"
-                        placeholder="2020-2024"
                         value={formData.studentInfo?.batch || ''}
                         onChange={(e) => handleInputChange('batch', e.target.value, 'studentInfo')}
+                        placeholder={`${currentYear}-${currentYear + 4}`}
+                        className="w-full"
                       />
                     </div>
                     <div>

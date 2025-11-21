@@ -125,7 +125,7 @@ class SocketService {
           const messageData = {
             _id: message._id,
             conversationId: message.conversationId,
-            senderId: message.senderId,
+            senderId: typeof message.senderId === 'object' ? message.senderId._id : message.senderId,
             senderName: message.senderName,
             content: message.content,
             messageType: message.messageType,
@@ -159,6 +159,61 @@ class SocketService {
         socket.to(`conversation_${conversationId}`).emit('user_stop_typing', {
           userId: socket.userId,
           conversationId
+        });
+      });
+
+      // Handle message status updates
+      socket.on('message_status', (data) => {
+        const { messageId, status, conversationId } = data;
+        socket.to(`conversation_${conversationId}`).emit('message_status_update', {
+          messageId,
+          status,
+          userId: socket.userId,
+          timestamp: new Date()
+        });
+      });
+
+      // Handle user status updates
+      socket.on('user_status_update', (data) => {
+        const { status, lastSeen } = data;
+        this.broadcastUserStatus(socket.userId, status, lastSeen);
+      });
+
+      // Handle message deletion events
+      socket.on('messages_deleted', (data) => {
+        const { messageIds, conversationId } = data;
+        socket.to(`conversation_${conversationId}`).emit('messages_deleted', {
+          messageIds,
+          conversationId,
+          deletedBy: socket.userId
+        });
+      });
+
+      // Handle chat cleared events
+      // NOTE: This handler is for client-initiated chat_cleared events
+      // The backend route /api/messages/conversation/:conversationId/clear
+      // emits 'chat_cleared_for_me' directly to the user room, not through this handler
+      // This handler should NOT be used for clear chat functionality as it would
+      // broadcast to all participants, which is incorrect behavior
+      // Keeping it commented out to prevent accidental broadcasts
+      /*
+      socket.on('chat_cleared', (data) => {
+        const { conversationId } = data;
+        // DO NOT broadcast to conversation room - this would clear chat for all participants
+        // Instead, the backend route emits 'chat_cleared_for_me' directly to user room
+        socket.to(`conversation_${conversationId}`).emit('chat_cleared', {
+          conversationId,
+          clearedBy: socket.userId
+        });
+      });
+      */
+
+      // Handle conversation deleted events
+      socket.on('conversation_deleted', (data) => {
+        const { conversationId } = data;
+        socket.to(`conversation_${conversationId}`).emit('conversation_deleted', {
+          conversationId,
+          deletedBy: socket.userId
         });
       });
 
@@ -334,10 +389,11 @@ class SocketService {
   }
 
   // Broadcast user status to all connected users
-  broadcastUserStatus(userId, status) {
+  broadcastUserStatus(userId, status, lastSeen = null) {
     this.io.emit('user_status_change', {
       userId,
       status,
+      lastSeen,
       timestamp: new Date()
     });
   }

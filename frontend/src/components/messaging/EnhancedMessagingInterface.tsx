@@ -11,6 +11,7 @@ import { socketService } from '../../services/socketService';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../ui/dropdown-menu';
 import { Textarea } from '../ui/textarea';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
+import { getBackendUrl } from '../../utils/urlConfig';
 
 interface Message {
   _id: string;
@@ -96,7 +97,18 @@ const EnhancedMessagingInterface: React.FC<EnhancedMessagingInterfaceProps> = ({
           };
           
           setMessages(prev => [...prev, newMessage]);
-          scrollToBottom();
+          // Auto-scroll to last message
+          setTimeout(() => {
+            const scrollContainer = document.querySelector('[data-radix-scroll-area-viewport]');
+            if (scrollContainer) {
+              scrollContainer.scrollTop = scrollContainer.scrollHeight;
+            }
+          }, 100);
+          
+          // Mark message as read immediately if it's from another user
+          if (data.message.senderId !== currentUser._id) {
+            socketService.markMessagesAsRead(conversation._id, [newMessage._id]);
+          }
         }
       };
 
@@ -118,6 +130,7 @@ const EnhancedMessagingInterface: React.FC<EnhancedMessagingInterfaceProps> = ({
 
       // Listen for message status updates
       const handleMessageStatus = (data: any) => {
+        console.log('🔔 Message status updated:', data);
         setMessages(prev => prev.map(msg => 
           msg._id === data.messageId 
             ? { ...msg, status: data.status, readAt: data.readAt }
@@ -127,48 +140,55 @@ const EnhancedMessagingInterface: React.FC<EnhancedMessagingInterfaceProps> = ({
 
       // Listen for user online status
       const handleUserStatus = (data: any) => {
-        if (data.userId === selectedUser._id) {
-          setConversation(prev => prev ? {
-            ...prev,
-            participants: prev.participants.map(p => 
-              p._id === data.userId 
-                ? { ...p, isOnline: data.isOnline, lastSeen: data.lastSeen }
-                : p
-            )
-          } : null);
+        if (data.userId === selectedUser?._id) {
+          console.log('🔔 User status updated:', data);
+          // Update user online status if needed
         }
       };
 
-      // Listen for follow request updates
-      const handleFollowRequestAccepted = (data: any) => {
-        if (data.followerId === selectedUser._id || data.followeeId === selectedUser._id) {
-          console.log('🔔 Follow request accepted, updating messaging permissions');
-          checkFollowStatus(); // Re-check follow status
+      // Listen for conversation updates
+      const handleConversationUpdate = (data: any) => {
+        if (data.conversationId === conversation._id) {
+          console.log('🔔 Conversation updated:', data);
+          // Refresh conversation data if needed
         }
       };
 
+      // Enhanced real-time listeners
       socketService.onMessage(handleNewMessage);
       socketService.onTyping(handleTyping);
       socketService.onStopTyping(handleStopTyping);
-      socketService.onMessageStatus(handleMessageStatus);
-      socketService.onUserOnlineStatus(handleUserStatus);
-      socketService.onFollowRequestAccepted(handleFollowRequestAccepted);
+      socketService.onMessageStatus?.(handleMessageStatus);
+      socketService.onUserStatus?.(handleUserStatus);
+      socketService.onConversationUpdate?.(handleConversationUpdate);
+
+      // Join conversation room for real-time updates
+      socketService.joinConversations([conversation._id]);
 
       return () => {
         socketService.offMessage();
         socketService.offTyping();
         socketService.offStopTyping();
-        socketService.offMessageStatus();
-        socketService.offUserOnlineStatus();
-        socketService.offFollowRequestAccepted();
+        socketService.offMessageStatus?.();
+        socketService.offUserStatus?.();
+        socketService.offConversationUpdate?.();
+        
+        // Leave conversation room
+        socketService.leaveConversations([conversation._id]);
       };
     }
-  }, [conversation, currentUser._id, selectedUser._id]);
+  }, [conversation, currentUser._id, selectedUser?._id]);
 
-  // Auto-scroll to bottom when new messages arrive
+  // Auto-scroll to last message ONLY when conversation changes (not on message send)
   useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
+    if (conversation && messages.length > 0) {
+      // Use direct scroll to bottom - more reliable
+      const scrollContainer = document.querySelector('[data-radix-scroll-area-viewport]');
+      if (scrollContainer) {
+        scrollContainer.scrollTop = scrollContainer.scrollHeight;
+      }
+    }
+  }, [conversation]); // Removed messages dependency to prevent scroll on send
 
   // Typing indicator with debouncing
   useEffect(() => {
@@ -360,15 +380,29 @@ const EnhancedMessagingInterface: React.FC<EnhancedMessagingInterfaceProps> = ({
   };
 
   const renderMessage = (message: Message) => {
-    const isOwn = message.isOwn;
+    // Fix: Handle senderId as object or string
+    let messageSenderId;
+    
+    // Handle senderId as object or string
+    if (typeof message.senderId === 'object' && message.senderId !== null) {
+      messageSenderId = message.senderId._id?.toString() || message.senderId.toString();
+    } else {
+      messageSenderId = message.senderId?.toString();
+    }
+    
+    const isOwn = message.isOwn !== undefined ? message.isOwn : (messageSenderId === currentUser._id?.toString());
+    
     const messageTime = new Date(message.createdAt).toLocaleTimeString([], { 
       hour: '2-digit', 
       minute: '2-digit' 
     });
 
-    // Get sender name
+    // Get sender name - show for group chats or received messages
     const senderName = isOwn ? currentUser.name : 
-      conversation?.participants.find(p => p._id === message.senderId)?.name || 'Unknown User';
+      conversation?.participants.find(p => p._id === message.senderId)?.name || message.senderName || 'Unknown User';
+
+    // Show sender name ONLY for group chats
+    const showSenderName = !isOwn && conversation?.isGroupChat;
 
     // Debug logging
     console.log('🔍 Rendering message:', {
@@ -377,36 +411,38 @@ const EnhancedMessagingInterface: React.FC<EnhancedMessagingInterfaceProps> = ({
       senderName,
       content: message.content?.substring(0, 50) + '...',
       senderId: message.senderId,
-      currentUserId: currentUser._id
+      currentUserId: currentUser._id,
+      isGroupChat: conversation?.isGroupChat
     });
 
     return (
-      <div key={message._id} className={`flex message-item ${isOwn ? 'message-right' : 'message-left'}`}>
-        <div className={`flex ${isOwn ? 'flex-row-reverse' : 'flex-row'} items-end max-w-xs lg:max-w-md`}>
+      <div key={message._id} data-message-id={message._id} className={`flex ${isOwn ? 'justify-end' : 'justify-start'} mb-3`}>
+        {/* Message container with proper alignment */}
+        <div className={`flex items-end max-w-xs lg:max-w-md ${isOwn ? 'flex-row-reverse' : 'flex-row'}`}>
           {/* Avatar - only show for received messages */}
           {!isOwn && (
-            <Avatar className="w-8 h-8 message-avatar">
+            <Avatar className="w-8 h-8 flex-shrink-0 mr-2">
               <AvatarImage src={conversation?.participants.find(p => p._id === message.senderId)?.avatar} />
               <AvatarFallback>
-                {conversation?.participants.find(p => p._id === message.senderId)?.name?.charAt(0)}
+                {conversation?.participants.find(p => p._id === message.senderId)?.name?.charAt(0) || 'U'}
               </AvatarFallback>
             </Avatar>
           )}
           
-          {/* Message container */}
-          <div className={`flex flex-col message-content ${isOwn ? 'items-end' : 'items-start'}`}>
-            {/* Sender name above message */}
-            <div className={`text-xs font-medium mb-1 ${
-              isOwn ? 'text-blue-600 dark:text-blue-400' : 'text-gray-600 dark:text-gray-400'
-            }`}>
-              {senderName}
-            </div>
+          {/* Message content container */}
+          <div className={`flex flex-col ${isOwn ? 'items-end' : 'items-start'}`}>
+            {/* Sender name above message - only for group chats or received messages */}
+            {showSenderName && (
+              <div className="text-xs font-medium mb-1 text-gray-600 dark:text-gray-400">
+                {senderName}
+              </div>
+            )}
             
             {/* Message bubble */}
             <div className={`rounded-lg px-3 py-2 ${
               isOwn 
-                ? 'message-bubble-right' 
-                : 'message-bubble-left'
+                ? 'bg-blue-500 text-white' 
+                : 'bg-gray-100 text-gray-900 dark:bg-gray-700 dark:text-gray-100'
             }`}>
               {message.messageType === 'file' && (
                 <div className="flex items-center space-x-2 mb-2">
@@ -641,7 +677,10 @@ const EnhancedMessagingInterface: React.FC<EnhancedMessagingInterfaceProps> = ({
             <div>
               <CardTitle className="text-lg">{selectedUser.name}</CardTitle>
               <div className="text-sm text-muted-foreground">
-                {selectedUser.type} • {selectedUser.department || 'No department'}
+                {selectedUser.type} • {selectedUser.department || 
+                  selectedUser.studentInfo?.department || 
+                  selectedUser.facultyInfo?.department || 
+                  'No department'}
                 {conversation?.participants.find(p => p._id === selectedUser._id)?.lastSeen && (
                   <span> • Last seen {formatTime(conversation.participants.find(p => p._id === selectedUser._id)?.lastSeen || '')}</span>
                 )}
@@ -744,38 +783,6 @@ const EnhancedMessagingInterface: React.FC<EnhancedMessagingInterfaceProps> = ({
             </ScrollArea>
 
             <div className="border-t p-4">
-              {/* Encryption toggle */}
-              <div className="flex items-center space-x-2 mb-2">
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setEncryptionEnabled(!encryptionEnabled)}
-                        className={encryptionEnabled ? 'text-green-600' : 'text-gray-500'}
-                      >
-                        {encryptionEnabled ? <Lock className="h-4 w-4" /> : <Unlock className="h-4 w-4" />}
-                        {encryptionEnabled ? 'Encrypted' : 'Unencrypted'}
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>{encryptionEnabled ? 'Messages are encrypted' : 'Messages are not encrypted'}</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              </div>
-              
-              {/* Encryption key input */}
-              {encryptionEnabled && (
-                <Input
-                  type="password"
-                  placeholder="Enter encryption key"
-                  value={encryptionKey}
-                  onChange={(e) => setEncryptionKey(e.target.value)}
-                  className="mb-2"
-                />
-              )}
               
               {/* Selected file display */}
               {selectedFile && (
@@ -826,13 +833,13 @@ const EnhancedMessagingInterface: React.FC<EnhancedMessagingInterfaceProps> = ({
                     </Tooltip>
                   </TooltipProvider>
                   
-                  {/* Hidden file input */}
+                  {/* Hidden file input - supports all common file formats */}
                   <input
                     ref={fileInputRef}
                     type="file"
                     onChange={handleFileSelect}
                     className="hidden"
-                    accept="image/*,.pdf,.doc,.docx,.txt"
+                    accept=".jpg,.jpeg,.png,.webp,.gif,.bmp,.svg,.mp4,.webm,.ogg,.mov,.avi,.wmv,.mp3,.wav,.ogg,.pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.csv,.txt,.html,.xml,.json,.log,.zip"
                   />
                 </div>
                 

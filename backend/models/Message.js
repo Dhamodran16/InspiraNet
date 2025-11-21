@@ -34,7 +34,7 @@ const messageSchema = new mongoose.Schema({
   },
   messageType: {
     type: String,
-    enum: ['text', 'image', 'file', 'system'],
+    enum: ['text', 'image', 'video', 'pdf', 'file', 'system'],
     default: 'text'
   },
   mediaUrl: {
@@ -97,8 +97,50 @@ const messageSchema = new mongoose.Schema({
     deletedAt: {
       type: Date,
       default: Date.now
+    },
+    deleteMode: {
+      type: String,
+      enum: ['forMe', 'forEveryone', 'soft', 'hard'],
+      default: 'forMe'
     }
-  }]
+  }],
+  // Deletion metadata
+  deletionMetadata: {
+    deletedForEveryone: {
+      type: Boolean,
+      default: false
+    },
+    deletedForEveryoneAt: Date,
+    deletedForEveryoneBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    },
+    graceDeleteQueued: {
+      type: Boolean,
+      default: false
+    },
+    graceDeleteRetries: {
+      type: Number,
+      default: 0
+    },
+    hardDeleted: {
+      type: Boolean,
+      default: false
+    },
+    hardDeletedAt: Date
+  },
+  // Auto-delete/disappearing messages
+  autoDelete: {
+    enabled: {
+      type: Boolean,
+      default: false
+    },
+    expiresAt: Date,
+    duration: {
+      type: Number, // in hours
+      default: null
+    }
+  }
 }, {
   timestamps: true
 });
@@ -108,6 +150,10 @@ messageSchema.index({ conversationId: 1, createdAt: -1 });
 messageSchema.index({ senderId: 1, createdAt: -1 });
 messageSchema.index({ 'metadata.isPrivate': 1 });
 messageSchema.index({ isDeleted: 1 });
+messageSchema.index({ 'deletionMetadata.deletedForEveryone': 1 });
+messageSchema.index({ 'deletionMetadata.hardDeleted': 1 });
+messageSchema.index({ 'autoDelete.enabled': 1, 'autoDelete.expiresAt': 1 });
+messageSchema.index({ 'deletionMetadata.graceDeleteQueued': 1 });
 
 // Virtual for timeAgo
 messageSchema.virtual('timeAgo').get(function() {
@@ -148,10 +194,29 @@ messageSchema.methods.softDeleteForUser = function(userId) {
 messageSchema.statics.getMessagesForConversation = function(conversationId, userId, page = 1, limit = 50) {
   return this.find({
     conversationId,
-    isDeleted: false,
+    'deletionMetadata.hardDeleted': { $ne: true },
     $or: [
-      { 'deletedBy.userId': { $ne: userId } },
-      { deletedBy: { $exists: false } }
+      // Not deleted for everyone
+      { 'deletionMetadata.deletedForEveryone': { $ne: true } },
+      // Or deleted for everyone but user is the sender (they can still see it)
+      { senderId: userId }
+    ],
+    // Exclude messages deleted for this user
+    $and: [
+      {
+        $or: [
+          { 'deletedBy.userId': { $ne: userId } },
+          { 
+            'deletedBy': { 
+              $elemMatch: { 
+                userId: userId, 
+                deleteMode: { $ne: 'forMe' } 
+              } 
+            } 
+          },
+          { deletedBy: { $exists: false } }
+        ]
+      }
     ]
   })
   .sort({ createdAt: -1 })
@@ -159,7 +224,8 @@ messageSchema.statics.getMessagesForConversation = function(conversationId, user
   .limit(limit)
   .populate('senderId', 'name avatar type')
   .populate('readBy.userId', 'name avatar')
-  .populate('deletedBy.userId', 'name');
+  .populate('deletedBy.userId', 'name')
+  .populate('deletionMetadata.deletedForEveryoneBy', 'name');
 };
 
 // Ensure virtual fields are serialized

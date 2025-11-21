@@ -76,10 +76,16 @@ export default function ChatSystem() {
     }
   }, [user]);
 
-  // Auto-scroll to bottom when new messages arrive
+  // Auto-scroll to last message ONLY when conversation changes (not on message send)
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+    if (selectedConversation && messages.length > 0) {
+      // Use direct scroll to bottom - more reliable
+      const scrollContainer = document.querySelector('.flex-1.p-4.scrollbar-thin');
+      if (scrollContainer) {
+        scrollContainer.scrollTop = scrollContainer.scrollHeight;
+      }
+    }
+  }, [selectedConversation]); // Removed messages dependency to prevent scroll on send
 
   const loadConversations = async () => {
     try {
@@ -334,37 +340,74 @@ export default function ChatSystem() {
             {/* Messages */}
             <ScrollArea className="flex-1 p-4 scrollbar-thin">
               <div className="space-y-4">
-                {messages.map((message) => (
-                  <div
-                    key={message._id}
-                    className={`flex ${message.isOwn ? 'justify-end' : 'justify-start'}`}
-                  >
+                {messages.map((message) => {
+                  // Fix: Handle senderId as object or string
+                  let messageSenderId;
+                  
+                  // Handle senderId as object or string
+                  if (typeof message.senderId === 'object' && message.senderId !== null) {
+                    messageSenderId = message.senderId._id?.toString() || message.senderId.toString();
+                  } else {
+                    messageSenderId = message.senderId?.toString();
+                  }
+                  
+                  const isOwn = message.isOwn !== undefined ? message.isOwn : (messageSenderId === user?._id?.toString());
+                  const messageTime = new Date(message.createdAt).toLocaleTimeString([], {
+                    hour: '2-digit',
+                    minute: '2-digit'
+                  });
+
+                  return (
                     <div
-                      className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
-                        message.isOwn
-                          ? 'bg-primary text-primary-foreground'
-                          : 'bg-muted'
-                      }`}
+                      key={message._id}
+                      data-message-id={message._id}
+                      className={`flex ${isOwn ? 'justify-end' : 'justify-start'} mb-3`}
                     >
-                      <div className="flex items-center space-x-2 mb-1">
-                        {!message.isOwn && (
-                          <span className="text-xs font-medium">
-                            {message.senderName}
-                          </span>
+                      {/* Message container with proper alignment */}
+                      <div className={`flex items-end max-w-xs lg:max-w-md ${isOwn ? 'flex-row-reverse' : 'flex-row'}`}>
+                        {/* Avatar - only show for received messages */}
+                        {!isOwn && (
+                          <div className="w-8 h-8 flex-shrink-0 mr-2 bg-gray-300 rounded-full flex items-center justify-center">
+                            <span className="text-xs font-medium">
+                              {message.senderName?.charAt(0) || 'U'}
+                            </span>
+                          </div>
                         )}
-                        <span className="text-xs opacity-70">
-                          {message.timeAgo}
-                        </span>
-                      </div>
-                      <p className="text-sm">{message.content}</p>
-                      {message.isOwn && message.isRead && (
-                        <div className="flex justify-end mt-1">
-                          <span className="text-xs opacity-70">✓ Read</span>
+                        
+                        {/* Message content container */}
+                        <div className={`flex flex-col ${isOwn ? 'items-end' : 'items-start'}`}>
+                          {/* Sender name above message - ONLY for group chats */}
+                          {!isOwn && selectedConversation?.isGroupChat && (
+                            <div className="text-xs font-medium mb-1 text-gray-600 dark:text-gray-400">
+                              {message.senderName || 'Unknown User'}
+                            </div>
+                          )}
+                          
+                          {/* Message bubble */}
+                          <div
+                            className={`px-4 py-2 rounded-lg ${
+                              isOwn
+                                ? 'bg-primary text-primary-foreground'
+                                : 'bg-muted text-muted-foreground'
+                            }`}
+                          >
+                            <p className="text-sm">{message.content}</p>
+                            <div className={`flex items-center justify-between mt-1 text-xs ${
+                              isOwn ? 'text-primary-foreground/70' : 'text-muted-foreground'
+                            }`}>
+                              <span>{messageTime}</span>
+                              {isOwn && message.isRead && (
+                                <div className="flex items-center space-x-1">
+                                  <span>✓ Read</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
                         </div>
-                      )}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
                 <div ref={messagesEndRef} />
               </div>
             </ScrollArea>

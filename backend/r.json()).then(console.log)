@@ -1,0 +1,1 @@
+fetch('https://inspiranet-backend.onrender.com/api/config/departments').then(r =

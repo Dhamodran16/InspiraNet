@@ -47,6 +47,18 @@ interface User {
   canMessage?: boolean;
   mutualConnections?: number;
   followRequestStatus?: 'pending' | 'accepted' | 'rejected' | null;
+  studentInfo?: {
+    department?: string;
+    batch?: string;
+    [key: string]: any;
+  };
+  facultyInfo?: {
+    department?: string;
+    [key: string]: any;
+  };
+  alumniInfo?: {
+    [key: string]: any;
+  };
 }
 
 export default function AlumniDirectory() {
@@ -62,6 +74,13 @@ export default function AlumniDirectory() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const { user } = useAuth();
   const navigate = useNavigate();
+
+  // Generate year options dynamically (from 2000 to current year)
+  const currentYear = new Date().getFullYear();
+  const yearOptions = [];
+  for (let year = currentYear; year >= 2000; year--) {
+    yearOptions.push(year);
+  }
 
   const loadUsers = async () => {
     try {
@@ -277,8 +296,21 @@ export default function AlumniDirectory() {
     loadUsers().finally(() => setIsRefreshing(false));
   };
 
-  const getUserBatch = (user: User) => user.batch || 'N/A';
-  const getUserDepartment = (user: User) => user.department || 'N/A';
+  const getUserBatch = (user: User) => {
+    // Check all possible batch locations
+    const batch = user.batch || 
+                  user.studentInfo?.batch || 
+                  'N/A';
+    return batch;
+  };
+  const getUserDepartment = (user: User) => {
+    // Check all possible department locations
+    const department = user.department || 
+                      user.studentInfo?.department || 
+                      user.facultyInfo?.department || 
+                      'N/A';
+    return department;
+  };
   const getUserCompany = (user: User) => user.company || 'Not specified';
   const getUserDesignation = (user: User) => user.designation || 'Not specified';
   const getUserLocation = (user: User) => user.location || 'Not specified';
@@ -336,10 +368,9 @@ export default function AlumniDirectory() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Batches</SelectItem>
-                  <SelectItem value="2020">2020</SelectItem>
-                  <SelectItem value="2021">2021</SelectItem>
-                  <SelectItem value="2022">2022</SelectItem>
-                  <SelectItem value="2023">2023</SelectItem>
+                  {yearOptions.map(year => (
+                    <SelectItem key={year} value={year.toString()}>{year}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -352,10 +383,17 @@ export default function AlumniDirectory() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Departments</SelectItem>
-                  <SelectItem value="CSE">Computer Science</SelectItem>
-                  <SelectItem value="ECE">Electronics</SelectItem>
-                  <SelectItem value="ME">Mechanical</SelectItem>
-                  <SelectItem value="CE">Civil</SelectItem>
+                  <SelectItem value="Mechanical Engineering">Mechanical Engineering</SelectItem>
+                  <SelectItem value="Artificial Intelligence and Data Science">Artificial Intelligence and Data Science</SelectItem>
+                  <SelectItem value="Artificial Intelligence and Machine Learning">Artificial Intelligence and Machine Learning</SelectItem>
+                  <SelectItem value="Mechatronics Engineering">Mechatronics Engineering</SelectItem>
+                  <SelectItem value="Automobile Engineering">Automobile Engineering</SelectItem>
+                  <SelectItem value="Electrical and Electronics Engineering">Electrical and Electronics Engineering</SelectItem>
+                  <SelectItem value="Electronics and Communication Engineering">Electronics and Communication Engineering</SelectItem>
+                  <SelectItem value="Electronics and Instrumentation Engineering">Electronics and Instrumentation Engineering</SelectItem>
+                  <SelectItem value="Computer Science and Engineering">Computer Science and Engineering</SelectItem>
+                  <SelectItem value="Information Technology">Information Technology</SelectItem>
+                  <SelectItem value="Computer Science and Design">Computer Science and Design</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -414,13 +452,13 @@ export default function AlumniDirectory() {
             {users.map((user) => (
               <Card 
                 key={user._id} 
-                className="alumni-card hover:shadow-xl transition-all duration-300 cursor-pointer hover:scale-[1.02] h-full w-full border border-border/50 bg-card/50 backdrop-blur-sm"
+                className="group hover:shadow-xl transition-all duration-300 cursor-pointer hover:scale-[1.02] h-full w-full border border-border/50 bg-card/50 backdrop-blur-sm hover:border-primary/30"
                 onClick={() => handleViewProfile(user._id)}
               >
                 <CardContent className="p-6 h-full flex flex-col w-full">
                   {/* Card Header with Avatar and Basic Info */}
                   <div className="flex items-start space-x-4 mb-4">
-                    <Avatar className="h-16 w-16 sm:h-20 sm:w-20 flex-shrink-0 ring-2 ring-primary/20">
+                    <Avatar className="h-16 w-16 sm:h-20 sm:w-20 flex-shrink-0 ring-2 ring-primary/20 group-hover:ring-primary/40 transition-all duration-300">
                       <AvatarImage src={user.avatar} alt={user.name} />
                       <AvatarFallback className="text-xl font-bold bg-gradient-to-br from-primary/20 to-primary/10 text-primary">
                         {user.name.charAt(0).toUpperCase()}
@@ -523,7 +561,7 @@ export default function AlumniDirectory() {
                           handleFollow(user._id);
                         }
                       }}
-                      className="w-full font-medium"
+                      className="w-full font-medium transition-all duration-300 hover:scale-105"
                       disabled={user.followRequestStatus === 'pending'}
                     >
                       {user.isFollowing ? (
@@ -548,15 +586,15 @@ export default function AlumniDirectory() {
                     <div className="flex space-x-2">
                       {/* Message Button */}
                       {(user.isFollowing || user.isFollowedBy || user.followRequestStatus === 'accepted') && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleMessage(user._id);
-                          }}
-                          className="flex-1"
-                        >
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleMessage(user._id);
+                        }}
+                        className="flex-1 transition-all duration-300 hover:scale-105"
+                      >
                           <MessageSquare className="h-4 w-4 mr-2" />
                           Message
                         </Button>
@@ -570,7 +608,7 @@ export default function AlumniDirectory() {
                           e.stopPropagation();
                           handleViewProfile(user._id);
                         }}
-                        className="flex-1"
+                        className="flex-1 transition-all duration-300 hover:scale-105"
                       >
                         <Eye className="h-4 w-4 mr-2" />
                         Profile

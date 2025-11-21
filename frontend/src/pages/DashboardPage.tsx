@@ -1,27 +1,37 @@
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import { useAuth } from "@/contexts/AuthContext";
-import Sidebar from "@/components/Sidebar";
-import { Button } from "@/components/ui/button";
-import { Menu, ArrowUp, Plus } from "lucide-react";
-import { cn } from "@/lib/utils";
-import PostFeed from "@/components/posts/PostFeed";
-import AlumniDirectory from "@/components/AlumniDirectory";
-import MessagesPage from "@/pages/MessagesPage";
-import PlacementPortal from "@/components/placements/PlacementPortal";
-import GoogleMeetIntegration from "@/components/meet/GoogleMeetIntegration";
-// import Events from "@/components/Events";
-import Settings from "@/components/Settings";
-import NotificationsPage from "@/pages/NotificationsPage";
-import ProfileView from "@/components/profile/ProfileView";
-import ErrorBoundary from "@/components/ErrorBoundary";
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
+import Sidebar from '@/components/Sidebar';
+import PostFeed from '@/components/posts/PostFeed';
+import AlumniDirectory from '@/components/AlumniDirectory';
+import EnhancedMessagesPage from '@/pages/EnhancedMessagesPage';
+import NotificationsPage from '@/pages/NotificationsPage';
+import PlacementPortal from '@/components/placements/PlacementPortal';
+import ProfileView from '@/components/profile/ProfileView';
+import Settings from '@/components/Settings';
+import GoogleCalendarHostDashboard from '@/components/meetings/GoogleCalendarHostDashboard';
+import ErrorBoundary from '@/components/ErrorBoundary';
+import { Button } from '@/components/ui/button';
+import { ArrowUp } from 'lucide-react';
 
 const DashboardPage = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [currentSection, setCurrentSection] = useState("home");
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [showScrollTop, setShowScrollTop] = useState(false);
   const { isAuthenticated, isLoading, user } = useAuth();
+  
+  // Handle URL parameters for section navigation
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.search);
+    const section = searchParams.get('section');
+    if (section && ['home', 'network', 'messages', 'notifications', 'meetings', 'placements', 'profile', 'settings'].includes(section)) {
+      setCurrentSection(section);
+    } else if (!section && location.pathname === '/dashboard') {
+      // Default to home if no section specified
+      setCurrentSection('home');
+    }
+  }, [location.search, location.pathname]);
   
   // Scroll to top functionality
   const scrollToTop = () => {
@@ -64,6 +74,12 @@ const DashboardPage = () => {
     navigate('/', { replace: true });
   };
 
+  const handleSectionChange = (section: string) => {
+    setCurrentSection(section);
+    // Update URL without page reload
+    navigate(`/dashboard?section=${section}`, { replace: true });
+  };
+
   const renderSection = () => {
     switch (currentSection) {
       case "home":
@@ -71,15 +87,13 @@ const DashboardPage = () => {
       case "network":
         return <AlumniDirectory />;
       case "messages":
-        return <MessagesPage />;
+        return <EnhancedMessagesPage />;
       case "notifications":
         return <NotificationsPage />;
-      // case "events":
-      //   return <Events />;
+      case "meetings":
+        return <GoogleCalendarHostDashboard />;
       case "placements":
         return <PlacementPortal />;
-      case "meetings":
-        return <GoogleMeetIntegration />;
       case "profile":
         return <ProfileView />;
       case "settings":
@@ -98,61 +112,37 @@ const DashboardPage = () => {
     );
   }
 
-  // If user is not authenticated, don't render dashboard
-  if (!isAuthenticated) {
-    return null;
-  }
-
   return (
-    <div className="dashboard-container">
-      {/* Floating Background Elements */}
-      <div className="fixed inset-0 pointer-events-none overflow-hidden">
-        <div className="floating-element absolute top-20 left-20 w-32 h-32 bg-gradient-to-r from-blue-400/20 to-purple-400/20 rounded-full blur-xl"></div>
-        <div className="floating-element absolute top-40 right-32 w-24 h-24 bg-gradient-to-r from-pink-400/20 to-red-400/20 rounded-full blur-xl"></div>
-        <div className="floating-element absolute bottom-32 left-32 w-28 h-28 bg-gradient-to-r from-green-400/20 to-blue-400/20 rounded-full blur-xl"></div>
-        <div className="floating-element absolute bottom-20 right-20 w-20 h-20 bg-gradient-to-r from-yellow-400/20 to-orange-400/20 rounded-full blur-xl"></div>
-      </div>
-      
+    <div className="min-h-screen bg-background flex">
+      {/* Sidebar - Fixed to left side */}
       <Sidebar 
-        currentSection={currentSection} 
-        onSectionChange={setCurrentSection} 
-        onLogout={onLogout} 
-        onCollapseChange={setIsSidebarCollapsed}
+        currentSection={currentSection}
+        onSectionChange={handleSectionChange}
+        onLogout={onLogout}
       />
-      <main className="dashboard-main">
-        <div className="h-full flex flex-col min-h-0">
-          {/* Section Content - Each section displays independently */}
-          <div className="flex-1 overflow-hidden">
+
+      {/* Main Content - Adjusted for fixed sidebar */}
+      <div className="flex-1 ml-16 flex flex-col">
+        {/* Content Area */}
+        <main className="flex-1">
+          <div className="h-full dashboard-section">
             <ErrorBoundary>
-              <div className={`dashboard-section dashboard-scroll section-${currentSection} h-full overflow-y-auto overflow-x-hidden`}>
-                <div className="p-6 min-h-full w-full">
-                  {renderSection()}
-                </div>
-              </div>
+              {renderSection()}
             </ErrorBoundary>
           </div>
-        </div>
-        
-        {/* Create Post Floating Action Button */}
-        <Button
-          onClick={() => navigate('/create-post')}
-          className="fixed bottom-6 right-20 z-50 rounded-full w-14 h-14 p-0 shadow-lg hover:shadow-xl transition-all duration-300 bg-blue-600 hover:bg-blue-700 text-white"
-          size="lg"
-        >
-          <Plus className="h-6 w-6" />
-        </Button>
+        </main>
 
         {/* Scroll to Top Button */}
         {showScrollTop && (
           <Button
             onClick={scrollToTop}
-            className="fixed bottom-6 right-6 z-50 rounded-full w-12 h-12 p-0 shadow-lg hover:shadow-xl transition-all duration-300"
-            size="sm"
+            className="fixed bottom-6 right-6 rounded-full w-12 h-12 p-0 shadow-lg z-50"
+            size="icon"
           >
             <ArrowUp className="h-5 w-5" />
           </Button>
         )}
-      </main>
+      </div>
     </div>
   );
 };

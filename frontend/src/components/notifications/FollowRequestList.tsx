@@ -13,7 +13,8 @@ import {
   CheckCircle, 
   XCircle,
   MessageSquare,
-  Eye
+  Eye,
+  UserMinus
 } from 'lucide-react';
 import api, { 
   getPendingFollowRequests, 
@@ -21,7 +22,8 @@ import api, {
   getAcceptedConnections,
   acceptFollowRequest, 
   rejectFollowRequest, 
-  cancelFollowRequest 
+  cancelFollowRequest,
+  unfollowUser
 } from '@/services/api';
 import { socketService } from '@/services/socketService';
 import { useAuth } from '@/contexts/AuthContext';
@@ -272,14 +274,53 @@ export default function FollowRequestList({ onRequestProcessed }: { onRequestPro
     window.location.href = `/profile/${userId}`;
   };
 
-  const receivedRequests = pendingRequests;
-  const outgoingRequests = sentRequests;
-  const mutualConnections = acceptedConnections;
+  const handleUnfollow = async (userId: string) => {
+    try {
+      setLoading(true);
+      await unfollowUser(userId);
+      
+      // Remove from accepted connections
+      setAcceptedConnections(prev => prev.filter(conn => conn.requester._id !== userId));
+      
+      toast({
+        title: "Unfollowed",
+        description: "You are no longer following this user",
+      });
+      
+      // Refresh all data
+      loadFollowRequests();
+    } catch (error: any) {
+      console.error('Error unfollowing user:', error);
+      
+      // Handle specific error cases
+      let errorMessage = "Failed to unfollow user";
+      let errorTitle = "Error";
+      
+      if (error.response?.status === 400) {
+        errorTitle = "Cannot Unfollow";
+        errorMessage = error.response.data?.error || "You are not following this user or cannot unfollow";
+      } else if (error.response?.status === 404) {
+        errorTitle = "User Not Found";
+        errorMessage = "The user you're trying to unfollow doesn't exist";
+      } else if (error.response?.data?.error) {
+        errorMessage = error.response.data.error;
+      }
+      
+      toast({
+        title: errorTitle,
+        description: errorMessage,
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
 
   console.log('🎯 Render Data:', {
-    receivedRequests,
-    outgoingRequests,
-    mutualConnections,
+    pendingRequests,
+    sentRequests,
+    acceptedConnections,
     activeTab
   });
 
@@ -309,24 +350,24 @@ export default function FollowRequestList({ onRequestProcessed }: { onRequestPro
             <UserPlus className="h-4 w-4" />
             <span className="hidden sm:inline">Received</span>
             <span className="sm:hidden">In</span>
-            {receivedRequests.length > 0 && (
-              <Badge variant="secondary" className="ml-2">{receivedRequests.length}</Badge>
+            {pendingRequests.length > 0 && (
+              <Badge variant="secondary" className="ml-2">{pendingRequests.length}</Badge>
             )}
           </TabsTrigger>
           <TabsTrigger value="sent" className="flex items-center space-x-2">
             <UserCheck className="h-4 w-4" />
             <span className="hidden sm:inline">Sent</span>
             <span className="sm:hidden">Out</span>
-            {outgoingRequests.length > 0 && (
-              <Badge variant="secondary" className="ml-2">{outgoingRequests.length}</Badge>
+            {sentRequests.length > 0 && (
+              <Badge variant="secondary" className="ml-2">{sentRequests.length}</Badge>
             )}
           </TabsTrigger>
           <TabsTrigger value="accepted" className="flex items-center space-x-2">
             <CheckCircle className="h-4 w-4" />
             <span className="hidden sm:inline">Accepted</span>
             <span className="sm:hidden">Done</span>
-            {mutualConnections.length > 0 && (
-              <Badge variant="secondary" className="ml-2">{mutualConnections.length}</Badge>
+            {acceptedConnections.length > 0 && (
+              <Badge variant="secondary" className="ml-2">{acceptedConnections.length}</Badge>
             )}
           </TabsTrigger>
         </TabsList>
@@ -342,7 +383,7 @@ export default function FollowRequestList({ onRequestProcessed }: { onRequestPro
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
               <p className="mt-2 text-muted-foreground">Loading requests...</p>
             </div>
-          ) : receivedRequests.length === 0 ? (
+          ) : pendingRequests.length === 0 ? (
             <Card className="text-center py-8">
               <CardContent>
                 <UserPlus className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
@@ -352,7 +393,7 @@ export default function FollowRequestList({ onRequestProcessed }: { onRequestPro
             </Card>
           ) : (
             <div className="grid gap-4">
-              {receivedRequests.map((request) => (
+              {pendingRequests.map((request) => (
                 <Card key={request._id} className="hover:shadow-md transition-shadow">
                   <CardContent className="p-4 sm:p-6">
                     <div className="flex flex-col sm:flex-row sm:items-start justify-between space-y-4 sm:space-y-0">
@@ -433,7 +474,7 @@ export default function FollowRequestList({ onRequestProcessed }: { onRequestPro
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
               <p className="mt-2 text-muted-foreground">Loading requests...</p>
             </div>
-          ) : outgoingRequests.length === 0 ? (
+          ) : sentRequests.length === 0 ? (
             <Card className="text-center py-8">
               <CardContent>
                 <UserCheck className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
@@ -443,7 +484,7 @@ export default function FollowRequestList({ onRequestProcessed }: { onRequestPro
             </Card>
           ) : (
             <div className="grid gap-4">
-              {outgoingRequests.map((request) => (
+              {sentRequests.map((request) => (
                 <Card key={request._id} className="hover:shadow-md transition-shadow">
                   <CardContent className="p-4 sm:p-6">
                     <div className="flex flex-col sm:flex-row sm:items-start justify-between space-y-4 sm:space-y-0">
@@ -517,7 +558,7 @@ export default function FollowRequestList({ onRequestProcessed }: { onRequestPro
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
               <p className="mt-2 text-muted-foreground">Loading connections...</p>
             </div>
-          ) : mutualConnections.length === 0 ? (
+          ) : acceptedConnections.length === 0 ? (
             <Card className="text-center py-8">
               <CardContent>
                 <CheckCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
@@ -527,7 +568,7 @@ export default function FollowRequestList({ onRequestProcessed }: { onRequestPro
             </Card>
           ) : (
             <div className="grid gap-4">
-              {mutualConnections.map((request) => (
+              {acceptedConnections.map((request) => (
                 <Card key={request._id} className="hover:shadow-md transition-shadow">
                   <CardContent className="p-4 sm:p-6">
                     <div className="flex flex-col sm:flex-row sm:items-start justify-between space-y-4 sm:space-y-0">
@@ -587,6 +628,14 @@ export default function FollowRequestList({ onRequestProcessed }: { onRequestPro
                         >
                           <Eye className="h-4 w-4 mr-2" />
                           Profile
+                        </Button>
+                        <Button
+                          variant="outline"
+                          onClick={() => handleUnfollow(request.requester._id)}
+                          className="w-full sm:w-auto text-red-600 hover:text-red-700 hover:bg-red-50"
+                        >
+                          <UserMinus className="h-4 w-4 mr-2" />
+                          Unfollow
                         </Button>
                       </div>
                     </div>

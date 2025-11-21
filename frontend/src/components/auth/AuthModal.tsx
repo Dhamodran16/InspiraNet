@@ -12,6 +12,7 @@ import { GraduationCap, Users, BookOpen, Eye, EyeOff } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { authService, LoginCredentials, RegisterData } from "@/services/auth";
+import { getBackendUrl } from "@/utils/urlConfig";
 
 interface AuthModalProps {
   children: React.ReactNode;
@@ -40,7 +41,7 @@ export default function AuthModal({ children, onAuthSuccess, defaultOpen, defaul
   useEffect(() => {
     const fetchDepartments = async () => {
       try {
-        const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/auth/departments`);
+        const response = await fetch(`${getBackendUrl()}/api/auth/departments`);
         if (response.ok) {
           const data = await response.json();
           setDepartments(data.departments);
@@ -150,12 +151,13 @@ export default function AuthModal({ children, onAuthSuccess, defaultOpen, defaul
         
         // Validate role-specific fields
         if (userType === 'student') {
-          if (!signupData.department || !signupData.joinYear) {
-            throw new Error('Students must provide department and join year');
+          if (!signupData.joinYear) {
+            throw new Error('Students must provide join year');
           }
+          // Department is now optional during registration, will be collected in profile completion
         } else if (userType === 'faculty') {
-          if (!signupData.department || !signupData.email) {
-            throw new Error('Faculty must provide department and official Kongu email');
+          if (!signupData.email) {
+            throw new Error('Faculty must provide official Kongu email');
           }
         }
 
@@ -437,7 +439,7 @@ export default function AuthModal({ children, onAuthSuccess, defaultOpen, defaul
 
   const renderLoginForm = () => {
     return (
-      <form onSubmit={handleAuth} className="space-y-4 max-h-[70vh] overflow-y-auto">
+      <form onSubmit={handleAuth} className="space-y-4">
             <div>
           <Label htmlFor="loginEmail">Email</Label>
               <Input 
@@ -492,7 +494,7 @@ export default function AuthModal({ children, onAuthSuccess, defaultOpen, defaul
       <DialogTrigger asChild>
         {children}
       </DialogTrigger>
-      <DialogContent className="sm:max-w-md w-[90vw] max-h-[85vh] overflow-hidden p-4 sm:p-6">
+      <DialogContent className="sm:max-w-md w-[90vw] p-4 sm:p-6">
         <DialogHeader className="pb-4">
           <DialogTitle className="text-center text-lg sm:text-xl">
             {isLogin ? "Welcome Back" : "Join KEC Alumni Network"}
@@ -505,11 +507,11 @@ export default function AuthModal({ children, onAuthSuccess, defaultOpen, defaul
             <TabsTrigger value="signup">Sign Up</TabsTrigger>
           </TabsList>
           
-          <TabsContent value="login" className="space-y-4 max-h-[60vh] overflow-y-auto scrollbar-thin">
+          <TabsContent value="login" className="space-y-4 scrollbar-thin">
             {renderLoginForm()}
           </TabsContent>
           
-          <TabsContent value="signup" className="space-y-4 max-h-[60vh] overflow-y-auto scrollbar-thin">
+          <TabsContent value="signup" className="space-y-4 scrollbar-thin">
                 {renderSignupForm()}
           </TabsContent>
         </Tabs>

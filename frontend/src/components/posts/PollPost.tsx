@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
-import { Vote, Eye, EyeOff, Calendar, Clock, Users, Award, Image as ImageIcon, Video, FileText } from 'lucide-react';
+import { Vote, Eye, EyeOff, Calendar, Clock, Users, Award, Image as ImageIcon, Video, FileText, MoreVertical, X, Share2, Trash2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from '@/hooks/use-toast';
 import { formatDistanceToNow } from 'date-fns';
@@ -53,6 +53,8 @@ interface PollPostProps {
   onComment: (postId: string, comment: string) => void;
   onEdit?: (post: Post) => void;
   onDelete?: (postId: string) => void;
+  onDeleteComment?: (postId: string, commentId: string) => void;
+  onShare?: (postId: string) => void;
   showComments: boolean;
   onToggleComments: () => void;
   commentsCount: number;
@@ -60,6 +62,7 @@ interface PollPostProps {
   isLiked: boolean;
   onPollVote: (postId: string, optionId: string) => void;
   showDeleteButton?: boolean;
+  showShareButton?: boolean;
 }
 
 const PollPost: React.FC<PollPostProps> = ({
@@ -68,19 +71,41 @@ const PollPost: React.FC<PollPostProps> = ({
   onComment,
   onEdit,
   onDelete,
+  onDeleteComment,
+  onShare,
   showComments,
   onToggleComments,
   commentsCount,
   likesCount,
   isLiked,
   onPollVote,
-  showDeleteButton
+  showDeleteButton,
+  showShareButton = true
 }) => {
   const { user } = useAuth();
   const [currentPost, setCurrentPost] = useState(post);
   const [showResults, setShowResults] = useState(false);
   const [newComment, setNewComment] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showPostMenu, setShowPostMenu] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  // Close menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setShowPostMenu(false);
+      }
+    };
+
+    if (showPostMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showPostMenu]);
 
   // Update local state when post prop changes
   useEffect(() => {
@@ -202,29 +227,84 @@ const PollPost: React.FC<PollPostProps> = ({
   };
 
   return (
-    <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm">
-      {/* Header */}
-      <div className="p-4 border-b border-gray-200 dark:border-gray-700">
-        <div className="flex items-center space-x-3">
-          <div className="flex-shrink-0">
-            <img
-              src={currentPost.author.avatar || '/default-avatar.png'}
-              alt={currentPost.author.name}
-              className="h-10 w-10 rounded-full object-cover"
-            />
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
-              {currentPost.author.name}
-            </p>
-            <div className="flex items-center space-x-2 text-xs text-gray-500 dark:text-gray-400">
-              <span>{formatDistanceToNow(new Date(currentPost.createdAt), { addSuffix: true })}</span>
-              <span>•</span>
-              <span className="capitalize">{currentPost.author.type}</span>
-            </div>
-          </div>
-        </div>
-      </div>
+    <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm max-w-4xl mx-auto">
+              {/* Header */}
+              <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <div className="flex-shrink-0">
+                      <img
+                        src={currentPost.author.avatar || '/default-avatar.png'}
+                        alt={currentPost.author.name}
+                        className="h-10 w-10 rounded-full object-cover"
+                      />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                        {currentPost.author.name}
+                      </p>
+                      <div className="flex items-center space-x-2 text-xs text-gray-500 dark:text-gray-400">
+                        <span>{formatDistanceToNow(new Date(currentPost.createdAt), { addSuffix: true })}</span>
+                        <span>•</span>
+                        <span className="capitalize">{currentPost.author.type}</span>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Three dot menu */}
+                  <div className="relative" ref={menuRef}>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-8 w-8 text-gray-500 dark:text-gray-400"
+                      onClick={() => setShowPostMenu(!showPostMenu)}
+                    >
+                      <MoreVertical className="h-4 w-4" />
+                    </Button>
+                    
+                    {showPostMenu && (
+                      <div className="absolute right-0 mt-2 w-40 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-lg z-10">
+                        <div className="p-1">
+                          {showShareButton && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                onShare?.(currentPost._id);
+                                setShowPostMenu(false);
+                              }}
+                              className="w-full justify-start text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+                            >
+                              <Share2 className="h-4 w-4 mr-2" /> Share
+                            </Button>
+                          )}
+                          {showDeleteButton && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                onDelete?.(currentPost._id);
+                                setShowPostMenu(false);
+                              }}
+                              className="w-full justify-start text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" /> Delete
+                            </Button>
+                          )}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="w-full justify-start"
+                            onClick={() => setShowPostMenu(false)}
+                          >
+                            <X className="h-4 w-4 mr-2" /> Close
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
 
       {/* Media Content - Display First */}
       {currentPost.media && currentPost.media.length > 0 && (
@@ -237,15 +317,17 @@ const PollPost: React.FC<PollPostProps> = ({
         </div>
       )}
 
-      {/* Poll Content */}
-      <div className="p-4">
+      {/* Poll Content Below Images */}
+      <div className="px-4 py-4">
         <div className="mb-4">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
-              {currentPost.pollDetails.question}
+            {currentPost.pollDetails.question}
           </h3>
-          <p className="text-gray-600 dark:text-gray-400 text-sm">
-            {currentPost.content}
+          {currentPost.content && (
+            <p className="text-gray-600 dark:text-gray-400 text-sm">
+              {currentPost.content}
             </p>
+          )}
         </div>
 
           {/* Poll Options */}

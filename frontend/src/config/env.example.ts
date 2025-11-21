@@ -3,13 +3,13 @@
 
 export const exampleConfig = {
   // Backend API URL
-  VITE_BACKEND_URL: 'http://localhost:5000',
+  VITE_BACKEND_URL: 'https://inspiranet-backend.onrender.com',
   
   // Frontend URL
-  VITE_FRONTEND_URL: 'http://localhost:8084',
+  VITE_FRONTEND_URL: 'https://inspiranet.onrender.com',
   
   // Socket URL
-  VITE_SOCKET_URL: 'http://localhost:5000',
+  VITE_SOCKET_URL: 'https://inspiranet-backend.onrender.com',
   
   // API Configuration
   VITE_API_TIMEOUT: '10000',
@@ -26,9 +26,9 @@ To use this configuration:
 1. Create a file named `.env.local` in your project root
 2. Add the following lines (update values as needed):
 
-VITE_BACKEND_URL=http://localhost:5000
-VITE_FRONTEND_URL=http://localhost:8084
-VITE_SOCKET_URL=http://localhost:5000
+VITE_BACKEND_URL=https://inspiranet-backend.onrender.com
+VITE_FRONTEND_URL=https://inspiranet.onrender.com
+VITE_SOCKET_URL=https://inspiranet-backend.onrender.com
 VITE_API_TIMEOUT=10000
 VITE_ENABLE_NOTIFICATIONS=true
 VITE_ENABLE_SOCKETS=true

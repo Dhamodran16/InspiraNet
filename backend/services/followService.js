@@ -5,6 +5,106 @@ const NotificationService = require('./notificationService');
 const Connection = require('../models/Connection');
 
 class FollowService {
+  // Send reverse follow request (specialized for mutual connections)
+  static async sendReverseFollowRequest(requesterId, targetId) {
+    try {
+      console.log('🔍 sendReverseFollowRequest called:', { requesterId, targetId });
+      
+      // Check if already following (this should be false for reverse requests)
+      const existingFollow = await Follow.findOne({
+        followerId: requesterId,
+        followeeId: targetId
+      });
+
+      if (existingFollow) {
+        console.log('⚠️ Reverse follow already exists, skipping');
+        return { 
+          success: false, 
+          reason: 'already_following',
+          message: 'Already following this user'
+        };
+      }
+
+      // Check if reverse request already exists
+      const existingRequest = await FollowRequest.findOne({
+        requesterId,
+        targetId,
+        status: 'pending'
+      });
+
+      if (existingRequest) {
+        console.log('⚠️ Reverse request already exists, skipping');
+        return { 
+          success: false, 
+          reason: 'request_already_sent',
+          message: 'Reverse follow request already sent and pending'
+        };
+      }
+
+      // Get users for notifications
+      const targetUser = await User.findById(targetId);
+      const requesterUser = await User.findById(requesterId);
+      
+      if (!targetUser || !requesterUser) {
+        console.log('❌ Users not found for reverse request');
+        return { 
+          success: false, 
+          reason: 'user_not_found',
+          message: 'User not found'
+        };
+      }
+
+      console.log('✅ Creating reverse follow request...');
+      
+      // Create reverse follow request
+      const followRequest = new FollowRequest({
+        requesterId,
+        targetId,
+        status: 'pending'
+      });
+
+      await followRequest.save();
+      console.log('✅ Reverse follow request saved:', followRequest._id);
+
+      // Create notification for target user (original requester)
+      try {
+        await NotificationService.createNotification({
+          recipientId: targetId,
+          senderId: requesterId,
+          type: 'follow_request',
+          title: 'New Follow Request',
+          message: `${requesterUser.name} sent you a follow request`,
+          relatedUserId: requesterId,
+          category: 'connection',
+          priority: 'medium',
+          metadata: {
+            requesterName: requesterUser.name,
+            requesterAvatar: requesterUser.avatar,
+            requesterType: requesterUser.type,
+            isReverseRequest: true
+          }
+        });
+        console.log('✅ Reverse request notification created');
+      } catch (notificationError) {
+        console.error('❌ Error creating reverse request notification:', notificationError);
+      }
+
+      return { 
+        success: true, 
+        message: 'Reverse follow request sent successfully',
+        targetName: targetUser.name,
+        requesterName: requesterUser.name
+      };
+    } catch (error) {
+      console.error('❌ Error sending reverse follow request:', error);
+      return { 
+        success: false, 
+        reason: 'server_error',
+        message: 'Server error occurred while sending reverse follow request'
+      };
+    }
+  }
+
   // Send follow request
   static async sendFollowRequest(requesterId, targetId) {
     try {
@@ -126,7 +226,7 @@ class FollowService {
     }
   }
 
-  // Accept follow request
+  // Accept follow request (Step 1 of two-step mutual follow)
   static async acceptFollowRequest(requestId, targetUserId) {
     try {
       const followRequest = await FollowRequest.findById(requestId);
@@ -147,49 +247,115 @@ class FollowService {
       followRequest.decidedAt = new Date();
       await followRequest.save();
 
-      console.log('🔍 Creating connection between users...');
-      // Create connection
-      try {
-        await this.createConnection(followRequest.requesterId, followRequest.targetId, followRequest.requesterId);
-        console.log('✅ Connection created successfully');
-      } catch (error) {
-        console.error('❌ Error creating connection:', error);
+      console.log('🔍 Step 1: Creating one-way follow relationship...');
+      
+      // Create one-way follow (requester -> target)
+      const existingFollow = await Follow.findOne({
+        followerId: followRequest.requesterId,
+        followeeId: followRequest.targetId
+      });
+      
+      if (!existingFollow) {
+        await Follow.create({ 
+          followerId: followRequest.requesterId, 
+          followeeId: followRequest.targetId 
+        });
+        console.log('✅ Created one-way follow (requester -> target)');
       }
 
-      // Ensure Follow documents exist for both directions (mutual follow persistence)
-      try {
-        const requesterId = followRequest.requesterId;
-        const targetId = followRequest.targetId;
-
-        // Create or ensure requester -> target follow
-        const existingForwardFollow = await Follow.findOne({
-          followerId: requesterId,
-          followeeId: targetId
-        });
-        if (!existingForwardFollow) {
-          await Follow.create({ followerId: requesterId, followeeId: targetId });
-          console.log('✅ Created Follow (requester -> target)');
-        }
-
-        // Create or ensure target -> requester follow (mutual)
-        const existingBackwardFollow = await Follow.findOne({
-          followerId: targetId,
-          followeeId: requesterId
-        });
-        if (!existingBackwardFollow) {
-          await Follow.create({ followerId: targetId, followeeId: requesterId });
-          console.log('✅ Created Follow (target -> requester)');
-        }
-      } catch (followCreationError) {
-        console.error('❌ Error ensuring Follow documents for mutual connection:', followCreationError);
-      }
-
-      // Create notifications
+      // Update User arrays for one-way follow
       const requester = await User.findById(followRequest.requesterId);
       const target = await User.findById(followRequest.targetId);
 
       if (requester && target) {
-        // Notify requester that their request was accepted
+        // Add target to requester's following list
+        if (!requester.following.some(id => id.toString() === followRequest.targetId.toString())) {
+          requester.following.push(followRequest.targetId);
+        }
+        
+        // Add requester to target's followers list
+        if (!target.followers.some(id => id.toString() === followRequest.requesterId.toString())) {
+          target.followers.push(followRequest.requesterId);
+        }
+
+        await Promise.all([requester.save(), target.save()]);
+        console.log('✅ Updated User arrays for one-way follow');
+      }
+
+      console.log('🔍 Step 2: Sending reverse follow request for mutual connection...');
+      console.log('🔍 Reverse request details:', {
+        requesterId: followRequest.targetId,
+        targetId: followRequest.requesterId,
+        originalRequesterId: followRequest.requesterId,
+        originalTargetId: followRequest.targetId
+      });
+      
+      // Send reverse follow request (target -> requester) for mutual connection
+      const reverseRequestResult = await this.sendReverseFollowRequest(
+        followRequest.targetId, 
+        followRequest.requesterId
+      );
+
+      if (reverseRequestResult.success) {
+        console.log('✅ Reverse follow request sent successfully');
+        
+        // Create notifications
+        // Notify requester that their request was accepted and they have a new follow request
+        try {
+          await NotificationService.createNotification({
+            recipientId: followRequest.requesterId,
+            senderId: followRequest.targetId,
+            type: 'follow_accepted_with_request',
+            title: 'Follow Request Accepted + New Request',
+            message: `${target.name} accepted your follow request and sent you a follow request back! Accept it to become mutual connections.`,
+            relatedUserId: followRequest.targetId,
+            category: 'connection',
+            priority: 'high',
+            metadata: {
+              targetName: target.name,
+              targetAvatar: target.avatar,
+              targetType: target.type,
+              hasReverseRequest: true
+            }
+          });
+        } catch (notificationError) {
+          console.error('Error creating follow accepted notification for requester:', notificationError);
+        }
+
+        // Notify target that they accepted the request and sent a reverse request
+        try {
+          await NotificationService.createNotification({
+            recipientId: followRequest.targetId,
+            senderId: followRequest.requesterId,
+            type: 'follow_accepted_reverse_sent',
+            title: 'Follow Request Accepted',
+            message: `You accepted ${requester.name}'s follow request and sent them a follow request back. Wait for their acceptance to become mutual connections.`,
+            relatedUserId: followRequest.requesterId,
+            category: 'connection',
+            priority: 'medium',
+            metadata: {
+              requesterName: requester.name,
+              requesterAvatar: requester.avatar,
+              requesterType: requester.type,
+              reverseRequestSent: true
+            }
+          });
+        } catch (notificationError) {
+          console.error('Error creating follow accepted notification for target:', notificationError);
+        }
+
+        return { 
+          success: true, 
+          message: 'Follow request accepted. Reverse follow request sent for mutual connection.',
+          requesterName: requester?.name,
+          targetName: target?.name,
+          reverseRequestSent: true,
+          nextStep: 'Wait for requester to accept the reverse follow request to become mutual connections'
+        };
+      } else {
+        console.log('❌ Failed to send reverse follow request:', reverseRequestResult);
+        
+        // Still notify about acceptance even if reverse request failed
         try {
           await NotificationService.createNotification({
             recipientId: followRequest.requesterId,
@@ -207,39 +373,145 @@ class FollowService {
             }
           });
         } catch (notificationError) {
-          console.error('Error creating follow accepted notification for requester:', notificationError);
+          console.error('Error creating follow accepted notification:', notificationError);
         }
 
-        // Notify target that they accepted the request
+        return { 
+          success: true, 
+          message: 'Follow request accepted (one-way follow established)',
+          requesterName: requester?.name,
+          targetName: target?.name,
+          reverseRequestSent: false,
+          warning: 'Could not send reverse follow request for mutual connection'
+        };
+      }
+    } catch (error) {
+      console.error('Error accepting follow request:', error);
+      return { success: false, reason: 'server_error' };
+    }
+  }
+
+  // Accept reverse follow request (Step 2 of two-step mutual follow)
+  static async acceptReverseFollowRequest(requestId, requesterUserId) {
+    try {
+      const followRequest = await FollowRequest.findById(requestId);
+      if (!followRequest) {
+        return { success: false, reason: 'request_not_found' };
+      }
+
+      if (followRequest.targetId.toString() !== requesterUserId.toString()) {
+        return { success: false, reason: 'unauthorized' };
+      }
+
+      if (followRequest.status !== 'pending') {
+        return { success: false, reason: 'request_already_processed' };
+      }
+
+      // Update request status
+      followRequest.status = 'accepted';
+      followRequest.decidedAt = new Date();
+      await followRequest.save();
+
+      console.log('🔍 Step 2: Creating mutual follow relationship...');
+      
+      // Create mutual follow (target -> requester)
+      const existingFollow = await Follow.findOne({
+        followerId: followRequest.requesterId,
+        followeeId: followRequest.targetId
+      });
+      
+      if (!existingFollow) {
+        await Follow.create({ 
+          followerId: followRequest.requesterId, 
+          followeeId: followRequest.targetId 
+        });
+        console.log('✅ Created mutual follow (target -> requester)');
+      }
+
+      // Update User arrays for mutual follow
+      const requester = await User.findById(followRequest.targetId); // Note: requesterUserId is the original requester
+      const target = await User.findById(followRequest.requesterId); // Note: requesterId in the request is the target
+
+      if (requester && target) {
+        // Add target to requester's following list
+        if (!requester.following.some(id => id.toString() === followRequest.requesterId.toString())) {
+          requester.following.push(followRequest.requesterId);
+        }
+        
+        // Add requester to target's followers list
+        if (!target.followers.some(id => id.toString() === followRequest.targetId.toString())) {
+          target.followers.push(followRequest.targetId);
+        }
+
+        await Promise.all([requester.save(), target.save()]);
+        console.log('✅ Updated User arrays for mutual follow');
+      }
+
+      // Create mutual connection
+      try {
+        await this.createConnection(followRequest.targetId, followRequest.requesterId, followRequest.targetId);
+        console.log('✅ Mutual connection created successfully');
+      } catch (error) {
+        console.error('❌ Error creating mutual connection:', error);
+      }
+
+      // Create notifications for mutual connection
+      if (requester && target) {
+        // Notify requester that mutual connection is established
         try {
           await NotificationService.createNotification({
             recipientId: followRequest.targetId,
             senderId: followRequest.requesterId,
-            type: 'follow_accepted',
-            title: 'Follow Request Accepted',
-            message: `You accepted ${requester.name}'s follow request`,
+            type: 'mutual_connection_established',
+            title: 'Mutual Connection Established! 🎉',
+            message: `You and ${target.name} are now mutual connections! You can message each other freely.`,
             relatedUserId: followRequest.requesterId,
             category: 'connection',
-            priority: 'medium',
+            priority: 'high',
             metadata: {
-              requesterName: requester.name,
-              requesterAvatar: requester.avatar,
-              requesterType: requester.type
+              targetName: target.name,
+              targetAvatar: target.avatar,
+              targetType: target.type,
+              connectionType: 'mutual'
             }
           });
         } catch (notificationError) {
-          console.error('Error creating follow accepted notification for target:', notificationError);
+          console.error('Error creating mutual connection notification for requester:', notificationError);
+        }
+
+        // Notify target that mutual connection is established
+        try {
+          await NotificationService.createNotification({
+            recipientId: followRequest.requesterId,
+            senderId: followRequest.targetId,
+            type: 'mutual_connection_established',
+            title: 'Mutual Connection Established! 🎉',
+            message: `You and ${requester.name} are now mutual connections! You can message each other freely.`,
+            relatedUserId: followRequest.targetId,
+            category: 'connection',
+            priority: 'high',
+            metadata: {
+              requesterName: requester.name,
+              requesterAvatar: requester.avatar,
+              requesterType: requester.type,
+              connectionType: 'mutual'
+            }
+          });
+        } catch (notificationError) {
+          console.error('Error creating mutual connection notification for target:', notificationError);
         }
       }
 
       return { 
         success: true, 
-        message: 'Follow request accepted successfully',
+        message: 'Mutual connection established successfully! 🎉',
         requesterName: requester?.name,
-        targetName: target?.name
+        targetName: target?.name,
+        connectionType: 'mutual',
+        canMessage: true
       };
     } catch (error) {
-      console.error('Error accepting follow request:', error);
+      console.error('Error accepting reverse follow request:', error);
       return { success: false, reason: 'server_error' };
     }
   }
@@ -364,8 +636,46 @@ class FollowService {
           console.log(`✅ Added ${user2.name} to ${user1.name}'s followers`);
         }
 
+        // Ensure arrays are properly initialized
+        if (!user1.following) user1.following = [];
+        if (!user1.followers) user1.followers = [];
+        if (!user2.following) user2.following = [];
+        if (!user2.followers) user2.followers = [];
+
+        // Force save and verify the arrays are updated
         await user1.save();
         await user2.save();
+        
+        // Verify the arrays were saved correctly
+        const updatedUser1 = await User.findById(user1Id);
+        const updatedUser2 = await User.findById(user2Id);
+        
+        console.log(`🔍 Verification - ${updatedUser1.name}: following=${updatedUser1.following.length}, followers=${updatedUser1.followers.length}`);
+        console.log(`🔍 Verification - ${updatedUser2.name}: following=${updatedUser2.following.length}, followers=${updatedUser2.followers.length}`);
+        
+        // Double-check that the IDs are actually in the arrays
+        const user1FollowingIds = updatedUser1.following.map(id => id.toString());
+        const user1FollowersIds = updatedUser1.followers.map(id => id.toString());
+        const user2FollowingIds = updatedUser2.following.map(id => id.toString());
+        const user2FollowersIds = updatedUser2.followers.map(id => id.toString());
+        
+        console.log(`🔍 User1 following IDs:`, user1FollowingIds);
+        console.log(`🔍 User1 followers IDs:`, user1FollowersIds);
+        console.log(`🔍 User2 following IDs:`, user2FollowingIds);
+        console.log(`🔍 User2 followers IDs:`, user2FollowersIds);
+        
+        // Verify mutual connection exists
+        const isUser1FollowingUser2 = user1FollowingIds.includes(user2Id.toString());
+        const isUser2FollowingUser1 = user2FollowingIds.includes(user1Id.toString());
+        const isUser1InUser2Followers = user2FollowersIds.includes(user1Id.toString());
+        const isUser2InUser1Followers = user1FollowersIds.includes(user2Id.toString());
+        
+        console.log(`🔍 Mutual verification:`, {
+          user1FollowingUser2: isUser1FollowingUser2,
+          user2FollowingUser1: isUser2FollowingUser1,
+          user1InUser2Followers: isUser1InUser2Followers,
+          user2InUser1Followers: isUser2InUser1Followers
+        });
         
         console.log(`✅ After save - ${user1.name}: following=${user1.following.length}, followers=${user1.followers.length}`);
         console.log(`✅ After save - ${user2.name}: following=${user2.following.length}, followers=${user2.followers.length}`);

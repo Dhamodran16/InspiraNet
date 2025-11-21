@@ -1,6 +1,7 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Users, GraduationCap } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import CollegeHeader from '@/components/CollegeHeader';
 import Footer from '@/components/Footer';
 
@@ -41,13 +42,14 @@ const TeamPage = () => {
 
   return (
     <div className="min-h-screen bg-white">
-      <CollegeHeader centered showNav={false} />
+      <CollegeHeader showNav={false} />
       
       {/* Main Content */}
       <div className="container mx-auto px-4 py-12">
         {/* Page Title */}
         <div className="text-center mb-16">
           <h1 className="text-4xl font-bold text-blue-800 mb-2">Beyond Bonds</h1>
+          <p className="text-lg text-gray-600">Development Team</p>
         </div>
 
         {/* Staff Members Section */}
@@ -105,8 +107,6 @@ const TeamPage = () => {
             ))}
           </div>
         </div>
-
-        {/* Contact Section removed as per request */}
       </div>
 
       <Footer />

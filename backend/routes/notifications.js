@@ -75,6 +75,73 @@ router.get('/unread-count', authenticateToken, async (req, res) => {
   }
 });
 
+// Get notification settings
+router.get('/settings', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user._id;
+    
+    // Get or create user settings
+    let userSettings = await UserSettings.findOne({ userId });
+    
+    if (!userSettings) {
+      // Create default settings
+      userSettings = new UserSettings({
+        userId,
+        emailNotifications: {
+          newMessages: true,
+          newFollowers: true,
+          postLikes: true,
+          postComments: true,
+          systemUpdates: true
+        },
+        pushNotifications: {
+          newMessages: true,
+          newFollowers: true,
+          postLikes: true,
+          postComments: true,
+          systemUpdates: true
+        },
+        inAppNotifications: {
+          newMessages: true,
+          newFollowers: true,
+          postLikes: true,
+          postComments: true,
+          systemUpdates: true
+        }
+      });
+      await userSettings.save();
+    }
+
+    res.json({ settings: userSettings });
+  } catch (error) {
+    console.error('Error getting notification settings:', error);
+    res.status(500).json({ error: 'Failed to get notification settings' });
+  }
+});
+
+// Update notification settings
+router.patch('/settings', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { emailNotifications, pushNotifications, inAppNotifications } = req.body;
+    
+    const userSettings = await UserSettings.findOneAndUpdate(
+      { userId },
+      { 
+        emailNotifications, 
+        pushNotifications, 
+        inAppNotifications 
+      },
+      { new: true, upsert: true }
+    );
+
+    res.json({ message: 'Settings updated successfully', settings: userSettings });
+  } catch (error) {
+    console.error('Error updating notification settings:', error);
+    res.status(500).json({ error: 'Failed to update notification settings' });
+  }
+});
+
 // Mark notification as read
 router.patch('/:notificationId/read', authenticateToken, async (req, res) => {
   try {
@@ -106,9 +173,15 @@ router.patch('/mark-all-read', authenticateToken, async (req, res) => {
     const userId = req.user._id;
     const result = await NotificationService.markAllAsRead(userId);
     
+    // Emit socket event for real-time updates
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`user_${userId}`).emit('all_notifications_read');
+    }
+
     res.json({ 
       message: 'All notifications marked as read', 
-      modifiedCount: result.modifiedCount 
+      updatedCount: result.modifiedCount 
     });
   } catch (error) {
     console.error('Error marking all notifications as read:', error);
@@ -116,39 +189,73 @@ router.patch('/mark-all-read', authenticateToken, async (req, res) => {
   }
 });
 
-// Delete notification
-router.delete('/:notificationId', authenticateToken, async (req, res) => {
-  try {
-    const { notificationId } = req.params;
-    const userId = req.user._id;
-
-    const notification = await NotificationService.deleteNotification(notificationId, userId);
-    
-    if (!notification) {
-      return res.status(404).json({ error: 'Notification not found' });
-    }
-
-    res.json({ message: 'Notification deleted successfully' });
-  } catch (error) {
-    console.error('Error deleting notification:', error);
-    res.status(500).json({ error: 'Failed to delete notification' });
-  }
-});
-
 // Get user notification settings
 router.get('/settings', authenticateToken, async (req, res) => {
   try {
     const userId = req.user._id;
+    let settings = await UserSettings.findOne({ userId });
     
-    let userSettings = await UserSettings.findOne({ userId });
-    
-    if (!userSettings) {
-      // Create default settings if none exist
-      userSettings = new UserSettings({ userId });
-      await userSettings.save();
+    if (!settings) {
+      // Create default settings matching UserSettings model
+      settings = new UserSettings({
+        userId,
+        notifications: {
+          followRequests: true,
+          followAccepted: true,
+          followRejected: true,
+          postLikes: true,
+          postComments: true,
+          postShares: true,
+          postMentions: true,
+          newMessages: true,
+          messageReadReceipts: true,
+          eventReminders: true,
+          eventInvitations: true,
+          jobApplications: true,
+          jobUpdates: true,
+          systemAnnouncements: true,
+          securityAlerts: true
+        },
+        privacy: {
+          profileVisibility: 'public',
+          showEmail: false,
+          showPhone: false,
+          showLocation: true,
+          showCompany: true,
+          showBatch: true,
+          showDepartment: true,
+          showOnlineStatus: true
+        },
+        communication: {
+          emailNotifications: true,
+          pushNotifications: true,
+          inAppNotifications: true,
+          notificationFrequency: 'immediate',
+          quietHours: {
+            enabled: false,
+            startTime: '22:00',
+            endTime: '08:00'
+          }
+        },
+        display: {
+          theme: 'auto',
+          language: 'en',
+          timezone: 'UTC',
+          dateFormat: 'MM/DD/YYYY',
+          timeFormat: '12h'
+        },
+        security: {
+          twoFactorEnabled: false,
+          loginNotifications: true,
+          sessionTimeout: 30, // minutes
+          requirePasswordChange: false,
+          passwordExpiryDays: 90
+        }
+      });
+      await settings.save();
     }
 
-    res.json(userSettings);
+    res.json({ success: true, settings });
   } catch (error) {
     console.error('Error getting notification settings:', error);
     res.status(500).json({ error: 'Failed to get notification settings' });
@@ -159,39 +266,275 @@ router.get('/settings', authenticateToken, async (req, res) => {
 router.put('/settings', authenticateToken, async (req, res) => {
   try {
     const userId = req.user._id;
-    const updateData = req.body;
+    const { notifications, privacy, communication, display, security } = req.body;
+    
+    let settings = await UserSettings.findOne({ userId });
+    
+    if (!settings) {
+      settings = new UserSettings({ userId });
+    }
 
-    // Validate the update data
-    const allowedFields = [
-      'notifications',
-      'privacy', 
-      'communication',
-      'display',
-      'security'
-    ];
+    // Update notification settings with validation
+    if (notifications) {
+      // Validate notification settings structure
+      const validNotificationFields = [
+        'followRequests', 'followAccepted', 'followRejected',
+        'postLikes', 'postComments', 'postShares', 'postMentions',
+        'newMessages', 'messageReadReceipts',
+        'eventReminders', 'eventInvitations',
+        'jobApplications', 'jobUpdates',
+        'systemAnnouncements', 'securityAlerts'
+      ];
+      const filteredNotifications = {};
+      validNotificationFields.forEach(field => {
+        if (notifications[field] !== undefined) {
+          filteredNotifications[field] = notifications[field];
+        }
+      });
+      settings.notifications = { ...settings.notifications, ...filteredNotifications };
+    }
 
-    const filteredData = {};
-    allowedFields.forEach(field => {
-      if (updateData[field]) {
-        filteredData[field] = updateData[field];
+    // Update privacy settings with validation
+    if (privacy) {
+      const validPrivacyFields = [
+        'profileVisibility', 'showEmail', 'showPhone', 'showLocation',
+        'showCompany', 'showBatch', 'showDepartment',
+        'showOnlineStatus'
+      ];
+      const filteredPrivacy = {};
+      validPrivacyFields.forEach(field => {
+        if (privacy[field] !== undefined) {
+          filteredPrivacy[field] = privacy[field];
+        }
+      });
+      // Validate enum values
+      if (filteredPrivacy.profileVisibility && !['public', 'connections'].includes(filteredPrivacy.profileVisibility)) {
+        return res.status(400).json({ error: 'Invalid profileVisibility value' });
       }
-    });
+      settings.privacy = { ...settings.privacy, ...filteredPrivacy };
+    }
 
-    const userSettings = await UserSettings.findOneAndUpdate(
-      { userId },
-      filteredData,
-      { new: true, upsert: true, runValidators: true }
-    );
+    // Update communication settings (handle nested quietHours)
+    if (communication) {
+      const validCommunicationFields = [
+        'emailNotifications', 'pushNotifications', 'inAppNotifications',
+        'notificationFrequency'
+      ];
+      const filteredCommunication = {};
+      validCommunicationFields.forEach(field => {
+        if (communication[field] !== undefined) {
+          filteredCommunication[field] = communication[field];
+        }
+      });
+      // Validate notificationFrequency enum
+      if (filteredCommunication.notificationFrequency && 
+          !['immediate', 'hourly', 'daily', 'weekly'].includes(filteredCommunication.notificationFrequency)) {
+        return res.status(400).json({ error: 'Invalid notificationFrequency value' });
+      }
+      // Handle nested quietHours
+      if (communication.quietHours) {
+        settings.communication.quietHours = {
+          ...settings.communication.quietHours,
+          ...communication.quietHours
+        };
+      }
+      settings.communication = { ...settings.communication, ...filteredCommunication };
+    }
+
+    // Update display settings with validation
+    if (display) {
+      const validDisplayFields = ['theme', 'language', 'timezone', 'dateFormat', 'timeFormat'];
+      const filteredDisplay = {};
+      validDisplayFields.forEach(field => {
+        if (display[field] !== undefined) {
+          filteredDisplay[field] = display[field];
+        }
+      });
+      // Validate enum values
+      if (filteredDisplay.theme && !['light', 'dark', 'auto'].includes(filteredDisplay.theme)) {
+        return res.status(400).json({ error: 'Invalid theme value' });
+      }
+      if (filteredDisplay.timeFormat && !['12h', '24h'].includes(filteredDisplay.timeFormat)) {
+        return res.status(400).json({ error: 'Invalid timeFormat value' });
+      }
+      settings.display = { ...settings.display, ...filteredDisplay };
+    }
+
+    // Update security settings with validation
+    let securityChanges = null;
+    if (security) {
+      const validSecurityFields = [
+        'twoFactorEnabled', 'loginNotifications', 'sessionTimeout',
+        'requirePasswordChange', 'lastPasswordChange', 'passwordExpiryDays'
+      ];
+      const filteredSecurity = {};
+      validSecurityFields.forEach(field => {
+        if (security[field] !== undefined) {
+          filteredSecurity[field] = security[field];
+        }
+      });
+      // Validate numeric fields
+      if (filteredSecurity.sessionTimeout !== undefined) {
+        const timeout = parseInt(filteredSecurity.sessionTimeout);
+        if (isNaN(timeout) || timeout < 5 || timeout > 1440) {
+          return res.status(400).json({ error: 'sessionTimeout must be between 5 and 1440 minutes' });
+        }
+        filteredSecurity.sessionTimeout = timeout;
+      }
+      if (filteredSecurity.passwordExpiryDays !== undefined) {
+        const expiry = parseInt(filteredSecurity.passwordExpiryDays);
+        if (isNaN(expiry) || expiry < 30 || expiry > 365) {
+          return res.status(400).json({ error: 'passwordExpiryDays must be between 30 and 365 days' });
+        }
+        filteredSecurity.passwordExpiryDays = expiry;
+      }
+      settings.security = { ...settings.security, ...filteredSecurity };
+      if (Object.keys(filteredSecurity).length > 0) {
+        securityChanges = { ...filteredSecurity };
+      }
+    }
+
+    await settings.save();
+
+    // Emit socket event for real-time settings update to all user's connected clients
+    const io = req.app.get('io');
+    if (io) {
+      // Convert settings to plain object for socket emission
+      const settingsObj = settings.toObject ? settings.toObject() : settings;
+      io.to(`user_${userId}`).emit('settings_updated', { settings: settingsObj });
+      console.log(`✅ Emitted settings_updated event to user_${userId} room`);
+      if (securityChanges) {
+        io.to(`user_${userId}`).emit('security_event', {
+          type: 'security_settings_updated',
+          changes: securityChanges,
+          timestamp: new Date().toISOString()
+        });
+      }
+    }
 
     res.json({ 
-      message: 'Settings updated successfully', 
-      settings: userSettings 
+      success: true, 
+      message: 'Settings updated successfully',
+      settings 
     });
   } catch (error) {
     console.error('Error updating notification settings:', error);
-    res.status(500).json({ error: 'Failed to update notification settings' });
+    res.status(500).json({ error: 'Failed to update notification settings', details: error.message });
   }
 });
+
+// Get activity log
+router.get('/activity', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const settings = await UserSettings.findOne({ userId }).select('activityLog');
+
+    res.json({
+      success: true,
+      logs: settings?.activityLog || []
+    });
+  } catch (error) {
+    console.error('Error fetching activity log:', error);
+    res.status(500).json({ error: 'Failed to fetch activity log' });
+  }
+});
+
+// Add activity log entry
+router.post('/activity', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { action, status = 'success', details, clientId } = req.body;
+
+    if (!action) {
+      return res.status(400).json({ error: 'Action is required' });
+    }
+
+    if (!['success', 'error', 'pending'].includes(status)) {
+      return res.status(400).json({ error: 'Invalid status value' });
+    }
+
+    const timestamp = new Date();
+
+    const settings = await UserSettings.findOneAndUpdate(
+      { userId },
+      {
+        $push: {
+          activityLog: {
+            $each: [{ action, status, details, timestamp }],
+            $position: 0,
+            $slice: 200
+          }
+        }
+      },
+      { new: true, upsert: true, runValidators: true }
+    ).select('activityLog');
+
+    const logEntry = settings?.activityLog?.[0];
+
+    const io = req.app.get('io');
+    if (io && logEntry) {
+      io.to(`user_${userId}`).emit('activity_log_created', { log: logEntry, clientId });
+    }
+
+    res.json({
+      success: true,
+      log: logEntry,
+      clientId
+    });
+  } catch (error) {
+    console.error('Error adding activity log:', error);
+    res.status(500).json({ error: 'Failed to add activity log' });
+  }
+});
+
+// Clear activity log
+router.delete('/activity', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user._id;
+    await UserSettings.findOneAndUpdate(
+      { userId },
+      { $set: { activityLog: [] } },
+      { upsert: true }
+    );
+
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`user_${userId}`).emit('activity_log_cleared');
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error clearing activity log:', error);
+    res.status(500).json({ error: 'Failed to clear activity log' });
+  }
+});
+
+// Delete notification
+router.delete('/:notificationId', authenticateToken, async (req, res) => {
+  try {
+    const { notificationId } = req.params;
+    const userId = req.user._id;
+
+    const result = await NotificationService.deleteNotification(notificationId, userId);
+    
+    if (!result) {
+      return res.status(404).json({ error: 'Notification not found' });
+    }
+
+    // Emit socket event for real-time updates
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`user_${userId}`).emit('notification_deleted', notificationId);
+    }
+
+    res.json({ message: 'Notification deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting notification:', error);
+    res.status(500).json({ error: 'Failed to delete notification' });
+  }
+});
+
+
 
 // Reset notification settings to defaults
 router.post('/settings/reset', authenticateToken, async (req, res) => {
@@ -206,6 +549,7 @@ router.post('/settings/reset', authenticateToken, async (req, res) => {
     await userSettings.save();
 
     res.json({ 
+      success: true,
       message: 'Settings reset to defaults', 
       settings: userSettings 
     });

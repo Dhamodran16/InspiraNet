@@ -13,12 +13,15 @@ interface JobPostProps {
   onComment: (postId: string, commentContent: string) => void;
   onEdit?: (postId: string) => void;
   onDelete: (postId: string) => void;
+  onDeleteComment?: (postId: string, commentId: string) => void;
+  onShare?: (postId: string) => void;
   showComments: boolean;
   onToggleComments: () => void;
   commentsCount: number;
   likesCount: number;
   isLiked: boolean;
   showDeleteButton?: boolean;
+  showShareButton?: boolean;
 }
 
 export default function JobPost({
@@ -28,12 +31,15 @@ export default function JobPost({
   onComment,
   onEdit,
   onDelete,
+  onDeleteComment,
+  onShare,
   showComments,
   onToggleComments,
   commentsCount,
   likesCount,
   isLiked,
-  showDeleteButton = false
+  showDeleteButton = false,
+  showShareButton = true
 }: JobPostProps) {
   const formatDeadline = (dateString: string) => {
     if (!dateString) return 'Not specified';
@@ -154,139 +160,153 @@ export default function JobPost({
   };
 
   return (
-    <BasePost
-      post={post}
-      user={user}
-      onLike={onLike}
-      onComment={onComment}
-      onEdit={onEdit}
-      onDelete={onDelete}
-      showComments={showComments}
-      onToggleComments={onToggleComments}
-      commentsCount={commentsCount}
-      likesCount={likesCount}
-      isLiked={isLiked}
-      showDeleteButton={showDeleteButton}
-      postTypeLabel="💼 Job Post"
-      postTypeIcon="💼"
-    >
-      {/* Job Details */}
-      {post.jobDetails && (
-        <div className="space-y-4 p-4 bg-green-50 dark:bg-green-900/10 rounded-lg border border-green-200 dark:border-green-800">
-          {/* Company and Position */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="flex items-center space-x-2">
-              <Building className="h-5 w-5 text-green-600" />
-              <div>
-                <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Company</p>
-                <p className="text-sm text-gray-600 dark:text-gray-400">{post.jobDetails.company}</p>
+            <BasePost
+              post={post}
+              user={user}
+              onLike={onLike}
+              onComment={onComment}
+              onEdit={onEdit}
+              onDelete={onDelete}
+              onDeleteComment={onDeleteComment}
+              onShare={onShare}
+              showComments={showComments}
+              onToggleComments={onToggleComments}
+              commentsCount={commentsCount}
+              isLiked={isLiked}
+              showDeleteButton={showDeleteButton}
+              showShareButton={showShareButton}
+              postTypeLabel="💼 Job Post"
+              postTypeIcon="💼"
+            >
+      {/* Images First - Media Display */}
+      {post.media && post.media.length > 0 && (
+        <div className="px-4 pt-4">
+          <div className="space-y-3">
+            {post.media.length === 1 ? (
+              <div className="rounded-lg overflow-hidden">
+                {renderMedia(post.media[0])}
               </div>
-            </div>
-            
-            <div className="flex items-center space-x-2">
-              <Briefcase className="h-5 w-5 text-green-600" />
-              <div>
-                <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Job Type</p>
-                <Badge className={getJobTypeColor(post.jobDetails.type || 'full-time')}>
-                  {(post.jobDetails.type || 'full-time').charAt(0).toUpperCase() + (post.jobDetails.type || 'full-time').slice(1)}
-                </Badge>
-              </div>
-            </div>
-          </div>
-          
-          {/* Location and Salary */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {post.jobDetails.location && (
-              <div className="flex items-center space-x-2">
-                <MapPin className="h-5 w-5 text-green-600" />
-                <div>
-                  <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Location</p>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">{post.jobDetails.location}</p>
-                        </div>
-                      </div>
-                    )}
-            
-            {post.jobDetails.salary && (
-              <div className="flex items-center space-x-2">
-                <DollarSign className="h-5 w-5 text-green-600" />
-                <div>
-                  <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Salary</p>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">{post.jobDetails.salary}</p>
+            ) : (
+              <div className="grid grid-cols-2 gap-2">
+                {post.media.slice(0, 4).map((mediaItem, index) => (
+                  <div key={index} className="rounded-lg overflow-hidden">
+                    {renderMedia(mediaItem)}
                   </div>
+                ))}
               </div>
             )}
           </div>
-
-          {/* Deadline and Eligibility */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {post.jobDetails.applicationDeadline && (
-              <div className="flex items-center space-x-2">
-                <Calendar className="h-5 w-5 text-green-600" />
-                <div>
-                  <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Application Deadline</p>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">{formatDeadline(post.jobDetails.applicationDeadline)}</p>
-                </div>
-              </div>
-            )}
-            
-            {post.jobDetails.requirements && post.jobDetails.requirements.length > 0 && (
-              <div className="flex items-center space-x-2">
-                <Users className="h-5 w-5 text-green-600" />
-                <div>
-                  <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Requirements</p>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">{post.jobDetails.requirements.join(', ')}</p>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Job Description */}
-          {post.jobDetails.description && (
-            <div className="mt-4">
-              <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">Job Description</h4>
-              <p className="text-sm text-gray-600 dark:text-gray-400">{post.jobDetails.description}</p>
-            </div>
-          )}
-
-          {/* Apply Link */}
-          {post.jobDetails.applyLink && (
-            <div className="mt-4">
-              <Button 
-                asChild
-                className="w-full bg-green-600 hover:bg-green-700 text-white"
-              >
-                <a 
-                  href={post.jobDetails.applyLink}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center justify-center space-x-2"
-                >
-                  <Link className="h-4 w-4" />
-                  <span>Apply for this Position</span>
-                </a>
-              </Button>
-            </div>
-          )}
         </div>
       )}
-      
-      {/* Media Display */}
-      {post.media && post.media.length > 0 && (
-        <div className="mt-4 space-y-3">
-          <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100">Attachments</h4>
-          {post.media.length === 1 ? (
-            <div className="rounded-lg overflow-hidden">
-              {renderMedia(post.media[0])}
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 gap-2">
-              {post.media.slice(0, 4).map((mediaItem, index) => (
-                <div key={index} className="rounded-lg overflow-hidden">
-                  {renderMedia(mediaItem)}
+
+      {/* Job Details Below Images */}
+      {post.jobDetails && (
+        <div className="px-4 py-4">
+          <div className="space-y-4 p-4 bg-green-50 dark:bg-green-900/10 rounded-lg border border-green-200 dark:border-green-800">
+            {/* Company and Position */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="flex items-center space-x-2">
+                <Building className="h-5 w-5 text-green-600" />
+                <div>
+                  <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Company</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">{post.jobDetails.company}</p>
                 </div>
-              ))}
+              </div>
+              
+              <div className="flex items-center space-x-2">
+                <Briefcase className="h-5 w-5 text-green-600" />
+                <div>
+                  <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Job Type</p>
+                  <Badge className={getJobTypeColor(post.jobDetails.type || 'full-time')}>
+                    {(post.jobDetails.type || 'full-time').charAt(0).toUpperCase() + (post.jobDetails.type || 'full-time').slice(1)}
+                  </Badge>
+                </div>
+              </div>
             </div>
-          )}
+            
+            {/* Location and Salary */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {post.jobDetails.location && (
+                <div className="flex items-center space-x-2">
+                  <MapPin className="h-5 w-5 text-green-600" />
+                  <div>
+                    <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Location</p>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">{post.jobDetails.location}</p>
+                  </div>
+                </div>
+              )}
+            
+              {post.jobDetails.salary && (
+                <div className="flex items-center space-x-2">
+                  <DollarSign className="h-5 w-5 text-green-600" />
+                  <div>
+                    <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Salary</p>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">{post.jobDetails.salary}</p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Deadline and Eligibility */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {post.jobDetails.applicationDeadline && (
+                <div className="flex items-center space-x-2">
+                  <Calendar className="h-5 w-5 text-green-600" />
+                  <div>
+                    <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Application Deadline</p>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">{formatDeadline(post.jobDetails.applicationDeadline)}</p>
+                  </div>
+                </div>
+              )}
+              
+              {post.jobDetails.requirements && post.jobDetails.requirements.length > 0 && (
+                <div className="flex items-center space-x-2">
+                  <Users className="h-5 w-5 text-green-600" />
+                  <div>
+                    <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Requirements</p>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">{post.jobDetails.requirements.join(', ')}</p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Job Description */}
+            {post.jobDetails.description && (
+              <div className="mt-4">
+                <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">Job Description</h4>
+                <p className="text-sm text-gray-600 dark:text-gray-400">{post.jobDetails.description}</p>
+              </div>
+            )}
+
+            {/* Apply Link */}
+            {post.jobDetails.applyLink && (
+              <div className="mt-4">
+                <Button 
+                  asChild
+                  className="w-full bg-green-600 hover:bg-green-700 text-white"
+                >
+                  <a 
+                    href={post.jobDetails.applyLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-center space-x-2"
+                  >
+                    <Link className="h-4 w-4" />
+                    <span>Apply for this Position</span>
+                  </a>
+                </Button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Post Content Below Job Details */}
+      {post.content && (
+        <div className="px-4 py-4">
+          <p className="text-gray-900 dark:text-gray-100 whitespace-pre-wrap">
+            {post.content}
+          </p>
         </div>
       )}
     </BasePost>

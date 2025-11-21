@@ -1,0 +1,9 @@
+RewriteEngine On
+
+# Handle SPA routing
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule . /index.html [L]
+
+# Error handling for 404s
+ErrorDocument 404 /index.html
