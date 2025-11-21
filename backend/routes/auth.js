@@ -73,7 +73,8 @@ router.post('/register', async (req, res) => {
 
 		if (userType === 'student') {
       console.log('📝 Processing student registration');
-			if (!email || !email.toLowerCase().endsWith('@kongu.edu')) {
+      const cleanedEmail = normalizeEmail(email);
+			if (!cleanedEmail || !cleanedEmail.endsWith('@kongu.edu')) {
         console.log('❌ Invalid email for student:', email);
         return res.status(400).json({ 
           success: false,
@@ -83,7 +84,7 @@ router.post('/register', async (req, res) => {
       }
 
 			// name.yydept@kongu.edu -> capture year and dept code
-			const m = email.match(/^[a-zA-Z]+\.(\d{2})([a-z]+)@kongu\.edu$/);
+			const m = cleanedEmail.match(/^[a-zA-Z]+\.(\d{2})([a-z]+)@kongu\.edu$/);
 			if (!m) {
         console.log('❌ Email format validation failed:', email);
         console.log('❌ Expected format: name.yydept@kongu.edu (e.g., john.23aim@kongu.edu)');
@@ -169,7 +170,7 @@ router.post('/register', async (req, res) => {
         });
       }
 
-      collegeEmail = email.toLowerCase();
+      collegeEmail = cleanedEmail;
       console.log('📝 Checking if email exists:', collegeEmail);
 			
 			// Check if email exists in ANY user type (college/personal/professional/migrated)
@@ -240,7 +241,8 @@ router.post('/register', async (req, res) => {
 
 		if (userType === 'faculty') {
       console.log('📝 Processing faculty registration');
-			if (!email || !email.toLowerCase().endsWith('@kongu.edu')) {
+      const cleanedEmail = normalizeEmail(email);
+			if (!cleanedEmail || !cleanedEmail.endsWith('@kongu.edu')) {
         console.log('❌ Invalid email for faculty:', email);
         return res.status(400).json({ 
           success: false,
@@ -251,13 +253,13 @@ router.post('/register', async (req, res) => {
 			
 			// If department is provided, validate it matches email
 			if (department) {
-				const match = email.match(/^[a-zA-Z]+\.([a-z]+)@kongu\.edu$/);
+				const match = cleanedEmail.match(/^[a-zA-Z]+\.([a-z]+)@kongu\.edu$/);
 				if (!match) return res.status(400).json({ error: `Faculty email must be name.${String(department).toLowerCase()}@kongu.edu` });
 				const emailDept = match[1];
 				if (emailDept !== String(department).toLowerCase()) return res.status(400).json({ error: `Email department (${emailDept}) doesn't match selected department (${department})` });
 			}
 
-			collegeEmail = email.toLowerCase();
+			collegeEmail = cleanedEmail;
 			
 			// Check if email exists in ANY user type (college/personal/professional/migrated)
 			const existingUser = await User.findOne(buildEmailLookupQuery(collegeEmail));
@@ -308,10 +310,11 @@ router.post('/register', async (req, res) => {
 		}
 
 		if (userType === 'alumni') {
-			if (!email) return res.status(400).json({ error: 'Email is required for alumni' });
+      if (!email) return res.status(400).json({ error: 'Email is required for alumni' });
 			const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-			if (!re.test(email)) return res.status(400).json({ error: 'Please provide a valid email address' });
-      personalEmail = email.toLowerCase();
+      const cleanedEmail = normalizeEmail(email);
+			if (!cleanedEmail || !re.test(cleanedEmail)) return res.status(400).json({ error: 'Please provide a valid email address' });
+      personalEmail = cleanedEmail;
 			
 			// Check if email exists in ANY user type (college/personal/professional/migrated)
 			const existingUser = await User.findOne(buildEmailLookupQuery(personalEmail));
