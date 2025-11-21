@@ -49,12 +49,13 @@ const server = createServer(app);
 const getBasePort = () => (process.env.PORT ? Number(process.env.PORT) : 5000);
 let currentPort = getBasePort();
 
-// Parse frontend URLs from environment variable
+// Parse frontend URLs from environment variable, default to production SPA if nothing provided
+const defaultFrontendOrigins = ['https://inspiranet.onrender.com'];
 const frontendUrls = process.env.FRONTEND_URL 
   ? process.env.FRONTEND_URL.split(',').map(url => url.trim())
   : process.env.CORS_ORIGIN 
     ? [process.env.CORS_ORIGIN]
-    : [];
+    : defaultFrontendOrigins;
 
 // Security middleware
 app.use(helmet({
@@ -101,7 +102,7 @@ const corsOptions = {
     // For development, allow all localhost origins (any port)
     if (process.env.NODE_ENV === 'development' || !process.env.NODE_ENV) {
       if (origin.includes('localhost') || origin.includes('127.0.0.1')) {
-      return callback(null, true);
+        return callback(null, true);
       }
     }
     
@@ -142,9 +143,9 @@ const io = new Server(server, {
       
       // For development, allow all localhost origins (any port)
       if (process.env.NODE_ENV === 'development' || !process.env.NODE_ENV) {
-        if (origin.includes('localhost') || origin.includes('127.0.0.1')) {
+      if (origin.includes('localhost') || origin.includes('127.0.0.1')) {
         return callback(null, true);
-        }
+      }
       }
       
       // Allow the production frontend URL
