@@ -1668,7 +1668,7 @@ export default function Settings() {
                       value={isEditingProfile ? profileForm.collegeEmail : (user?.email?.college || '')} 
                       disabled={!isEditingProfile}
                       onChange={(e) => setProfileForm({ ...profileForm, collegeEmail: e.target.value })}
-                      placeholder="dhamodraprasathcm.23aim@kongu.edu"
+                      placeholder="college-email@kongu.edu"
                     />
                   </div>
                   <div>

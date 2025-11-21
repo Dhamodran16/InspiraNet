@@ -130,6 +130,8 @@ const ProfileCompletionPage: FC = () => {
     // Get user type from pending signup data or existing user
     const pendingSignupDataStr = localStorage.getItem('pendingSignupData');
     const pendingSignupData = pendingSignupDataStr ? JSON.parse(pendingSignupDataStr) : null;
+    const pendingUserType = pendingSignupData?.userType;
+    const pendingEmail = pendingSignupData?.email?.trim().toLowerCase();
     const currentUserType = user?.type || pendingSignupData?.userType;
     
     // Email validation function
@@ -468,13 +470,17 @@ const ProfileCompletionPage: FC = () => {
     // Handle email - backend expects { college: string, personal: string }
     const trimmedPersonal = formData.personalEmail?.trim();
     const emailPayload: Record<string, string> = {};
-    const collegeEmail = extractCollegeEmail(sourceUser?.email);
+    const collegeEmail = extractCollegeEmail(sourceUser?.email) 
+      || (user?.email?.college || '').trim()
+      || ((pendingUserType === 'student' || pendingUserType === 'faculty') ? pendingEmail : undefined);
 
     if (collegeEmail) {
-      emailPayload.college = collegeEmail;
+      emailPayload.college = collegeEmail.toLowerCase();
     }
     if (trimmedPersonal) {
-      emailPayload.personal = trimmedPersonal;
+      emailPayload.personal = trimmedPersonal.toLowerCase();
+    } else if (pendingUserType === 'alumni' && pendingEmail) {
+      emailPayload.personal = pendingEmail;
     }
     if (Object.keys(emailPayload).length > 0) {
       payload.email = emailPayload;
