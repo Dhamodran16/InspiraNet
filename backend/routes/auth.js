@@ -9,6 +9,20 @@ const GoogleCalendarService = require('../services/googleCalendarService');
 
 const router = express.Router();
 
+const normalizeEmail = (value) => value?.trim().toLowerCase();
+
+const buildEmailLookupQuery = (rawEmail) => {
+  const normalized = normalizeEmail(rawEmail);
+  return {
+    $or: [
+      { 'email.college': normalized },
+      { 'email.personal': normalized },
+      { 'email.professional': normalized },
+      { 'emailMigration.newPersonalEmail': normalized }
+    ]
+  };
+};
+
 // Test route to verify router is working
 router.get('/test-callback', (req, res) => {
   res.json({ message: 'Callback route test - router is working!' });
@@ -158,13 +172,8 @@ router.post('/register', async (req, res) => {
       collegeEmail = email.toLowerCase();
       console.log('📝 Checking if email exists:', collegeEmail);
 			
-			// Check if email exists in ANY user type (college or personal)
-			const existingUser = await User.findOne({
-				$or: [
-					{ 'email.college': collegeEmail },
-					{ 'email.personal': collegeEmail }
-				]
-			});
+			// Check if email exists in ANY user type (college/personal/professional/migrated)
+			const existingUser = await User.findOne(buildEmailLookupQuery(collegeEmail));
 			if (existingUser) {
         console.log('❌ Email already exists:', collegeEmail, 'as type:', existingUser.type);
         return res.status(400).json({ 
@@ -250,13 +259,8 @@ router.post('/register', async (req, res) => {
 
 			collegeEmail = email.toLowerCase();
 			
-			// Check if email exists in ANY user type (college or personal)
-			const existingUser = await User.findOne({
-				$or: [
-					{ 'email.college': collegeEmail },
-					{ 'email.personal': collegeEmail }
-				]
-			});
+			// Check if email exists in ANY user type (college/personal/professional/migrated)
+			const existingUser = await User.findOne(buildEmailLookupQuery(collegeEmail));
 			if (existingUser) {
 				return res.status(400).json({ 
 					error: `Email ${collegeEmail} is already registered as ${existingUser.type}. One email can only be used for one account type.` 
@@ -309,13 +313,8 @@ router.post('/register', async (req, res) => {
 			if (!re.test(email)) return res.status(400).json({ error: 'Please provide a valid email address' });
       personalEmail = email.toLowerCase();
 			
-			// Check if email exists in ANY user type (college or personal)
-			const existingUser = await User.findOne({
-				$or: [
-					{ 'email.college': personalEmail },
-					{ 'email.personal': personalEmail }
-				]
-			});
+			// Check if email exists in ANY user type (college/personal/professional/migrated)
+			const existingUser = await User.findOne(buildEmailLookupQuery(personalEmail));
 			if (existingUser) {
 				return res.status(400).json({ 
 					error: `Email ${personalEmail} is already registered as ${existingUser.type}. One email can only be used for one account type.` 
@@ -387,12 +386,19 @@ router.post('/login', async (req, res) => {
 		if (!email || !password) return res.status(400).json({ error: 'Email and password are required' });
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 		if (!emailRegex.test(email)) return res.status(400).json({ error: 'Invalid email format' });
-		const user = await User.findOne({ $or: [{ 'email.college': email.toLowerCase() }, { 'email.personal': email.toLowerCase() }] }).select('+password');
-		if (!user) return res.status(401).json({ error: 'Invalid email or password' });
-		
+    const normalizedEmail = normalizeEmail(email);
+    const user = await User.findOne(buildEmailLookupQuery(normalizedEmail)).select('+password');
+    if (!user) {
+      console.log('❌ Login failed - user not found for email:', normalizedEmail);
+      return res.status(401).json({ error: 'Invalid email or password' });
+    }
+    
 		// Use the comparePassword method for consistent password comparison
 		const ok = await user.comparePassword(password);
-		if (!ok) return res.status(401).json({ error: 'Invalid email or password' });
+    if (!ok) {
+      console.log('❌ Login failed - password mismatch for user:', user._id);
+      return res.status(401).json({ error: 'Invalid email or password' });
+    }
     user.lastLogin = new Date();
     await user.save();
     const token = generateToken(user._id);
