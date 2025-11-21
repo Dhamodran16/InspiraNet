@@ -1,0 +1,18 @@
+{
+  "routes": [
+    { "src": "/", "dest": "/index.html" },
+    { "src": "/signin", "dest": "/index.html" },
+    { "src": "/signup", "dest": "/index.html" },
+    { "src": "/dashboard", "dest": "/index.html" },
+    { "src": "/meeting", "dest": "/index.html" },
+    { "src": "/meeting/.*", "dest": "/index.html" },
+    { "src": "/profile/.*", "dest": "/index.html" },
+    { "src": "/messages/.*", "dest": "/index.html" },
+    { "src": "/privacy-policy", "dest": "/index.html" },
+    { "src": "/terms", "dest": "/index.html" },
+    { "src": "/cookie-policy", "dest": "/index.html" },
+    { "src": "/.*", "dest": "/index.html" }
+  ],
+  "error_page": "/index.html"
+}
+

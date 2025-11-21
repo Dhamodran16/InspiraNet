@@ -30,6 +30,7 @@ const meetingRoutes = require('./routes/meetings');
 const calendarMeetingRoutes = require('./routes/calendarMeetings');
 const googleMeetRoutes = require('./routes/googleMeet');
 const CronService = require('./services/cronService');
+const { ensureDemoUser } = require('./services/demoUserService');
 const { startEmailExpiryMonitoring } = require('./services/emailExpiryService');
 
 // Import middleware
@@ -305,7 +306,9 @@ const connectDB = async () => {
     
     // Test the connection
           await mongoose.connection.db.admin().ping();
-          console.log('✅ Database ping successful - connection stable');
+    console.log('✅ Database ping successful - connection stable');
+    
+    await ensureDemoUser();
     
     // Realtime watchers are started once socket.io is ready (see below)
     
