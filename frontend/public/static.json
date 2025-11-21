@@ -1,17 +1,17 @@
 {
   "routes": [
-    { "route": "/", "serve": "/index.html", "status": 200 },
-    { "route": "/signin", "serve": "/index.html", "status": 200 },
-    { "route": "/signup", "serve": "/index.html", "status": 200 },
-    { "route": "/dashboard", "serve": "/index.html", "status": 200 },
-    { "route": "/meeting", "serve": "/index.html", "status": 200 },
-    { "route": "/meeting/*", "serve": "/index.html", "status": 200 },
-    { "route": "/profile/*", "serve": "/index.html", "status": 200 },
-    { "route": "/messages/*", "serve": "/index.html", "status": 200 },
-    { "route": "/privacy-policy", "serve": "/index.html", "status": 200 },
-    { "route": "/terms", "serve": "/index.html", "status": 200 },
-    { "route": "/cookie-policy", "serve": "/index.html", "status": 200 },
-    { "route": "/(.*)", "serve": "/index.html", "status": 200 }
+    { "src": "/", "dest": "/index.html" },
+    { "src": "/signin", "dest": "/index.html" },
+    { "src": "/signup", "dest": "/index.html" },
+    { "src": "/dashboard", "dest": "/index.html" },
+    { "src": "/meeting", "dest": "/index.html" },
+    { "src": "/meeting/.*", "dest": "/index.html" },
+    { "src": "/profile/.*", "dest": "/index.html" },
+    { "src": "/messages/.*", "dest": "/index.html" },
+    { "src": "/privacy-policy", "dest": "/index.html" },
+    { "src": "/terms", "dest": "/index.html" },
+    { "src": "/cookie-policy", "dest": "/index.html" },
+    { "src": "/.*", "dest": "/index.html" }
   ],
   "error_page": "/index.html"
 }
