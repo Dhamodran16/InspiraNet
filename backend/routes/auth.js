@@ -402,8 +402,11 @@ router.post('/login', async (req, res) => {
       console.log('❌ Login failed - password mismatch for user:', user._id);
       return res.status(401).json({ error: 'Invalid email or password' });
     }
-    user.lastLogin = new Date();
-    await user.save();
+    await User.updateOne(
+      { _id: user._id },
+      { $set: { lastLogin: new Date() } },
+      { runValidators: false }
+    );
     const token = generateToken(user._id);
     const refreshToken = generateRefreshToken(user._id);
 		// Return complete user data including all registration and profile completion fields
