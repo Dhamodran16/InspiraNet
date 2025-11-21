@@ -1,6 +1,17 @@
 {
-  "routes": {
-    "/**": "index.html"
-  },
-  "error_page": "index.html"
+  "routes": [
+    { "route": "/", "serve": "/index.html", "status": 200 },
+    { "route": "/signin", "serve": "/index.html", "status": 200 },
+    { "route": "/signup", "serve": "/index.html", "status": 200 },
+    { "route": "/dashboard", "serve": "/index.html", "status": 200 },
+    { "route": "/meeting", "serve": "/index.html", "status": 200 },
+    { "route": "/meeting/*", "serve": "/index.html", "status": 200 },
+    { "route": "/profile/*", "serve": "/index.html", "status": 200 },
+    { "route": "/messages/*", "serve": "/index.html", "status": 200 },
+    { "route": "/privacy-policy", "serve": "/index.html", "status": 200 },
+    { "route": "/terms", "serve": "/index.html", "status": 200 },
+    { "route": "/cookie-policy", "serve": "/index.html", "status": 200 },
+    { "route": "/(.*)", "serve": "/index.html", "status": 200 }
+  ],
+  "error_page": "/index.html"
 }
