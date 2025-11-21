@@ -108,9 +108,6 @@ const userSettingsSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Index for better query performance
-userSettingsSchema.index({ userId: 1 });
-
 // Ensure virtuals are serialized
 userSettingsSchema.set('toJSON', { virtuals: true });
 userSettingsSchema.set('toObject', { virtuals: true });

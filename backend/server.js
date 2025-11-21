@@ -43,6 +43,7 @@ const { startRealtimeWatchers } = require('./services/realtimeWatchers');
 const { checkEmailValidity, checkEmailExpiryWarning } = require('./middleware/emailValidation');
 
 const app = express();
+app.set('trust proxy', 1);
 const ensureDb = require('./middleware/db');
 const server = createServer(app);
 const getBasePort = () => (process.env.PORT ? Number(process.env.PORT) : 5000);
@@ -305,9 +306,7 @@ const connectDB = async () => {
           await mongoose.connection.db.admin().ping();
           console.log('✅ Database ping successful - connection stable');
     
-    // Start realtime watchers
-    startRealtimeWatchers();
-    console.log('✅ Realtime Mongo watchers started');
+    // Realtime watchers are started once socket.io is ready (see below)
     
   } catch (error) {
     console.error('❌ MongoDB connection error:', error.message);

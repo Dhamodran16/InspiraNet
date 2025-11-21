@@ -1,8 +1,21 @@
 const mongoose = require('mongoose');
 
+let initialized = false;
+
 // Starts MongoDB change streams and emits socket events so the frontend updates automatically
 function startRealtimeWatchers(io) {
   const conn = mongoose.connection;
+
+  if (initialized) {
+    return;
+  }
+
+  if (!io) {
+    console.warn('Realtime watchers: Socket server not ready yet. Will retry in 3s');
+    setTimeout(() => startRealtimeWatchers(io), 3000);
+    return;
+  }
+
   if (!conn || conn.readyState !== 1) {
     console.warn('Realtime watchers: Mongo connection not ready yet. Will retry in 3s');
     setTimeout(() => startRealtimeWatchers(io), 3000);
@@ -63,6 +76,7 @@ function startRealtimeWatchers(io) {
       io.emit('configuration_updated');
     });
 
+    initialized = true;
     console.log('✅ Realtime Mongo watchers started');
   } catch (err) {
     console.error('Failed to start realtime watchers:', err);
