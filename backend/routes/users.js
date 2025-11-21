@@ -142,8 +142,16 @@ router.put('/profile', authenticateToken, async (req, res) => {
     const updateData = req.body || {};
     const normalizeEmail = (value) => typeof value === 'string' ? value.trim().toLowerCase() : undefined;
     const normalizeString = (value) => typeof value === 'string' ? value.trim() : '';
+    const hasField = (key) => Object.prototype.hasOwnProperty.call(updateData, key);
+
+    const currentUser = await User.findById(userId);
+    if (!currentUser) {
+      return res.status(404).json({ success: false, error: 'User not found' });
+    }
     
-    const resolvedName = normalizeString(updateData.name) || normalizeString(req.user?.name);
+    const resolvedName = hasField('name')
+      ? normalizeString(updateData.name)
+      : normalizeString(currentUser.name);
     if (!resolvedName) {
       console.log('❌ Validation failed: Name missing on payload and user record');
       return res.status(400).json({ 
@@ -214,27 +222,67 @@ router.put('/profile', authenticateToken, async (req, res) => {
     }
 
     // Prepare update object with all profile fields
-    const profileUpdate = {
-      name: updateData.name,
-      ...(Object.keys(emailUpdate).length > 0 && { email: emailUpdate }),
-      phone: updateData.phone,
-      dateOfBirth: updateData.dateOfBirth,
-      gender: updateData.gender,
-      bio: updateData.bio,
-      location: updateData.location,
-      city: updateData.city,
-      state: updateData.state,
-      country: updateData.country,
-      timezone: updateData.timezone,
-      skills: updateData.skills || [],
-      languages: updateData.languages || [],
-      extraCurricularActivities: updateData.extraCurricularActivities || [],
-      interests: updateData.interests || [],
-      goals: updateData.goals || [],
-      socialLinks: updateData.socialLinks || {},
-      resume: updateData.resume,
-      portfolio: updateData.portfolio
-    };
+    const profileUpdate = {};
+    const unsetFields = {};
+
+    profileUpdate.name = updateData.name;
+    if (Object.keys(emailUpdate).length > 0) {
+      profileUpdate.email = emailUpdate;
+    }
+
+    const scalarFields = [
+      'phone',
+      'dateOfBirth',
+      'gender',
+      'bio',
+      'location',
+      'city',
+      'state',
+      'country',
+      'timezone',
+      'resume',
+      'portfolio',
+      'department',
+      'company',
+      'designation',
+      'batch',
+      'joinYear'
+    ];
+
+    scalarFields.forEach((field) => {
+      if (hasField(field)) {
+        profileUpdate[field] = updateData[field];
+      }
+    });
+
+    const arrayFields = [
+      'skills',
+      'languages',
+      'extraCurricularActivities',
+      'interests',
+      'goals'
+    ];
+
+    arrayFields.forEach((field) => {
+      if (hasField(field)) {
+        const value = updateData[field];
+        profileUpdate[field] = Array.isArray(value)
+          ? value
+          : value
+            ? [value]
+            : [];
+      }
+    });
+
+    if (hasField('socialLinks')) {
+      const existingLinks = currentUser.socialLinks?.toObject
+        ? currentUser.socialLinks.toObject()
+        : currentUser.socialLinks || {};
+      profileUpdate.socialLinks = {
+        ...existingLinks,
+        ...(updateData.socialLinks || {})
+      };
+    }
 
     // Handle department - set at root level and in type-specific info
     if (updateData.department) {
@@ -242,49 +290,69 @@ router.put('/profile', authenticateToken, async (req, res) => {
     }
 
     // Handle type-specific information
-    if (updateData.studentInfo) {
-      profileUpdate.studentInfo = {
-        ...updateData.studentInfo,
-        department: updateData.department || updateData.studentInfo.department
-      };
-      // Also set batch at root level if provided
-      if (updateData.studentInfo.batch) {
-        profileUpdate.batch = updateData.studentInfo.batch;
+    if (currentUser.type === 'student') {
+      unsetFields.alumniInfo = '';
+      unsetFields.facultyInfo = '';
+      if (updateData.studentInfo) {
+        profileUpdate.studentInfo = {
+          ...(currentUser.studentInfo?.toObject
+            ? currentUser.studentInfo.toObject()
+            : currentUser.studentInfo || {}),
+          ...updateData.studentInfo
+        };
+        if (updateData.studentInfo.batch) {
+          profileUpdate.batch = updateData.studentInfo.batch;
+        }
+        if (updateData.studentInfo.joinYear) {
+          profileUpdate.joinYear = updateData.studentInfo.joinYear;
+        }
       }
-      if (updateData.studentInfo.joinYear) {
-        profileUpdate.joinYear = updateData.studentInfo.joinYear;
+    } else if (currentUser.type === 'alumni') {
+      unsetFields.studentInfo = '';
+      unsetFields.facultyInfo = '';
+      if (updateData.alumniInfo) {
+        profileUpdate.alumniInfo = {
+          ...(currentUser.alumniInfo?.toObject
+            ? currentUser.alumniInfo.toObject()
+            : currentUser.alumniInfo || {}),
+          ...updateData.alumniInfo
+        };
+        if (updateData.alumniInfo.currentCompany) {
+          profileUpdate.company = updateData.alumniInfo.currentCompany;
+        }
+        if (updateData.alumniInfo.graduationYear) {
+          profileUpdate.batch = String(updateData.alumniInfo.graduationYear);
+        }
       }
-    }
-    if (updateData.alumniInfo) {
-      profileUpdate.alumniInfo = updateData.alumniInfo;
-      // Also set company at root level if provided
-      if (updateData.alumniInfo.currentCompany) {
-        profileUpdate.company = updateData.alumniInfo.currentCompany;
-      }
-      // Also set batch at root level from graduationYear if provided (for alumni, graduationYear is their batch)
-      if (updateData.alumniInfo.graduationYear) {
-        profileUpdate.batch = String(updateData.alumniInfo.graduationYear);
-      }
-    }
-    if (updateData.facultyInfo) {
-      profileUpdate.facultyInfo = {
-        ...updateData.facultyInfo,
-        department: updateData.department || updateData.facultyInfo.department
-      };
-      // Also set designation at root level if provided
-      if (updateData.facultyInfo.designation) {
-        profileUpdate.designation = updateData.facultyInfo.designation;
+    } else if (currentUser.type === 'faculty') {
+      unsetFields.studentInfo = '';
+      unsetFields.alumniInfo = '';
+      if (updateData.facultyInfo) {
+        profileUpdate.facultyInfo = {
+          ...(currentUser.facultyInfo?.toObject
+            ? currentUser.facultyInfo.toObject()
+            : currentUser.facultyInfo || {}),
+          ...updateData.facultyInfo,
+          department: updateData.department || updateData.facultyInfo.department || currentUser.facultyInfo?.department
+        };
+        if (updateData.facultyInfo.designation) {
+          profileUpdate.designation = updateData.facultyInfo.designation;
+        }
       }
     }
 
     // Automatically set isProfileComplete to true if user has basic information
-    const hasBasicProfile = updateData.name && updateData.email && (
-      updateData.department || 
-      updateData.bio || 
-      (updateData.skills && updateData.skills.length > 0) ||
-      updateData.studentInfo?.department ||
-      updateData.alumniInfo?.currentCompany ||
-      updateData.facultyInfo?.department
+    const hasBasicProfile = Boolean(
+      resolvedName &&
+      ((emailUpdate && Object.keys(emailUpdate).length > 0) || currentUser.email) &&
+      (
+        (hasField('department') ? updateData.department : currentUser.department) ||
+        (hasField('bio') ? updateData.bio : currentUser.bio) ||
+        (hasField('skills') ? updateData.skills?.length : currentUser.skills?.length) ||
+        updateData.studentInfo?.department ||
+        updateData.alumniInfo?.currentCompany ||
+        updateData.facultyInfo?.department
+      )
     );
     
     if (hasBasicProfile) {
@@ -293,9 +361,13 @@ router.put('/profile', authenticateToken, async (req, res) => {
 
     console.log('📝 Updating profile with data:', profileUpdate);
 
+    const updatePayload = Object.keys(unsetFields).length > 0
+      ? { $set: profileUpdate, $unset: unsetFields }
+      : { $set: profileUpdate };
+
     const updatedUser = await User.findByIdAndUpdate(
       userId,
-      profileUpdate,
+      updatePayload,
       { new: true, runValidators: true }
     ).select('-password');
 
