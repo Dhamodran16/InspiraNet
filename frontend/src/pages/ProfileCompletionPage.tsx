@@ -765,7 +765,7 @@ const ProfileCompletionPage: FC = () => {
         };
         
         // Update user in context
-        updateUser(transformedUser);
+        updateUser(transformedUser, { replace: true });
         
         toast({
           title: "✅ Account Created Successfully!",
@@ -843,7 +843,7 @@ const ProfileCompletionPage: FC = () => {
         }
       };
       
-      updateUser(transformedUser);
+        updateUser(transformedUser);
       
       toast({
         title: "Profile completed successfully!",

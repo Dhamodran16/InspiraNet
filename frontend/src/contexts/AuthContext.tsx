@@ -110,7 +110,7 @@ interface AuthContextType {
   register: (userData: any) => Promise<any>;
   logout: () => void;
   refreshToken: () => Promise<boolean>;
-  updateUser: (userData: Partial<User>) => void;
+  updateUser: (userData: Partial<User>, options?: { replace?: boolean }) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -350,9 +350,17 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
-  const updateUser = (userData: Partial<User>) => {
-    if (user) {
-      setUser({ ...user, ...userData });
+  const updateUser = (userData: Partial<User>, options?: { replace?: boolean }) => {
+    setUser(prev => {
+      if (options?.replace || !prev) {
+        const merged = { ...(prev || {}), ...userData } as User;
+        return merged;
+      }
+      return { ...prev, ...userData };
+    });
+    
+    if (userData) {
+      setIsAuthenticated(true);
     }
   };
 
