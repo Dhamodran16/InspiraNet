@@ -1,64 +1,29 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent } from '@/components/ui/card';
-import { Vote, Eye, EyeOff, Calendar, Clock, Users, Award, Image as ImageIcon, Video, FileText, MoreVertical, X, Share2, Trash2 } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
+import { Vote, FileText, Download } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { formatDistanceToNow } from 'date-fns';
-import { cn } from '@/lib/utils';
 import api from '@/services/api';
+import BasePost from './BasePost';
+import { Post } from '@/services/postsApi';
+import { User } from '@/contexts/AuthContext';
+import { socketService } from '@/services/socketService';
 
-interface PollOption {
-  id: string;
-  text: string;
-  votes: string[];
-}
-
-interface PollDetails {
-  question: string;
-  options: PollOption[];
-  endDate?: string;
-  hideResults: boolean;
-  allowMultipleVotes: boolean;
-  maxVotes?: number;
-}
-
-interface Post {
-  _id: string;
-  content: string;
-  author: {
-    _id: string;
-    name: string;
-    avatar?: string;
-    type: string;
-  };
-  createdAt: string;
-  pollDetails: PollDetails;
-  media?: Array<{
-    type: string;
-    url: string;
-    filename?: string;
-    size?: number;
-    mimeType?: string;
-  }>;
-  likes: string[];
-  comments: any[];
-  postType: string;
-}
+// Using Post type from postsApi which has pollDetails with _id for options
 
 interface PollPostProps {
   post: Post;
+  user: User | null;
   onLike: (postId: string) => void;
   onComment: (postId: string, comment: string) => void;
-  onEdit?: (post: Post) => void;
-  onDelete?: (postId: string) => void;
+  onEdit?: (postId: string) => void;
+  onDelete: (postId: string) => void;
   onDeleteComment?: (postId: string, commentId: string) => void;
   onShare?: (postId: string) => void;
   showComments: boolean;
   onToggleComments: () => void;
   commentsCount: number;
-  likesCount: number;
   isLiked: boolean;
   onPollVote: (postId: string, optionId: string) => void;
   showDeleteButton?: boolean;
@@ -67,6 +32,7 @@ interface PollPostProps {
 
 const PollPost: React.FC<PollPostProps> = ({
   post,
+  user,
   onLike,
   onComment,
   onEdit,
@@ -76,43 +42,53 @@ const PollPost: React.FC<PollPostProps> = ({
   showComments,
   onToggleComments,
   commentsCount,
-  likesCount,
   isLiked,
   onPollVote,
   showDeleteButton,
   showShareButton = true
 }) => {
-  const { user } = useAuth();
-  const [currentPost, setCurrentPost] = useState(post);
-  const [showResults, setShowResults] = useState(false);
-  const [newComment, setNewComment] = useState('');
+  const [currentPost, setCurrentPost] = useState<Post>(post);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showPostMenu, setShowPostMenu] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
-
-  // Close menu when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-        setShowPostMenu(false);
-      }
-    };
-
-    if (showPostMenu) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [showPostMenu]);
+  const [newComment, setNewComment] = useState('');
 
   // Update local state when post prop changes
   useEffect(() => {
     setCurrentPost(post);
   }, [post]);
 
+  // Listen for real-time poll updates
+  useEffect(() => {
+    const handlePollUpdate = (data: any) => {
+      if (data.postId === post._id) {
+        console.log('Real-time poll update received:', data);
+        setCurrentPost((prev) => ({
+          ...prev,
+          pollDetails: data.pollDetails
+        }));
+        // Update parent without triggering vote (just update state)
+        // Don't call onPollVote here as it requires an optionId
+      }
+    };
+
+    socketService.onPollVoteUpdate(handlePollUpdate);
+
+    return () => {
+      socketService.offPollVoteUpdate();
+    };
+  }, [post._id]);
+
   const handleVote = async (optionId: string) => {
+    // Validate optionId first
+    if (!optionId || optionId.trim() === '' || optionId === 'undefined' || optionId === 'null') {
+      console.error('Invalid optionId received:', optionId);
+      toast({
+        title: "Invalid Option",
+        description: "Please select a valid poll option.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (!user) {
       toast({
         title: "Authentication Required",
@@ -122,25 +98,107 @@ const PollPost: React.FC<PollPostProps> = ({
       return;
     }
 
+    // Check if poll has ended
+    if (!canVote) {
+      toast({
+        title: "Poll Ended",
+        description: "This poll has ended. You can no longer vote.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Prevent multiple submissions
+    if (isSubmitting) {
+      return;
+    }
+
+    // Check if user has already voted on any option (for "Vote updated" message)
+    const hasVotedBefore = hasUserVoted();
+    // Find option by comparing both _id and id as strings
+    const optionIdStr = String(optionId);
+    const selectedOption = currentPost.pollDetails?.options.find(opt => {
+      const optId = opt._id ? String(opt._id) : '';
+      const optStringId = (opt as any).id ? String((opt as any).id) : '';
+      return optId === optionIdStr || optStringId === optionIdStr;
+    });
+    
+    if (!selectedOption) {
+      console.error('Selected option not found in poll options:', optionIdStr);
+      console.log('Available options:', currentPost.pollDetails?.options.map(opt => ({
+        _id: opt._id,
+        id: (opt as any).id,
+        text: opt.text
+      })));
+      toast({
+        title: "Invalid Option",
+        description: "The selected option was not found.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    const isCurrentVote = selectedOption?.votes?.includes(user._id || '');
+
     try {
       setIsSubmitting(true);
+      
+      // Ensure optionId is a string
+      const optionIdToSend = String(optionId);
+      
+      console.log('Voting on poll:', post._id, 'with optionId:', optionIdToSend);
       const response = await api.post(`/api/posts/${post._id}/poll-vote`, {
-        optionId
+        optionId: optionIdToSend
       });
 
       if (response.data) {
-        setCurrentPost(response.data);
-        onPollVote(post._id, optionId);
-        toast({
-          title: "Vote Recorded",
-          description: "Your vote has been recorded successfully!",
-        });
+        // Backend returns the full updated post
+        const updatedPost = response.data;
+        
+        // Check if vote was actually removed (user clicked same option) BEFORE updating state
+        const stillHasVote = updatedPost?.pollDetails?.options.some((opt: any) => 
+          opt.votes?.includes(user._id || '')
+        );
+        
+        // Update local state immediately
+        setCurrentPost(updatedPost);
+        
+        // Update parent PostFeed state with the updated post data
+        // Pass empty string to indicate this is just a state update, not a new vote
+        // The PostFeed will update its posts array with the new pollDetails
+        onPollVote(post._id, '');
+        
+        // Also update the PostFeed posts array directly to ensure consistency
+        // This is done via the onPollVote callback which will update the parent state
+        
+        // Show appropriate message based on vote state
+        if (hasVotedBefore && isCurrentVote && !stillHasVote) {
+          // User clicked the same option they already voted for (removes vote)
+          toast({
+            title: "Vote Removed",
+            description: "Your vote has been removed.",
+          });
+        } else if (hasVotedBefore && !isCurrentVote && stillHasVote) {
+          toast({
+            title: "Vote Updated",
+            description: "Your vote has been updated.",
+          });
+        } else if (!hasVotedBefore && stillHasVote) {
+          toast({
+            title: "Vote Recorded",
+            description: "Your vote has been recorded successfully!",
+          });
+        } else {
+          // Fallback - shouldn't happen but handle gracefully
+          console.warn('Unexpected vote state:', { hasVotedBefore, isCurrentVote, stillHasVote });
+        }
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error voting:', error);
+      const errorMessage = error.response?.data?.error || error.message || "Failed to record your vote. Please try again.";
       toast({
         title: "Voting Failed",
-        description: "Failed to record your vote. Please try again.",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -149,24 +207,80 @@ const PollPost: React.FC<PollPostProps> = ({
   };
 
   const hasUserVoted = () => {
-    return currentPost.pollDetails.options.some(option => 
+    return currentPost.pollDetails?.options.some(option => 
+      option.votes?.includes(user?._id || '')
+    ) || false;
+  };
+
+  const getUserVotedOption = () => {
+    return currentPost.pollDetails?.options.find(option => 
       option.votes?.includes(user?._id || '')
     );
   };
 
-  const canVote = !currentPost.pollDetails.endDate || 
-    new Date(currentPost.pollDetails.endDate) > new Date();
+  const canVote = (() => {
+    if (!currentPost.pollDetails?.endDate) return true;
+    try {
+      const endDate = new Date(currentPost.pollDetails.endDate);
+      return !isNaN(endDate.getTime()) && endDate > new Date();
+    } catch {
+      return true;
+    }
+  })();
 
-  const isPollEnded = currentPost.pollDetails.endDate && 
-    new Date(currentPost.pollDetails.endDate) <= new Date();
+  const isPollEnded = (() => {
+    if (!currentPost.pollDetails?.endDate) return false;
+    try {
+      const endDate = new Date(currentPost.pollDetails.endDate);
+      return !isNaN(endDate.getTime()) && endDate <= new Date();
+    } catch {
+      return false;
+    }
+  })();
 
-  const shouldShowResults = showResults || isPollEnded || !currentPost.pollDetails.hideResults;
+  // Always show results
+  const shouldShowResults = true;
 
   const formatEndDate = (dateString: string) => {
     try {
       return formatDistanceToNow(new Date(dateString), { addSuffix: true });
     } catch {
       return 'Invalid date';
+    }
+  };
+
+  const handleDownloadExcel = async () => {
+    try {
+      const response = await api.get(`/api/posts/${post._id}/poll-data/excel`, {
+        responseType: 'blob'
+      });
+
+      // Create a blob from the response
+      const blob = new Blob([response.data], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      });
+
+      // Create a temporary URL and trigger download
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `poll-data-${post._id}.xlsx`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      toast({
+        title: "Download Started",
+        description: "Poll data is being downloaded.",
+      });
+    } catch (error: any) {
+      console.error('Error downloading poll data:', error);
+      toast({
+        title: "Download Failed",
+        description: error.response?.data?.error || "Failed to download poll data.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -184,7 +298,7 @@ const PollPost: React.FC<PollPostProps> = ({
     
     if (type === 'image') {
       return (
-        <div className="mb-4">
+        <div className="mb-3">
           <img
             src={mediaUrl}
             alt="Poll media"
@@ -194,7 +308,7 @@ const PollPost: React.FC<PollPostProps> = ({
       );
     } else if (type === 'video') {
       return (
-        <div className="mb-4">
+        <div className="mb-3">
           <video
             src={mediaUrl}
             controls
@@ -206,8 +320,8 @@ const PollPost: React.FC<PollPostProps> = ({
       );
     } else if (type === 'pdf' || type === 'document') {
       return (
-        <div className="mb-4">
-          <div className="flex items-center space-x-2 p-3 bg-gray-100 dark:bg-gray-800 rounded-xl">
+        <div className="mb-3">
+          <div className="flex items-center space-x-2 p-2.5 bg-gray-100 dark:bg-gray-800 rounded-xl">
             <FileText className="h-6 w-6 text-blue-600" />
             <span className="text-sm font-medium">Document attached</span>
             <a
@@ -227,88 +341,28 @@ const PollPost: React.FC<PollPostProps> = ({
   };
 
   return (
-    <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm max-w-4xl mx-auto">
-              {/* Header */}
-              <div className="p-4 border-b border-gray-200 dark:border-gray-700">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <div className="flex-shrink-0">
-                      <img
-                        src={currentPost.author.avatar || '/default-avatar.png'}
-                        alt={currentPost.author.name}
-                        className="h-10 w-10 rounded-full object-cover"
-                      />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                        {currentPost.author.name}
-                      </p>
-                      <div className="flex items-center space-x-2 text-xs text-gray-500 dark:text-gray-400">
-                        <span>{formatDistanceToNow(new Date(currentPost.createdAt), { addSuffix: true })}</span>
-                        <span>•</span>
-                        <span className="capitalize">{currentPost.author.type}</span>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  {/* Three dot menu */}
-                  <div className="relative" ref={menuRef}>
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      className="h-8 w-8 text-gray-500 dark:text-gray-400"
-                      onClick={() => setShowPostMenu(!showPostMenu)}
-                    >
-                      <MoreVertical className="h-4 w-4" />
-                    </Button>
-                    
-                    {showPostMenu && (
-                      <div className="absolute right-0 mt-2 w-40 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-lg z-10">
-                        <div className="p-1">
-                          {showShareButton && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => {
-                                onShare?.(currentPost._id);
-                                setShowPostMenu(false);
-                              }}
-                              className="w-full justify-start text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
-                            >
-                              <Share2 className="h-4 w-4 mr-2" /> Share
-                            </Button>
-                          )}
-                          {showDeleteButton && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => {
-                                onDelete?.(currentPost._id);
-                                setShowPostMenu(false);
-                              }}
-                              className="w-full justify-start text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
-                            >
-                              <Trash2 className="h-4 w-4 mr-2" /> Delete
-                            </Button>
-                          )}
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="w-full justify-start"
-                            onClick={() => setShowPostMenu(false)}
-                          >
-                            <X className="h-4 w-4 mr-2" /> Close
-                          </Button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
+    <BasePost
+      post={currentPost}
+      user={user}
+      onLike={onLike}
+      onComment={onComment}
+      onEdit={onEdit}
+      onDelete={onDelete}
+      onDeleteComment={onDeleteComment}
+      onShare={onShare}
+      showComments={showComments}
+      onToggleComments={onToggleComments}
+      commentsCount={commentsCount}
+      isLiked={isLiked}
+      showDeleteButton={showDeleteButton}
+      showShareButton={showShareButton}
+      postTypeLabel="📊 Poll"
+      postTypeIcon="📊"
+    >
 
       {/* Media Content - Display First */}
       {currentPost.media && currentPost.media.length > 0 && (
-        <div className="px-4 pt-4">
+        <div className="px-3 pt-3">
           {currentPost.media.map((mediaItem, index) => (
             <div key={index}>
               {renderMedia(mediaItem)}
@@ -318,39 +372,66 @@ const PollPost: React.FC<PollPostProps> = ({
       )}
 
       {/* Poll Content Below Images */}
-      <div className="px-4 py-4">
-        <div className="mb-4">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
-            {currentPost.pollDetails.question}
+      <div className="px-3 py-3">
+        <div className="mb-3">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-1.5">
+            {currentPost.pollDetails?.question || 'Poll Question'}
           </h3>
           {currentPost.content && (
-            <p className="text-gray-600 dark:text-gray-400 text-sm">
+            <p className="text-gray-600 dark:text-gray-400 text-sm mb-2">
               {currentPost.content}
             </p>
           )}
         </div>
 
           {/* Poll Options */}
-        <div className="space-y-3 mb-4">
-          {currentPost.pollDetails.options.map((option) => {
+        <div className="space-y-2 mb-3">
+          {currentPost.pollDetails?.options.map((option, index) => {
               const votes = option.votes?.length || 0;
-            const totalVotes = currentPost.pollDetails.options.reduce((sum, opt) => 
+            const totalVotes = (currentPost.pollDetails?.options || []).reduce((sum, opt) => 
               sum + (opt.votes?.length || 0), 0
             );
             const percentage = totalVotes > 0 ? Math.round((votes / totalVotes) * 100) : 0;
               const userVoted = option.votes?.includes(user?._id || '');
               
+              const canClick = !isSubmitting && canVote && !isPollEnded;
+              // Get optionId - prefer _id (MongoDB ObjectId) over id (string like "option_0")
+              // Convert to string to ensure consistency
+              let optionId: string = '';
+              if (option._id) {
+                optionId = String(option._id);
+              } else if ((option as any).id) {
+                optionId = String((option as any).id);
+              } else {
+                // Fallback: use index-based ID if neither exists
+                optionId = `option_${index}`;
+              }
+              
+              // Validate optionId before allowing vote
+              if (!optionId || optionId === 'undefined' || optionId === 'null' || optionId.trim() === '') {
+                console.error('Invalid optionId:', option, 'index:', index);
+                return null;
+              }
+              
               return (
                 <div
-                  key={option.id}
-                  className={`relative p-3 rounded-lg border-2 transition-all cursor-pointer ${
+                  key={optionId}
+                  className={`relative p-2.5 rounded-lg border-2 transition-all ${
                     userVoted 
-                      ? 'border-purple-500 bg-purple-100 dark:bg-purple-900/20' 
-                      : 'border-gray-200 dark:border-gray-700 hover:border-purple-300 dark:hover:border-purple-600'
+                      ? 'border-purple-500 bg-purple-100 dark:bg-purple-900/20 cursor-pointer hover:border-purple-600' 
+                      : canClick
+                      ? 'border-gray-200 dark:border-gray-700 hover:border-purple-300 dark:hover:border-purple-600 cursor-pointer'
+                      : 'border-gray-200 dark:border-gray-700 cursor-not-allowed opacity-60'
                   }`}
-                  onClick={() => handleVote(option.id)}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (canClick) {
+                      handleVote(optionId);
+                    }
+                  }}
                 >
-                  <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center justify-between mb-1.5">
                     <span className="font-medium text-gray-900 dark:text-gray-100">
                       {option.text}
                     </span>
@@ -371,7 +452,7 @@ const PollPost: React.FC<PollPostProps> = ({
                   )}
                   
                   {shouldShowResults && (
-                    <div className="flex items-center justify-between mt-2 text-xs text-gray-500 dark:text-gray-400">
+                    <div className="flex items-center justify-between mt-1.5 text-xs text-gray-500 dark:text-gray-400">
                       <span>{votes} votes</span>
                       {userVoted && (
                         <Badge variant="secondary" className="text-xs">
@@ -382,19 +463,20 @@ const PollPost: React.FC<PollPostProps> = ({
                   </div>
                 )}
                   
-                  {!shouldShowResults && canVote && !hasUserVoted() && (
+                  {!shouldShowResults && canVote && (
                     <div className="text-center">
                       <Button
                         size="sm"
-                        variant="outline"
-                        className="mt-2"
+                        variant={userVoted ? "default" : "outline"}
+                        className={`mt-2 ${userVoted ? 'bg-purple-500 hover:bg-purple-600' : ''}`}
                         onClick={(e) => {
                           e.stopPropagation();
-                          handleVote(option.id);
+                          handleVote(optionId);
                         }}
+                        disabled={isSubmitting}
                       >
                         <Vote className="h-3 w-3 mr-1" />
-                        Vote
+                        {userVoted ? 'Change Vote' : 'Vote'}
                       </Button>
                   </div>
                 )}
@@ -405,35 +487,28 @@ const PollPost: React.FC<PollPostProps> = ({
 
           {/* Poll Controls */}
           <div className="flex items-center justify-between pt-2 border-t border-purple-200 dark:border-purple-700">
-          {currentPost.pollDetails.hideResults && !isPollEnded && (
-            <Button 
-              variant="ghost" 
-              size="sm"
-                onClick={() => setShowResults(!showResults)}
-                className="text-purple-600 hover:text-purple-800"
-              >
-                {showResults ? (
-                  <>
-                    <EyeOff className="h-4 w-4 mr-1" />
-                    Hide Results
-                  </>
-                ) : (
-                  <>
-                    <Eye className="h-4 w-4 mr-1" />
-                    Show Results
-                  </>
+            {isPollEnded && currentPost.pollDetails?.endDate && (
+              <>
+                <Badge variant="destructive">
+                  Poll ended on {formatEndDate(currentPost.pollDetails.endDate)}
+                </Badge>
+                {user && user._id === currentPost.author?._id && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handleDownloadExcel}
+                    className="ml-2"
+                  >
+                    <Download className="h-4 w-4 mr-2" />
+                    Download Poll Data
+                  </Button>
                 )}
-            </Button>
-            )}
-            
-            {isPollEnded && (
-              <Badge variant="destructive" className="ml-auto">
-                Poll ended on {formatEndDate(currentPost.pollDetails.endDate || '')}
-              </Badge>
+              </>
             )}
           </div>
         </div>
-    </div>
+
+    </BasePost>
   );
 };
 

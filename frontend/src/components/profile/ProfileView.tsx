@@ -47,14 +47,14 @@ interface UserProfile {
 	createdAt?: string;
 }
 
-interface ProfileStats { posts: number; connections: number; events: number }
+interface ProfileStats { posts: number; connections: number }
 
 interface ProfileViewProps { profileUserId?: string }
 
 export default function ProfileView({ profileUserId }: ProfileViewProps) {
   const { user: currentUser } = useAuth();
   const [profile, setProfile] = useState<UserProfile | null>(null);
-	const [stats, setStats] = useState<ProfileStats>({ posts: 0, connections: 0, events: 0 });
+	const [stats, setStats] = useState<ProfileStats>({ posts: 0, connections: 0 });
   const [isLoading, setIsLoading] = useState(true);
   const [isOwnProfile, setIsOwnProfile] = useState(true);
 	const [isFollowing, setIsFollowing] = useState(false);
@@ -79,19 +79,31 @@ export default function ProfileView({ profileUserId }: ProfileViewProps) {
 		console.log('🔗 API URL will be:', `/api/users/${targetUserId}/connections`);
 		
 		// Force refresh by clearing previous data
-		setStats({ posts: 0, connections: 0, events: 0 });
+		setStats({ posts: 0, connections: 0 });
 		setConnections([]);
 		
 		loadProfile(targetUserId);
-		loadStats(targetUserId);
-		// Load connections first, then stats will be updated based on actual connections
+		// Load connections first, which will update stats with the correct count
 		loadConnections(targetUserId).then(() => {
-			// Reload stats after connections are loaded to ensure consistency
-			setTimeout(() => {
-				loadStats(targetUserId);
-			}, 100);
+			// Then load other stats (posts, etc.) but preserve connections count from connections endpoint
+			loadStats(targetUserId).then((statsData) => {
+				// Keep the connections count from loadConnections, only update posts
+				setStats(prevStats => ({
+					posts: statsData.posts || 0,
+					connections: prevStats.connections || 0 // Always use connections count from connections endpoint
+				}));
+			}).catch((error) => {
+				console.error('❌ Error loading stats:', error);
+			});
 		}).catch((error) => {
 			console.error('❌ Error in loadConnections promise:', error);
+			// If connections fail, still try to load stats (but connections will be 0)
+			loadStats(targetUserId).then((statsData) => {
+				setStats({
+					posts: statsData.posts || 0,
+					connections: 0
+				});
+			});
 		});
 		if (!isOwnProfileCheck) checkFollowStatus(targetUserId);
 	}, [targetUserId, isOwnProfileCheck]);
@@ -131,14 +143,19 @@ export default function ProfileView({ profileUserId }: ProfileViewProps) {
 		} finally { setIsLoading(false); }
 	};
 
-	const loadStats = async (id: string) => {
+	const loadStats = async (id: string): Promise<{ posts: number; connections: number }> => {
 		try {
 			console.log('📊 Loading stats for user:', id);
 			const data = await getUserStats(id);
 			console.log('📊 Stats received:', data);
-			setStats(data);
+			// Return stats data (connections count will be overridden by connections endpoint)
+			return {
+				posts: data.posts || 0,
+				connections: data.connections || 0
+			};
 		} catch (error) {
 			console.error('❌ Error loading stats:', error);
+			return { posts: 0, connections: 0 };
 		}
 	};
 
@@ -146,77 +163,42 @@ export default function ProfileView({ profileUserId }: ProfileViewProps) {
 		try {
 			setLoadingConnections(true);
 			console.log('🔍 Loading connections for user ID:', id);
-			console.log('🌐 API Base URL:', window.location.origin);
-			console.log('🔗 Full API URL:', `/api/users/${id}/connections`);
-			console.log('🔐 Auth token exists:', !!localStorage.getItem('authToken'));
 			
-			// Test the API call with more detailed error handling
 			const res = await api.get(`/api/users/${id}/connections`);
-			console.log('📡 Full API response:', res);
-			console.log('📊 Response data:', res.data);
-			console.log('👥 Mutual connections array:', res.data?.mutual);
-			console.log('📈 Mutual count:', res.data?.mutual?.length);
-			console.log('🔢 Counts object:', res.data?.counts);
-			console.log('✅ Response status:', res.status);
-			console.log('📋 Response headers:', res.headers);
 			
-			// Use mutual connections from the response
+			// Handle the response structure from backend
+			// Backend returns: { success: true, followers: [], following: [], mutual: [], counts: {...} }
 			const mutualConnections = res.data?.mutual || [];
-			console.log('✅ Setting connections state with:', mutualConnections);
-			console.log('🔢 Final connections length:', mutualConnections.length);
+			const connectionCount = res.data?.counts?.mutual || mutualConnections.length;
 			
-			// Additional debugging for the data structure
-			if (res.data) {
-				console.log('📋 Full response structure:', JSON.stringify(res.data, null, 2));
-			}
+			console.log('✅ Connections loaded:', {
+				mutual: mutualConnections.length,
+				count: connectionCount,
+				hasData: mutualConnections.length > 0
+			});
 			
-			// If no mutual connections found, let's check if we have followers/following data
-			if (mutualConnections.length === 0) {
-				console.log('⚠️ No mutual connections found, checking followers/following data:');
-				console.log('👥 Followers:', res.data?.followers?.length || 0);
-				console.log('👤 Following:', res.data?.following?.length || 0);
-				console.log('🔢 Counts:', res.data?.counts);
-				
-				// Let's also check if the data structure is different
-				console.log('🔍 Checking alternative data paths:');
-				console.log('📊 res.data.mutual:', res.data?.mutual);
-				console.log('📊 res.data.mutualConnections:', res.data?.mutualConnections);
-				console.log('📊 res.data.connections:', res.data?.connections);
-				console.log('📊 res.data.data:', res.data?.data);
-				
-				// Try alternative data paths
-				const altMutual = res.data?.mutualConnections || res.data?.connections?.mutual || res.data?.data?.mutual || [];
-				if (altMutual.length > 0) {
-					console.log('✅ Found mutual connections in alternative path:', altMutual);
-					setConnections(altMutual);
-					return;
-				}
-			} else {
-				console.log('✅ Found mutual connections:', mutualConnections.length);
-				// Update stats to match the actual connections count
-				setStats(prevStats => ({
-					...prevStats,
-					connections: mutualConnections.length
-				}));
-				console.log('🔄 Updated stats with connections count:', mutualConnections.length);
-				
-				// Also update the stats in the backend to ensure consistency
-				if (mutualConnections.length !== res.data?.counts?.mutual) {
-					console.log('⚠️ Count mismatch detected:', {
-						frontend: mutualConnections.length,
-						backend: res.data?.counts?.mutual
-					});
-				}
-			}
-			
+			// Set connections state
 			setConnections(mutualConnections);
-		} catch (error) { 
+			
+			// Update stats with the actual connection count
+			setStats(prevStats => ({
+				...prevStats,
+				connections: connectionCount
+			}));
+			
+		} catch (error: any) { 
 			console.error('❌ Error loading connections:', error);
 			console.error('❌ Error details:', error.response?.data);
 			console.error('❌ Error status:', error.response?.status);
-			console.error('❌ Error config:', error.config);
-			console.error('❌ Full error object:', error);
-			setConnections([]); 
+			
+			// Set empty connections on error
+			setConnections([]);
+			
+			// Update stats to show 0 connections on error
+			setStats(prevStats => ({
+				...prevStats,
+				connections: 0
+			}));
 		} finally { 
 			setLoadingConnections(false); 
 		}
@@ -368,11 +350,9 @@ export default function ProfileView({ profileUserId }: ProfileViewProps) {
             </div>
           </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-2 gap-4">
 				<Card><CardContent className="p-4 text-center"><div className="text-2xl font-bold text-primary">{stats.posts}</div><p className="text-sm text-muted-foreground">Posts</p></CardContent></Card>
 				<Card><CardContent className="p-4 text-center"><div className="text-2xl font-bold text-primary">{stats.connections}</div><p className="text-sm text-muted-foreground">Connections</p></CardContent></Card>
-				<Card><CardContent className="p-4 text-center"><div className="text-2xl font-bold text-primary">{stats.events}</div><p className="text-sm text-muted-foreground">Events</p></CardContent></Card>
-				
       </div>
 
       <Tabs defaultValue="overview" className="space-y-6">
@@ -449,10 +429,9 @@ export default function ProfileView({ profileUserId }: ProfileViewProps) {
 									<div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
 									<p className="text-muted-foreground">Loading connections...</p>
 								</div>
-							) : connections.length > 0 ? (
+							) : connections.filter(c => c && c._id).length > 0 ? (
 								<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-									{connections.map((c) => {
-										console.log('🎨 Rendering connection:', c);
+									{connections.filter(c => c && c._id).map((c) => {
 										return (
 										<div key={c._id} className="flex items-center space-x-3 p-3 border rounded-lg">
 											<Avatar className="h-10 w-10"><AvatarImage src={c.avatar} alt={c.name} /><AvatarFallback>{c.name?.charAt(0)?.toUpperCase()}</AvatarFallback></Avatar>
@@ -485,10 +464,9 @@ export default function ProfileView({ profileUserId }: ProfileViewProps) {
 									})}
 								</div>
 							) : (
-																	<div className="text-center py-8">
+								<div className="text-center py-8">
 									<Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
 									<p className="text-gray-500 dark:text-gray-400">{isOwnProfile ? "You haven't made any connections yet." : "This user hasn't made any connections yet."}</p>
-									<p className="text-xs text-gray-400 mt-2">Debug: connections.length = {connections.length}</p>
 								</div>
 							)}
             </CardContent>

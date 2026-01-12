@@ -87,6 +87,7 @@ export default function PostRenderer({
       return (
         <PollPost
           post={post}
+          user={user}
           onLike={onLike}
           onComment={onComment}
           onEdit={onEdit}
@@ -96,7 +97,6 @@ export default function PostRenderer({
           showComments={showComments}
           onToggleComments={onToggleComments}
           commentsCount={commentsCount}
-          likesCount={post.likes?.length || 0}
           isLiked={isLiked}
           onPollVote={onPollVote}
           showDeleteButton={showDeleteButton}

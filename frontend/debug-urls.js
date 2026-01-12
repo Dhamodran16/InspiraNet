@@ -22,8 +22,10 @@ console.log('- Hostname:', window.location.hostname);
 // Test API endpoints
 console.log('\nTesting API Endpoints:');
 
+const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
+
 // Test backend health
-fetch('https://inspiranet-backend.onrender.com/health')
+fetch(`${backendUrl}/health`)
   .then(r => r.json())
   .then(data => {
     console.log('✅ Backend Health:', data);
@@ -33,7 +35,7 @@ fetch('https://inspiranet-backend.onrender.com/health')
   });
 
 // Test config endpoints
-fetch('https://inspiranet-backend.onrender.com/api/config/departments')
+fetch(`${backendUrl}/api/config/departments`)
   .then(r => r.json())
   .then(data => {
     console.log('✅ Departments API:', data);

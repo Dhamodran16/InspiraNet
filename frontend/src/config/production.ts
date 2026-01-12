@@ -54,10 +54,10 @@ const getNumberEnvVar = (key: string, fallback: number): number => {
 };
 
 export const productionConfig: ProductionConfig = {
-  backendUrl: getEnvVar('VITE_BACKEND_URL', 'https://inspiranet-backend.onrender.com'),
-  frontendUrl: getEnvVar('VITE_FRONTEND_URL', 'https://inspiranet.onrender.com'),
-  socketUrl: getEnvVar('VITE_SOCKET_URL', 'https://inspiranet-backend.onrender.com'),
-  meetingUrl: getEnvVar('VITE_MEETING_URL', 'https://inspiranet-backend.onrender.com'),
+  backendUrl: getEnvVar('VITE_BACKEND_URL', 'http://localhost:5000'),
+  frontendUrl: getEnvVar('VITE_FRONTEND_URL', 'http://localhost:8083'),
+  socketUrl: getEnvVar('VITE_SOCKET_URL', getEnvVar('VITE_BACKEND_URL', 'http://localhost:5000')),
+  meetingUrl: getEnvVar('VITE_MEETING_URL', getEnvVar('VITE_BACKEND_URL', 'http://localhost:5000')),
 
   cloudinary: {
     cloudName: getEnvVar('VITE_CLOUDINARY_CLOUD_NAME', ''),

@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Heart, MessageCircle, Edit, Trash2, MoreVertical, X, Share2 } from 'lucide-react';
+import { Heart, MessageCircle, Edit, Trash2, MoreVertical, X, Share2, Send } from 'lucide-react';
 import { Post } from '@/services/postsApi';
 import { useAuth } from '@/contexts/AuthContext';
 import { Input } from '@/components/ui/input';
@@ -225,11 +225,11 @@ export default function BasePost({
   };
 
   return (
-    <Card className="post-card border border-gray-200 dark:border-gray-700 shadow-sm max-w-4xl mx-auto">
+    <Card className="post-card border border-gray-200 dark:border-gray-700 shadow-sm mx-auto" style={{ display: 'flex', flexDirection: 'column' }}>
       {/* Post Header */}
-      <div className="post-header p-4 border-b border-gray-100 dark:border-gray-800">
+      <div className="post-header p-3 border-b border-gray-100 dark:border-gray-800 flex-shrink-0">
         <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-3">
+          <div className="flex items-center space-x-2">
             <Avatar className="h-10 w-10">
               <AvatarImage src={post.author?.avatar} />
               <AvatarFallback className="bg-primary text-primary-foreground font-semibold">
@@ -246,12 +246,28 @@ export default function BasePost({
                     {post.author.type}
                   </Badge>
                 )}
+                {/* Post Type Badge - Enhanced Design */}
+                <Badge 
+                  variant="outline" 
+                  className={`text-xs font-semibold px-2.5 py-1 border-2 flex items-center gap-1.5 shadow-sm ${
+                    post.postType === 'poll' 
+                      ? 'bg-gradient-to-r from-orange-50 to-amber-50 dark:from-orange-900/20 dark:to-amber-900/20 border-orange-400 dark:border-orange-600 text-orange-700 dark:text-orange-300'
+                      : post.postType === 'job'
+                      ? 'bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border-green-400 dark:border-green-600 text-green-700 dark:text-green-300'
+                      : post.postType === 'event'
+                      ? 'bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-900/20 dark:to-cyan-900/20 border-blue-400 dark:border-blue-600 text-blue-700 dark:text-blue-300'
+                      : 'bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 border-purple-400 dark:border-purple-600 text-purple-700 dark:text-purple-300'
+                  }`}
+                >
+                  <span className="text-sm leading-none">{postTypeIcon}</span>
+                  <span className="font-bold">{postTypeLabel}</span>
+                </Badge>
               </div>
               <div className="flex items-center space-x-2 text-sm text-gray-500 dark:text-gray-400">
                 <span>
                   {post.author?.department || 
-                   post.author?.studentInfo?.department || 
-                   post.author?.facultyInfo?.department || 
+                   (post.author as any)?.studentInfo?.department || 
+                   (post.author as any)?.facultyInfo?.department || 
                    'Unknown Department'}
                 </span>
                 {post.author?.batch && (
@@ -324,14 +340,30 @@ export default function BasePost({
       </div>
 
       {/* Post Content - Images First, then other content */}
-      <div className="post-content">
+      <div className="post-content flex-1">
+        {/* Display tags if they exist */}
+        {post.tags && post.tags.length > 0 && (
+          <div className="px-3 pt-3 pb-2">
+            <div className="flex flex-wrap gap-2">
+              {post.tags.map((tag: string, index: number) => {
+                // Remove existing # if present, then add it
+                const cleanTag = tag.startsWith('#') ? tag.slice(1) : tag;
+                return (
+                  <Badge key={index} variant="secondary" className="text-xs">
+                    #{cleanTag}
+                  </Badge>
+                );
+              })}
+            </div>
+          </div>
+        )}
         {children}
       </div>
 
       {/* Post Actions */}
-      <div className="px-4 pb-3">
+      <div className="px-3 pb-2 flex-shrink-0 border-t border-gray-100 dark:border-gray-800">
         <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-3">
             <Button
               variant="ghost"
               size="sm"
@@ -362,8 +394,8 @@ export default function BasePost({
 
         {/* Comments Section */}
         {showComments && (
-          <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-800">
-            <div className="space-y-2">
+          <div className="mt-2 pt-2 border-t border-gray-100 dark:border-gray-800">
+            <div className="space-y-1.5">
               {(() => {
                 const uniqueComments = getUniqueComments(post.comments);
                 const commentsToShow = showAllComments ? uniqueComments : uniqueComments.slice(0, 3);
@@ -380,7 +412,7 @@ export default function BasePost({
                         </AvatarFallback>
                       </Avatar>
                       <div className="flex-1 min-w-0">
-                        <div className="bg-gray-50 dark:bg-gray-800 rounded-lg px-3 py-2">
+                        <div className="bg-gray-50 dark:bg-gray-800 rounded-lg px-2.5 py-1.5">
                           <div className="flex items-center justify-between">
                             <p className="text-sm">
                               <span className="font-medium text-gray-900 dark:text-gray-100">
@@ -423,19 +455,34 @@ export default function BasePost({
                     {user?.name?.charAt(0) || 'U'}
                   </AvatarFallback>
                 </Avatar>
-                <div className="flex-1">
+                <div className="flex-1 flex items-center space-x-2">
                   <Input
                     placeholder="Add a comment..."
                     value={commentText}
                     onChange={(e) => setCommentText(e.target.value)}
                     onKeyPress={(e) => {
-                      if (e.key === 'Enter' && commentText.trim()) {
+                      if (e.key === 'Enter' && !e.shiftKey && commentText.trim()) {
+                        e.preventDefault();
                         onComment?.(post._id, commentText.trim());
                         setCommentText('');
                       }
                     }}
                     className="text-sm"
                   />
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      if (commentText.trim()) {
+                        onComment?.(post._id, commentText.trim());
+                        setCommentText('');
+                      }
+                    }}
+                    disabled={!commentText.trim()}
+                    className="shrink-0"
+                    title="Send comment"
+                  >
+                    <Send className="h-4 w-4" />
+                  </Button>
                 </div>
               </div>
             </div>

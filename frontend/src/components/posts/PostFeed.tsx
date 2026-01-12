@@ -21,6 +21,7 @@ const PostFeed: React.FC<{ showDeleteButton?: boolean }> = ({ showDeleteButton =
   const [hasMore, setHasMore] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [showComments, setShowComments] = useState<Record<string, boolean>>({});
+  const [searchQuery, setSearchQuery] = useState("");
   const observer = useRef<IntersectionObserver>();
   const lastPostRef = useRef<HTMLDivElement>(null);
 
@@ -95,6 +96,98 @@ const PostFeed: React.FC<{ showDeleteButton?: boolean }> = ({ showDeleteButton =
     }
   }, [user, loadPosts]);
 
+  // Listen for search events from DashboardPage
+  useEffect(() => {
+    const handleSearch = (event: CustomEvent) => {
+      const query = event.detail as string;
+      setSearchQuery(query);
+    };
+
+    window.addEventListener('searchPosts', handleSearch as EventListener);
+    return () => {
+      window.removeEventListener('searchPosts', handleSearch as EventListener);
+    };
+  }, []);
+
+  // Listen for refresh events from DashboardPage
+  useEffect(() => {
+    const handleRefreshEvent = async () => {
+      if (user && user._id) {
+        setRefreshing(true);
+        try {
+          await loadPosts(1, false);
+          toast({
+            title: "Posts Refreshed",
+            description: "Latest posts have been loaded.",
+          });
+        } catch (error) {
+          console.error('Error refreshing posts:', error);
+        } finally {
+          setRefreshing(false);
+        }
+      }
+    };
+
+    window.addEventListener('refreshPosts', handleRefreshEvent as EventListener);
+    return () => {
+      window.removeEventListener('refreshPosts', handleRefreshEvent as EventListener);
+    };
+  }, [user, loadPosts, toast]);
+
+  // Filter posts based on search query
+  useEffect(() => {
+    if (!searchQuery.trim()) {
+      setPosts(originalPosts);
+      return;
+    }
+
+    const query = searchQuery.toLowerCase().trim();
+    const filtered = originalPosts.filter(post => {
+      // Search in tags
+      if (post.tags && post.tags.some(tag => tag.toLowerCase().includes(query))) {
+        return true;
+      }
+
+      // Search in title (all post types)
+      if (post.title && post.title.toLowerCase().includes(query)) {
+        return true;
+      }
+
+      // Search in content
+      if (post.content && post.content.toLowerCase().includes(query)) {
+        return true;
+      }
+
+      // Search in company name (job posts)
+      if (post.postType === 'job' && post.jobDetails?.company && 
+          post.jobDetails.company.toLowerCase().includes(query)) {
+        return true;
+      }
+
+      // Search in poll question (poll posts)
+      if (post.postType === 'poll' && post.pollDetails?.question && 
+          post.pollDetails.question.toLowerCase().includes(query)) {
+        return true;
+      }
+
+      // Search in event title
+      if (post.postType === 'event' && post.eventDetails?.title && 
+          post.eventDetails.title.toLowerCase().includes(query)) {
+        return true;
+      }
+
+      // Search in job title
+      if (post.postType === 'job' && post.jobDetails?.title && 
+          post.jobDetails.title.toLowerCase().includes(query)) {
+        return true;
+      }
+
+      return false;
+    });
+
+    setPosts(filtered);
+  }, [searchQuery, originalPosts]);
+
   // Real-time socket listeners for post updates
   useEffect(() => {
     if (!user?._id) return;
@@ -126,9 +219,33 @@ const PostFeed: React.FC<{ showDeleteButton?: boolean }> = ({ showDeleteButton =
       }
     };
 
+    // Listen for poll vote updates
+    const handlePollVoteUpdate = (data: any) => {
+      console.log('PostFeed: Received poll vote update:', data);
+      setPosts(prev => prev.map(post => {
+        if (post._id === data.postId) {
+          return {
+            ...post,
+            pollDetails: data.pollDetails
+          };
+        }
+        return post;
+      }));
+      setOriginalPosts(prev => prev.map(post => {
+        if (post._id === data.postId) {
+          return {
+            ...post,
+            pollDetails: data.pollDetails
+          };
+        }
+        return post;
+      }));
+    };
+
     // Add socket listeners (removed like updates to prevent conflicts)
     socketService.onPostCommentAdded(handlePostCommentAdded);
     socketService.onNewNotification(handleNewNotification);
+    socketService.onPollVoteUpdate(handlePollVoteUpdate);
 
     console.log('PostFeed: Socket listeners set up successfully');
 
@@ -137,6 +254,7 @@ const PostFeed: React.FC<{ showDeleteButton?: boolean }> = ({ showDeleteButton =
       console.log('PostFeed: Cleaning up socket listeners');
       socketService.offPostCommentAdded();
       socketService.offNewNotification();
+      socketService.offPollVoteUpdate();
     };
   }, [user?._id, toast]);
 
@@ -407,6 +525,26 @@ const PostFeed: React.FC<{ showDeleteButton?: boolean }> = ({ showDeleteButton =
 
   // Handle poll voting
   const handlePollVote = useCallback(async (postId: string, optionId: string) => {
+    // If optionId is empty, this is just a state update notification from PollPost
+    // PollPost already made the API call and updated its local state
+    // We should update our posts array to sync with PollPost's state
+    if (!optionId || optionId.trim() === '') {
+      console.log('Poll vote state update - syncing PostFeed state with PollPost');
+      // Fetch the updated post to sync our state
+      try {
+        const updatedPost = await postsApi.getPost(postId);
+        setPosts(prev => prev.map(post => 
+          post._id === postId ? updatedPost : post
+        ));
+        setOriginalPosts(prev => prev.map(post => 
+          post._id === postId ? updatedPost : post
+        ));
+      } catch (error) {
+        console.error('Error syncing poll vote state:', error);
+      }
+      return;
+    }
+
     if (!user || !user._id) {
       toast({
         title: "Authentication Required",
@@ -416,21 +554,21 @@ const PostFeed: React.FC<{ showDeleteButton?: boolean }> = ({ showDeleteButton =
       return;
     }
 
+    // This should not be called anymore since PollPost handles voting directly
+    // But keeping it as a fallback for any edge cases
     try {
-      console.log('Voting on poll:', postId, 'Option:', optionId);
+      console.log('Voting on poll (fallback):', postId, 'Option:', optionId);
       const response = await postsApi.voteOnPollOption(postId, optionId);
       console.log('Poll vote response:', response);
       
-      if (response && response.success) {
+      // Backend now returns the full updated post object (Post type)
+      if (response && '_id' in response && 'pollDetails' in response) {
         setPosts(prev => prev.map(post => 
           post._id === postId 
-            ? { ...post, pollDetails: response.pollResults }
+            ? { ...post, pollDetails: (response as any).pollDetails }
             : post
         ));
-        toast({
-          title: "Vote Recorded",
-          description: "Your vote has been recorded successfully!",
-        });
+        // Don't show toast here - PollPost component handles it
         console.log('Poll vote recorded successfully');
       } else {
         console.error('Invalid poll vote response:', response);
@@ -564,35 +702,9 @@ const PostFeed: React.FC<{ showDeleteButton?: boolean }> = ({ showDeleteButton =
   }
                     
   return (
-    <div className="space-y-6 min-h-full">
-      {/* Header with Refresh button */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Button
-            onClick={() => navigate('/create-post')}
-            className="bg-blue-600 hover:bg-blue-700 text-white"
-            size="sm"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Create Post
-          </Button>
-          <Button 
-            onClick={handleRefresh} 
-            disabled={refreshing}
-            variant="outline"
-            size="sm"
-          >
-            {refreshing ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <RefreshCw className="h-4 w-4" />
-            )}
-          </Button>
-        </div>
-      </div>
-
+    <div className="space-y-4 min-h-full">
       {/* Posts List */}
-      <div className="space-y-4">
+      <div className="space-y-3">
         {posts.map((post, index) => {
           // Safety check - ensure post exists and has required properties
           if (!post || !post._id) {

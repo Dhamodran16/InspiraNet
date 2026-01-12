@@ -12,13 +12,18 @@ import Settings from '@/components/Settings';
 import GoogleCalendarHostDashboard from '@/components/meetings/GoogleCalendarHostDashboard';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import { Button } from '@/components/ui/button';
-import { ArrowUp } from 'lucide-react';
+import { ArrowUp, Search, Plus, RefreshCw, Loader2 } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 const DashboardPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [currentSection, setCurrentSection] = useState("home");
   const [showScrollTop, setShowScrollTop] = useState(false);
+  const [showSearch, setShowSearch] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [refreshing, setRefreshing] = useState(false);
   const { isAuthenticated, isLoading, user } = useAuth();
   
   // Handle URL parameters for section navigation
@@ -56,6 +61,17 @@ const DashboardPage = () => {
       return () => sectionContent.removeEventListener('scroll', handleScroll);
     }
   }, [currentSection]);
+
+  // Handle refresh posts
+  const handleRefresh = () => {
+    if (currentSection === 'home') {
+      setRefreshing(true);
+      const event = new CustomEvent('refreshPosts');
+      window.dispatchEvent(event);
+      // Reset refreshing state after a delay
+      setTimeout(() => setRefreshing(false), 1000);
+    }
+  };
 
   // Redirect logic based on authentication only
   useEffect(() => {
@@ -123,6 +139,50 @@ const DashboardPage = () => {
 
       {/* Main Content - Adjusted for fixed sidebar */}
       <div className="flex-1 ml-16 flex flex-col">
+        {/* Header with Create Post, Search, and Refresh */}
+        {currentSection === "home" && (
+          <div className="sticky top-0 z-40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b">
+            <div className="flex items-center justify-between px-4 py-2">
+              {/* Left side - Create Post button */}
+              <Button
+                onClick={() => navigate('/create-post')}
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+                size="sm"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Create Post
+              </Button>
+              
+              {/* Right side - Search and Refresh buttons */}
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setShowSearch(true)}
+                  className="h-9 w-9"
+                  title="Search posts"
+                >
+                  <Search className="h-5 w-5" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleRefresh}
+                  disabled={refreshing}
+                  className="h-9 w-9"
+                  title="Refresh posts"
+                >
+                  {refreshing ? (
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                  ) : (
+                    <RefreshCw className="h-5 w-5" />
+                  )}
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+        
         {/* Content Area */}
         <main className="flex-1">
           <div className="h-full dashboard-section">
@@ -143,6 +203,59 @@ const DashboardPage = () => {
           </Button>
         )}
       </div>
+
+      {/* Search Dialog */}
+      <Dialog open={showSearch} onOpenChange={setShowSearch}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Search Posts</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <Input
+              placeholder="Search by tags, title, company name, or poll question..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyPress={(e) => {
+                if (e.key === 'Enter' && searchQuery.trim()) {
+                  // Pass search query to PostFeed
+                  const event = new CustomEvent('searchPosts', { detail: searchQuery.trim() });
+                  window.dispatchEvent(event);
+                  setShowSearch(false);
+                }
+              }}
+              className="w-full"
+            />
+            <div className="text-sm text-muted-foreground">
+              <p>Search filters:</p>
+              <ul className="list-disc list-inside mt-1 space-y-1">
+                <li>Tags</li>
+                <li>Post titles (all post types)</li>
+                <li>Company names (job posts)</li>
+                <li>Poll questions (poll posts)</li>
+              </ul>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => {
+                setSearchQuery("");
+                const event = new CustomEvent('searchPosts', { detail: "" });
+                window.dispatchEvent(event);
+                setShowSearch(false);
+              }}>
+                Clear
+              </Button>
+              <Button onClick={() => {
+                if (searchQuery.trim()) {
+                  const event = new CustomEvent('searchPosts', { detail: searchQuery.trim() });
+                  window.dispatchEvent(event);
+                  setShowSearch(false);
+                }
+              }}>
+                Search
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

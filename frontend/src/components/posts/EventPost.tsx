@@ -248,7 +248,7 @@ export default function EventPost({
             >
       {/* Images First - Media Content */}
       {post.media && post.media.length > 0 && (
-        <div className="px-4 pt-4">
+        <div className="px-3 pt-3">
           <div className="space-y-3">
             {post.media.map((mediaItem, index) => (
               <div key={index} className="w-full">
@@ -261,8 +261,15 @@ export default function EventPost({
 
       {/* Event Details Below Images */}
       {post.eventDetails && (
-        <div className="px-4 py-3">
-          <div className="space-y-4 p-4 bg-blue-50 dark:bg-blue-900/10 rounded-lg border border-blue-200 dark:border-blue-800">
+        <div className="px-3 py-2">
+          <div className="space-y-3 p-3 bg-blue-50 dark:bg-blue-900/10 rounded-lg border border-blue-200 dark:border-blue-800">
+            {/* Event Title */}
+            {post.eventDetails.title && (
+              <div className="mb-3">
+                <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100">{post.eventDetails.title}</h3>
+              </div>
+            )}
+            
             {/* Event Status */}
             <div className="flex items-center justify-between">
               <Badge className={getEventStatusColor()}>
@@ -277,7 +284,7 @@ export default function EventPost({
             </div>
 
             {/* Event Date and Time */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div className="flex items-center space-x-2">
                 <Calendar className="h-5 w-5 text-blue-600" />
                 <div>
@@ -298,7 +305,7 @@ export default function EventPost({
             </div>
 
             {/* Event Location and Attendance */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {post.eventDetails.location && (
                 <div className="flex items-center space-x-2">
                   <MapPin className="h-5 w-5 text-blue-600" />
@@ -353,13 +360,21 @@ export default function EventPost({
                 </div>
               </div>
             )}
+
+            {/* Event Description */}
+            {post.eventDetails.description && (
+              <div className="mt-3">
+                <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-1.5">Event Description</h4>
+                <p className="text-sm text-gray-600 dark:text-gray-400">{post.eventDetails.description}</p>
+              </div>
+            )}
           </div>
         </div>
       )}
 
       {/* Post Content Below Event Details */}
       {post.content && (
-        <div className="px-4 py-3">
+        <div className="px-3 py-2">
           <p className="text-gray-900 dark:text-gray-100 whitespace-pre-wrap">
             {post.content}
           </p>

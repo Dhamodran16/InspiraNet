@@ -229,6 +229,29 @@ const postSchema = new mongoose.Schema({
         message: 'Poll posts must have at least 2 options'
       }
     },
+    voteHistory: {
+      type: [{
+        userId: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: 'User',
+          required: true
+        },
+        optionId: {
+          type: String,
+          required: true
+        },
+        action: {
+          type: String,
+          enum: ['voted', 'vote_updated', 'vote_removed'],
+          required: true
+        },
+        timestamp: {
+          type: Date,
+          default: Date.now
+        }
+      }],
+      default: []
+    },
     duration: {
       type: Number,
       min: 1,

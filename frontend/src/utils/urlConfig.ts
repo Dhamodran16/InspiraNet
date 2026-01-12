@@ -9,21 +9,24 @@ export interface URLConfig {
   environment: string;
 }
 
+const DEFAULT_BACKEND = 'http://localhost:5000';
+const DEFAULT_FRONTEND = 'http://localhost:8083';
+
 // Development configuration
 export const devConfig: URLConfig = {
-  apiUrl: import.meta.env.VITE_BACKEND_URL || 'https://inspiranet-backend.onrender.com',
-  socketUrl: import.meta.env.VITE_SOCKET_URL || 'https://inspiranet-backend.onrender.com',
-  meetingUrl: import.meta.env.VITE_MEETING_URL || 'https://inspiranet-backend.onrender.com',
-  frontendUrl: import.meta.env.VITE_FRONTEND_URL || 'https://inspiranet.onrender.com',
+  apiUrl: import.meta.env.VITE_BACKEND_URL || DEFAULT_BACKEND,
+  socketUrl: import.meta.env.VITE_SOCKET_URL || import.meta.env.VITE_BACKEND_URL || DEFAULT_BACKEND,
+  meetingUrl: import.meta.env.VITE_MEETING_URL || import.meta.env.VITE_BACKEND_URL || DEFAULT_BACKEND,
+  frontendUrl: import.meta.env.VITE_FRONTEND_URL || DEFAULT_FRONTEND,
   environment: 'development'
 };
 
-// Production configuration (identical endpoints to avoid localhost usage)
+// Production configuration (uses same environment-driven URLs to support local hosting)
 export const prodConfig: URLConfig = {
-  apiUrl: 'https://inspiranet-backend.onrender.com',
-  socketUrl: 'https://inspiranet-backend.onrender.com',
-  meetingUrl: 'https://inspiranet-backend.onrender.com',
-  frontendUrl: 'https://inspiranet.onrender.com',
+  apiUrl: import.meta.env.VITE_BACKEND_URL || DEFAULT_BACKEND,
+  socketUrl: import.meta.env.VITE_SOCKET_URL || import.meta.env.VITE_BACKEND_URL || DEFAULT_BACKEND,
+  meetingUrl: import.meta.env.VITE_MEETING_URL || import.meta.env.VITE_BACKEND_URL || DEFAULT_BACKEND,
+  frontendUrl: import.meta.env.VITE_FRONTEND_URL || DEFAULT_FRONTEND,
   environment: 'production'
 };
 

@@ -50,8 +50,8 @@ const server = createServer(app);
 const getBasePort = () => (process.env.PORT ? Number(process.env.PORT) : 5000);
 let currentPort = getBasePort();
 
-// Parse frontend URLs from environment variable, default to production SPA if nothing provided
-const defaultFrontendOrigins = ['https://inspiranet.onrender.com'];
+// Parse frontend URLs from environment variable, default to local SPA if nothing provided
+const defaultFrontendOrigins = ['http://localhost:8083'];
 const frontendUrls = process.env.FRONTEND_URL 
   ? process.env.FRONTEND_URL.split(',').map(url => url.trim())
   : process.env.CORS_ORIGIN 
@@ -149,8 +149,8 @@ const io = new Server(server, {
       }
       }
       
-      // Allow the production frontend URL
-      if (origin === 'https://inspiranet.onrender.com') {
+      // Allow any explicitly configured frontend origins (e.g., for staging)
+      if (process.env.FRONTEND_URL && process.env.FRONTEND_URL.split(',').map(url => url.trim()).includes(origin)) {
         return callback(null, true);
       }
       
@@ -468,10 +468,10 @@ startEmailExpiryMonitoring();
 // Start server with automatic port fallback when PORT is not explicitly set
 const startServer = (port) => {
   server.listen(port, () => {
-    const backendUrl = process.env.BACKEND_URL || 'https://inspiranet-backend.onrender.com';
+    const backendUrl = process.env.BACKEND_URL || `http://localhost:${port}`;
     console.log(`🚀 KEC Alumni Network API server running on port ${port}`);
     console.log(`📊 Health check: ${backendUrl}/api/health`);
-    console.log(`🌐 Frontend URL: ${process.env.FRONTEND_URL || 'https://inspiranet.onrender.com'}`);
+    console.log(`🌐 Frontend URL: ${process.env.FRONTEND_URL || 'http://localhost:8083'}`);
     console.log(`🔌 WebSocket server ready for real-time messaging`);
     console.log(`🕐 Cron jobs: Initialized for email expiry processing`);
     

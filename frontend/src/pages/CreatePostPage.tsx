@@ -93,7 +93,8 @@ const CreatePostPage: React.FC = () => {
   const [pollDetails, setPollDetails] = useState({
     question: '',
     options: ['', ''],
-    endDate: ''
+    endDate: '',
+    endTime: ''
   });
 
   // Clear content on page refresh
@@ -219,9 +220,10 @@ const CreatePostPage: React.FC = () => {
 
     // Type-specific requirements
     if (postType === 'event') {
-      total += 3;
+      total += 4;
       if (eventDetails.title.trim()) completed += 1;
       if (eventDetails.date) completed += 1;
+      if (eventDetails.time) completed += 1;
       if (eventDetails.location.trim()) completed += 1;
     } else if (postType === 'job') {
       total += 3;
@@ -229,10 +231,12 @@ const CreatePostPage: React.FC = () => {
       if (jobDetails.company.trim()) completed += 1;
       if (jobDetails.location.trim()) completed += 1;
     } else if (postType === 'poll') {
-      total += 2;
+      total += 4;
       if (pollDetails.question.trim()) completed += 1;
       const validOptions = pollDetails.options.filter(opt => opt.trim());
       if (validOptions.length >= 2) completed += 1;
+      if (pollDetails.endDate) completed += 1;
+      if (pollDetails.endTime) completed += 1;
     }
 
     return total > 0 ? Math.round((completed / total) * 100) : 0;
@@ -426,6 +430,16 @@ const CreatePostPage: React.FC = () => {
       return false;
     }
 
+    // Tags validation (mandatory)
+    if (!tags || tags.length === 0) {
+      toast({
+        title: "Tags required",
+        description: "Please add at least one tag to your post.",
+        variant: "destructive"
+      });
+      return false;
+    }
+
     // Content length validation
     if (getCurrentContent().length > 2000) {
       toast({
@@ -450,6 +464,14 @@ const CreatePostPage: React.FC = () => {
         toast({
           title: "Event date required",
           description: "Please select an event date.",
+          variant: "destructive"
+        });
+        return false;
+      }
+      if (!eventDetails.time) {
+        toast({
+          title: "Event time required",
+          description: "Please select an event time.",
           variant: "destructive"
         });
         return false;
@@ -511,6 +533,22 @@ const CreatePostPage: React.FC = () => {
         });
         return false;
       }
+      if (!pollDetails.endDate) {
+        toast({
+          title: "Poll end date required",
+          description: "Please select a poll end date.",
+          variant: "destructive"
+        });
+        return false;
+      }
+      if (!pollDetails.endTime) {
+        toast({
+          title: "Poll end time required",
+          description: "Please select a poll end time.",
+          variant: "destructive"
+        });
+        return false;
+      }
     }
 
     return true;
@@ -533,7 +571,8 @@ const CreatePostPage: React.FC = () => {
       const postData: CreatePostData = {
         content: getCurrentContent().trim(),
         postType,
-        media: media.length > 0 ? media : undefined
+        media: media.length > 0 ? media : undefined,
+        tags: tags.length > 0 ? tags : undefined
       };
 
       if (postType === 'event') {
@@ -559,10 +598,15 @@ const CreatePostPage: React.FC = () => {
       }
 
       if (postType === 'poll') {
+        // Combine date and time for endDate
+        const endDateTime = pollDetails.endDate && pollDetails.endTime 
+          ? `${pollDetails.endDate} ${pollDetails.endTime}`
+          : pollDetails.endDate;
+        
         postData.pollDetails = {
           question: pollDetails.question,
           options: pollDetails.options.filter(opt => opt.trim()),
-          endDate: pollDetails.endDate
+          endDate: endDateTime
         };
       }
 
@@ -791,16 +835,16 @@ const CreatePostPage: React.FC = () => {
                             type="date"
                             value={eventDetails.date}
                             onChange={(e) => setEventDetails(prev => ({ ...prev, date: e.target.value }))}
-                            className="border-2 border-slate-200 dark:border-slate-700 focus:border-green-500"
+                            className="border-2 border-slate-200 dark:border-slate-700 focus:border-green-500 dark:bg-slate-800 dark:text-white dark:[color-scheme:dark]"
                           />
                         </div>
                         <div className="space-y-3">
-                          <Label className="font-semibold">Time</Label>
+                          <Label className="font-semibold">Time *</Label>
                           <Input
                             type="time"
                             value={eventDetails.time}
                             onChange={(e) => setEventDetails(prev => ({ ...prev, time: e.target.value }))}
-                            className="border-2 border-slate-200 dark:border-slate-700 focus:border-green-500"
+                            className="border-2 border-slate-200 dark:border-slate-700 focus:border-green-500 dark:bg-slate-800 dark:text-white dark:[color-scheme:dark]"
                           />
                         </div>
                         <div className="space-y-3">
@@ -925,7 +969,7 @@ const CreatePostPage: React.FC = () => {
                             type="date"
                             value={jobDetails.applicationDeadline}
                             onChange={(e) => setJobDetails(prev => ({ ...prev, applicationDeadline: e.target.value }))}
-                            className="border-2 border-slate-200 dark:border-slate-700 focus:border-purple-500"
+                            className="border-2 border-slate-200 dark:border-slate-700 focus:border-purple-500 dark:bg-slate-800 dark:text-white dark:[color-scheme:dark]"
                           />
                         </div>
                       </div>
@@ -1007,14 +1051,25 @@ const CreatePostPage: React.FC = () => {
                           Add Option
                         </Button>
                       </div>
-                      <div className="space-y-3">
-                        <Label className="font-semibold">End Date</Label>
-                        <Input
-                          type="date"
-                          value={pollDetails.endDate}
-                          onChange={(e) => setPollDetails(prev => ({ ...prev, endDate: e.target.value }))}
-                          className="border-2 border-slate-200 dark:border-slate-700 focus:border-orange-500"
-                        />
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-3">
+                          <Label className="font-semibold">End Date *</Label>
+                          <Input
+                            type="date"
+                            value={pollDetails.endDate}
+                            onChange={(e) => setPollDetails(prev => ({ ...prev, endDate: e.target.value }))}
+                            className="border-2 border-slate-200 dark:border-slate-700 focus:border-orange-500 dark:bg-slate-800 dark:text-white dark:[color-scheme:dark]"
+                          />
+                        </div>
+                        <div className="space-y-3">
+                          <Label className="font-semibold">End Time *</Label>
+                          <Input
+                            type="time"
+                            value={pollDetails.endTime}
+                            onChange={(e) => setPollDetails(prev => ({ ...prev, endTime: e.target.value }))}
+                            className="border-2 border-slate-200 dark:border-slate-700 focus:border-orange-500 dark:bg-slate-800 dark:text-white dark:[color-scheme:dark]"
+                          />
+                        </div>
                       </div>
                     </TabsContent>
                   </Tabs>
@@ -1166,7 +1221,7 @@ const CreatePostPage: React.FC = () => {
 
                 {/* Tags */}
                 <div className="form-element space-y-3">
-                  <Label className="text-lg font-semibold">Add Tags (Optional)</Label>
+                  <Label className="text-lg font-semibold">Add Tags <span className="text-red-500">*</span></Label>
                   <div className="flex gap-2">
                     <Input
                       placeholder="Add a tag"

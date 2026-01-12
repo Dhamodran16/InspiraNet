@@ -44,7 +44,7 @@ router.post('/create-multiple-meetings', authenticateToken, requireCreatorType, 
         error: 'Google Calendar access required',
         message: 'Please connect your Google Calendar account first',
         action: 'connect_google_calendar',
-        authUrl: `${process.env.BACKEND_URL || 'https://inspiranet-backend.onrender.com'}/api/auth/google`
+        authUrl: `${process.env.BACKEND_URL || 'http://localhost:5000'}/api/auth/google`
       });
     }
 
@@ -163,7 +163,7 @@ router.get('/google-calendar-status', authenticateToken, async (req, res) => {
       success: true,
       connected: connectionStatus.connected,
       hasTokens: connectionStatus.hasTokens,
-      authUrl: `${process.env.BACKEND_URL || 'https://inspiranet-backend.onrender.com'}/api/auth/google`
+      authUrl: `${process.env.BACKEND_URL || 'http://localhost:5000'}/api/auth/google`
     });
   } catch (error) {
     console.error('Check Google Calendar status error:', error);
@@ -224,7 +224,7 @@ router.post('/create-meeting', authenticateToken, requireCreatorType, async (req
         error: 'Google Calendar access required',
         message: 'Please connect your Google Calendar account first',
         action: 'connect_google_calendar',
-        authUrl: `${process.env.BACKEND_URL || 'https://inspiranet-backend.onrender.com'}/api/auth/google`
+        authUrl: `${process.env.BACKEND_URL || 'http://localhost:5000'}/api/auth/google`
       });
     }
     

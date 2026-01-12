@@ -180,8 +180,8 @@ export default function JobPost({
             >
       {/* Images First - Media Display */}
       {post.media && post.media.length > 0 && (
-        <div className="px-4 pt-4">
-          <div className="space-y-3">
+        <div className="px-3 pt-3">
+          <div className="space-y-2">
             {post.media.length === 1 ? (
               <div className="rounded-lg overflow-hidden">
                 {renderMedia(post.media[0])}
@@ -201,10 +201,17 @@ export default function JobPost({
 
       {/* Job Details Below Images */}
       {post.jobDetails && (
-        <div className="px-4 py-4">
-          <div className="space-y-4 p-4 bg-green-50 dark:bg-green-900/10 rounded-lg border border-green-200 dark:border-green-800">
+        <div className="px-3 py-3">
+          <div className="space-y-3 p-3 bg-green-50 dark:bg-green-900/10 rounded-lg border border-green-200 dark:border-green-800">
+            {/* Job Title */}
+            {post.jobDetails.title && (
+              <div className="mb-3">
+                <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100">{post.jobDetails.title}</h3>
+              </div>
+            )}
+            
             {/* Company and Position */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div className="flex items-center space-x-2">
                 <Building className="h-5 w-5 text-green-600" />
                 <div>
@@ -225,7 +232,7 @@ export default function JobPost({
             </div>
             
             {/* Location and Salary */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {post.jobDetails.location && (
                 <div className="flex items-center space-x-2">
                   <MapPin className="h-5 w-5 text-green-600" />
@@ -248,7 +255,7 @@ export default function JobPost({
             </div>
 
             {/* Deadline and Eligibility */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {post.jobDetails.applicationDeadline && (
                 <div className="flex items-center space-x-2">
                   <Calendar className="h-5 w-5 text-green-600" />
@@ -272,15 +279,15 @@ export default function JobPost({
 
             {/* Job Description */}
             {post.jobDetails.description && (
-              <div className="mt-4">
-                <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">Job Description</h4>
+              <div className="mt-3">
+                <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-1.5">Job Description</h4>
                 <p className="text-sm text-gray-600 dark:text-gray-400">{post.jobDetails.description}</p>
               </div>
             )}
 
             {/* Apply Link */}
             {post.jobDetails.applyLink && (
-              <div className="mt-4">
+              <div className="mt-3">
                 <Button 
                   asChild
                   className="w-full bg-green-600 hover:bg-green-700 text-white"
@@ -303,7 +310,7 @@ export default function JobPost({
 
       {/* Post Content Below Job Details */}
       {post.content && (
-        <div className="px-4 py-4">
+        <div className="px-3 py-3">
           <p className="text-gray-900 dark:text-gray-100 whitespace-pre-wrap">
             {post.content}
           </p>

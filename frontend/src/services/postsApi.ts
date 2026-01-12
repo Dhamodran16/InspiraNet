@@ -77,6 +77,7 @@ export interface CreatePostData {
   content: string;
   postType: 'general' | 'event' | 'job' | 'poll';
   media?: File[];
+  tags?: string[];
   eventDetails?: {
     title: string;
     date: string;
@@ -170,6 +171,10 @@ class PostsApiService {
 
       if (postData.pollDetails) {
         formData.append('pollDetails', JSON.stringify(postData.pollDetails));
+      }
+
+      if (postData.tags && postData.tags.length > 0) {
+        formData.append('tags', JSON.stringify(postData.tags));
       }
 
       const response = await makeAuthenticatedRequest<Post>({
@@ -267,9 +272,9 @@ class PostsApiService {
     }
   }
 
-  async voteOnPollOption(postId: string, optionId: string): Promise<{ success: boolean; pollResults: any }> {
+  async voteOnPollOption(postId: string, optionId: string): Promise<Post> {
     try {
-      const response = await makeAuthenticatedRequest<{ success: boolean; pollResults: any }>({
+      const response = await makeAuthenticatedRequest<Post>({
         method: 'POST',
         url: `/api/posts/${postId}/poll-vote`,
         data: { optionId },

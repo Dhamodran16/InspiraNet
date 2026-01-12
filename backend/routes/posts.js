@@ -252,7 +252,11 @@ router.post('/', authenticateToken, upload.array('media', 5), async (req, res) =
       content: content.trim(),
       media: mediaFiles,
       tags: tags ? (Array.isArray(tags) ? tags.map(tag => tag.trim()) : 
-                   typeof tags === 'string' ? tags.split(',').map(tag => tag.trim()).filter(tag => tag) : 
+                   typeof tags === 'string' ? (
+                     // Try to parse as JSON first, then fall back to comma-separated
+                      tags.startsWith('[') ? JSON.parse(tags).map(tag => tag.trim()) :
+                      tags.split(',').map(tag => tag.trim()).filter(tag => tag)
+                   ) : 
                    []) : [],
       isPublic: isPublic !== 'false',
       allowComments: allowComments !== 'false'
@@ -730,39 +734,111 @@ router.post('/:id/poll-vote', authenticateToken, async (req, res) => {
 
     console.log('Poll options:', post.pollDetails.options);
 
-    // Check if poll has ended
-    if (post.pollDetails.endDate && new Date() > new Date(post.pollDetails.endDate)) {
-      return res.status(400).json({ error: 'Poll has ended' });
+    // Check if poll has ended (handle both date-only and datetime formats)
+    if (post.pollDetails.endDate) {
+      const endDate = new Date(post.pollDetails.endDate);
+      const now = new Date();
+      if (isNaN(endDate.getTime())) {
+        console.error('Invalid endDate format:', post.pollDetails.endDate);
+      } else if (endDate <= now) {
+        return res.status(400).json({ error: 'Poll has ended' });
+      }
     }
 
-    // Find the option by id (string comparison)
-    const option = post.pollDetails.options.find(opt => opt.id === optionId);
+    // Find the option by id or _id (support both formats)
+    // Convert optionId to string for comparison
+    const optionIdStr = String(optionId);
+    const option = post.pollDetails.options.find(opt => {
+      // Check both id (string) and _id (ObjectId or string)
+      const optId = String(opt.id || '');
+      const optMongoId = opt._id ? String(opt._id) : '';
+      return optId === optionIdStr || optMongoId === optionIdStr;
+    });
     if (!option) {
       console.log('Option not found for ID:', optionId);
-      console.log('Available options:', post.pollDetails.options.map(opt => ({ id: opt.id, text: opt.text })));
+      console.log('Available options:', post.pollDetails.options.map(opt => ({ id: opt.id, _id: opt._id, text: opt.text })));
       return res.status(400).json({ error: 'Invalid option' });
     }
 
     console.log('Found option:', option);
 
-    // Check if user has already voted (unless multiple votes allowed)
-    if (!post.pollDetails.allowMultiple) {
-      const hasVoted = post.pollDetails.options.some(opt => 
-        opt.votes && opt.votes.includes(userId.toString())
-      );
-      if (hasVoted) {
-        return res.status(400).json({ error: 'You have already voted on this poll' });
+    // Check if user is clicking the same option they already voted for (remove vote)
+    // IMPORTANT: Check BEFORE removing votes, as we need to know if this was the current vote
+    const isCurrentVote = option.votes && option.votes.includes(userId.toString());
+    
+    // Check if user has voted before (to determine action type)
+    let hasVotedBefore = false;
+    post.pollDetails.options.forEach(opt => {
+      if (opt.votes && opt.votes.includes(userId.toString())) {
+        hasVotedBefore = true;
+      }
+    });
+    
+    // Mutable voting: Remove user's vote from all options first (if they voted before)
+    let previousVoteRemoved = false;
+    post.pollDetails.options.forEach(opt => {
+      if (opt.votes && opt.votes.includes(userId.toString())) {
+        opt.votes = opt.votes.filter(vote => vote !== userId.toString());
+        previousVoteRemoved = true;
+      }
+    });
+
+    // Initialize voteHistory if it doesn't exist (handle old posts without voteHistory)
+    if (!post.pollDetails.voteHistory) {
+      post.pollDetails.voteHistory = [];
+    }
+    
+    // Ensure voteHistory is an array (defensive check)
+    if (!Array.isArray(post.pollDetails.voteHistory)) {
+      post.pollDetails.voteHistory = [];
+    }
+
+    // If user clicked the same option they already voted for, just remove the vote (don't add it back)
+    if (isCurrentVote) {
+      // Vote has already been removed above, just update total votes
+      if (post.pollDetails.totalVotes > 0) {
+        post.pollDetails.totalVotes = post.pollDetails.totalVotes - 1;
+      }
+      // Record vote removal in history
+      post.pollDetails.voteHistory.push({
+        userId: userId,
+        optionId: optionIdStr,
+        action: 'vote_removed',
+        timestamp: new Date()
+      });
+      // Don't add the vote back - user is removing their vote
+    } else {
+      // User is voting on a different option (or voting for the first time)
+      // If user was switching votes, don't increment total (they already had a vote)
+      // If this is a new vote, increment total
+      if (!previousVoteRemoved) {
+        post.pollDetails.totalVotes = (post.pollDetails.totalVotes || 0) + 1;
+        // Record new vote
+        post.pollDetails.voteHistory.push({
+          userId: userId,
+          optionId: optionIdStr,
+          action: 'voted',
+          timestamp: new Date()
+        });
+      } else {
+        // Record vote update
+        post.pollDetails.voteHistory.push({
+          userId: userId,
+          optionId: optionIdStr,
+          action: 'vote_updated',
+          timestamp: new Date()
+        });
+      }
+
+      // Add vote to the selected option
+      if (!option.votes) {
+        option.votes = [];
+      }
+      // Only add if not already there (shouldn't happen after removal, but safety check)
+      if (!option.votes.includes(userId.toString())) {
+        option.votes.push(userId.toString());
       }
     }
-
-    // Add vote to the option
-    if (!option.votes) {
-      option.votes = [];
-    }
-    option.votes.push(userId.toString());
-
-    // Update total votes
-    post.pollDetails.totalVotes = (post.pollDetails.totalVotes || 0) + 1;
 
     await post.save();
 
@@ -780,11 +856,16 @@ router.post('/:id/poll-vote', authenticateToken, async (req, res) => {
       });
     }
 
-    res.json({
-      success: true,
-      pollDetails: post.pollDetails,
-      totalVotes: post.pollDetails.totalVotes
-    });
+    // Return the full updated post for frontend consistency
+    const updatedPost = await Post.findById(postId)
+      .populate('author', 'name avatar type department batch')
+      .lean();
+
+    if (!updatedPost) {
+      return res.status(404).json({ error: 'Post not found after update' });
+    }
+
+    res.json(updatedPost);
 
   } catch (error) {
     console.error('Error voting on poll:', error);
@@ -1042,5 +1123,212 @@ router.post('/:id/share', authenticateToken, async (req, res) => {
     res.status(500).json({ error: 'Failed to share post' });
   }
 });
+
+// Export poll data to Excel (MUST come before /:id/poll-data route)
+router.get('/:id/poll-data/excel', authenticateToken, async (req, res) => {
+  try {
+    const XLSX = require('xlsx');
+    const postId = req.params.id;
+    const userId = req.user._id;
+
+    const post = await Post.findById(postId);
+    if (!post) {
+      return res.status(404).json({ error: 'Post not found' });
+    }
+
+    if (post.postType !== 'poll') {
+      return res.status(400).json({ error: 'This post is not a poll' });
+    }
+
+    // Check if poll has ended (handle both date-only and datetime formats)
+    let isPollEnded = false;
+    if (post.pollDetails?.endDate) {
+      try {
+        const endDate = new Date(post.pollDetails.endDate);
+        if (!isNaN(endDate.getTime())) {
+          isPollEnded = endDate <= new Date();
+        }
+      } catch (error) {
+        console.error('Error parsing endDate:', error);
+      }
+    }
+    if (!isPollEnded) {
+      return res.status(400).json({ error: 'Poll has not ended yet' });
+    }
+
+    // Check if user is the author
+    if (post.author.toString() !== userId.toString()) {
+      return res.status(403).json({ error: 'Only the poll creator can download voting data' });
+    }
+
+    // Get all unique user IDs from vote history (handle missing voteHistory)
+    const voteHistory = post.pollDetails.voteHistory || [];
+    const userIds = [...new Set(voteHistory.map(vh => vh.userId.toString()))];
+    
+    // Fetch user details
+    const users = await User.find({ _id: { $in: userIds } })
+      .select('name email type department batch studentInfo facultyInfo')
+      .lean();
+
+    // Create a map of user data
+    const userMap = {};
+    users.forEach(user => {
+      userMap[user._id.toString()] = {
+        name: user.name || 'Unknown',
+        email: user.email || 'N/A',
+        type: user.type || 'N/A',
+        department: user.department || user.studentInfo?.department || user.facultyInfo?.department || 'N/A',
+        batch: user.batch || user.studentInfo?.batch || 'N/A',
+        rollNumber: user.studentInfo?.rollNumber || (user.type === 'student' ? 'N/A' : user.type)
+      };
+    });
+
+    // Build voting data
+    const votingData = [];
+    voteHistory.forEach(vote => {
+      const user = userMap[vote.userId.toString()] || {
+        name: 'Unknown',
+        email: 'N/A',
+        type: 'N/A',
+        department: 'N/A',
+        batch: 'N/A',
+        rollNumber: 'N/A'
+      };
+
+      const option = post.pollDetails.options.find(opt => 
+        String(opt.id || opt._id) === vote.optionId
+      );
+
+      votingData.push({
+        'Profile Name': user.name,
+        'Department': user.department,
+        'Batch Number': user.batch,
+        'College Mail ID': user.email,
+        'Roll Number': user.rollNumber,
+        'Time Voted': new Date(vote.timestamp).toLocaleString(),
+        'Action': vote.action === 'voted' ? 'Voted' : vote.action === 'vote_updated' ? 'Vote Updated' : 'Vote Removed',
+        'Option Selected': option ? option.text : 'N/A'
+      });
+    });
+
+    // Create workbook and worksheet
+    const workbook = XLSX.utils.book_new();
+    const worksheet = XLSX.utils.json_to_sheet(votingData);
+    
+    // Add worksheet to workbook
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Poll Voting Data');
+
+    // Generate Excel file buffer
+    const excelBuffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+
+    // Set response headers
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="poll-data-${postId}.xlsx"`);
+
+    // Send Excel file
+    res.send(excelBuffer);
+
+  } catch (error) {
+    console.error('Error exporting poll data to Excel:', error);
+    res.status(500).json({ error: 'Failed to export poll data' });
+  }
+});
+
+// Get poll voting data for JSON export
+router.get('/:id/poll-data', authenticateToken, async (req, res) => {
+  try {
+    const postId = req.params.id;
+    const userId = req.user._id;
+
+    const post = await Post.findById(postId);
+    if (!post) {
+      return res.status(404).json({ error: 'Post not found' });
+    }
+
+    if (post.postType !== 'poll') {
+      return res.status(400).json({ error: 'This post is not a poll' });
+    }
+
+    // Check if poll has ended (handle both date-only and datetime formats)
+    let isPollEnded = false;
+    if (post.pollDetails?.endDate) {
+      try {
+        const endDate = new Date(post.pollDetails.endDate);
+        if (!isNaN(endDate.getTime())) {
+          isPollEnded = endDate <= new Date();
+        }
+      } catch (error) {
+        console.error('Error parsing endDate:', error);
+      }
+    }
+    if (!isPollEnded) {
+      return res.status(400).json({ error: 'Poll has not ended yet' });
+    }
+
+    // Check if user is the author
+    if (post.author.toString() !== userId.toString()) {
+      return res.status(403).json({ error: 'Only the poll creator can download voting data' });
+    }
+
+    // Get all unique user IDs from vote history
+    const userIds = [...new Set(post.pollDetails.voteHistory.map(vh => vh.userId.toString()))];
+    
+    // Fetch user details
+    const users = await User.find({ _id: { $in: userIds } })
+      .select('name email type department batch studentInfo facultyInfo')
+      .lean();
+
+    // Create a map of user data
+    const userMap = {};
+    users.forEach(user => {
+      userMap[user._id.toString()] = {
+        name: user.name || 'Unknown',
+        email: user.email || 'N/A',
+        type: user.type || 'N/A',
+        department: user.department || user.studentInfo?.department || user.facultyInfo?.department || 'N/A',
+        batch: user.batch || user.studentInfo?.batch || 'N/A',
+        rollNumber: user.studentInfo?.rollNumber || (user.type === 'student' ? 'N/A' : user.type)
+      };
+    });
+
+    // Build voting data
+    const votingData = [];
+    post.pollDetails.voteHistory.forEach(vote => {
+      const user = userMap[vote.userId.toString()] || {
+        name: 'Unknown',
+        email: 'N/A',
+        type: 'N/A',
+        department: 'N/A',
+        batch: 'N/A',
+        rollNumber: 'N/A'
+      };
+
+      const option = post.pollDetails.options.find(opt => 
+        String(opt.id || opt._id) === vote.optionId
+      );
+
+      votingData.push({
+        'Profile Name': user.name,
+        'Department': user.department,
+        'Batch Number': user.batch,
+        'College Mail ID': user.email,
+        'Roll Number': user.rollNumber,
+        'Time Voted': new Date(vote.timestamp).toLocaleString(),
+        'Action': vote.action === 'voted' ? 'Voted' : vote.action === 'vote_updated' ? 'Vote Updated' : 'Vote Removed',
+        'Option Selected': option ? option.text : 'N/A'
+      });
+    });
+
+    res.json({
+      pollQuestion: post.pollDetails.question,
+      votingData: votingData
+    });
+
+  } catch (error) {
+    console.error('Error fetching poll data:', error);
+    res.status(500).json({ error: 'Failed to fetch poll data' });
+  }
+});
+
 
 module.exports = router;

@@ -934,27 +934,65 @@ router.get('/:userId/stats', authenticateToken, async (req, res) => {
     }
 
     // Get connection count (mutual connections only) using Follow model
+    // IMPORTANT: Must filter out deleted users to match the connections endpoint
     let connectionCount = 0;
     try {
       const Follow = require('../models/Follow');
       
-      // Get followers and following from Follow model
-      const followers = await Follow.find({ followeeId: userId });
-      const following = await Follow.find({ followerId: userId });
+      // Get followers (users who follow the target user) - populate to check if users exist
+      const followerRelations = await Follow.find({ followeeId: userId })
+        .populate('followerId', '_id');
       
-      const followersIds = followers.map(f => f.followerId.toString());
-      const followingIds = following.map(f => f.followeeId.toString());
+      // Filter out deleted users - only count users that actually exist
+      const validFollowers = [];
+      for (const rel of followerRelations) {
+        if (rel && rel.followerId && rel.followerId._id) {
+          try {
+            const idStr = rel.followerId._id.toString ? rel.followerId._id.toString() : String(rel.followerId._id);
+            if (idStr && mongoose.Types.ObjectId.isValid(idStr)) {
+              validFollowers.push(idStr);
+            }
+          } catch (err) {
+            // Skip invalid IDs
+            continue;
+          }
+        }
+      }
       
-      console.log('📊 Stats - Followers count (Follow model):', followersIds.length);
-      console.log('📊 Stats - Following count (Follow model):', followingIds.length);
-      console.log('📊 Stats - Followers IDs:', followersIds);
-      console.log('📊 Stats - Following IDs:', followingIds);
+      // Get following (users the target user follows) - populate to check if users exist
+      const followingRelations = await Follow.find({ followerId: userId })
+        .populate('followeeId', '_id');
       
-      // Find intersection using Set for better performance
-      const followersSet = new Set(followersIds);
-      const followingSet = new Set(followingIds);
+      // Filter out deleted users - only count users that actually exist
+      const validFollowing = [];
+      for (const rel of followingRelations) {
+        if (rel && rel.followeeId && rel.followeeId._id) {
+          try {
+            const idStr = rel.followeeId._id.toString ? rel.followeeId._id.toString() : String(rel.followeeId._id);
+            if (idStr && mongoose.Types.ObjectId.isValid(idStr)) {
+              validFollowing.push(idStr);
+            }
+          } catch (err) {
+            // Skip invalid IDs
+            continue;
+          }
+        }
+      }
       
-      const mutualStr = followersIds.filter(id => followingSet.has(id));
+      console.log('📊 Stats - Valid followers count:', validFollowers.length);
+      console.log('📊 Stats - Valid following count:', validFollowing.length);
+      console.log('📊 Stats - Valid followers IDs:', validFollowers);
+      console.log('📊 Stats - Valid following IDs:', validFollowing);
+      
+      // Deduplicate IDs first to avoid counting duplicates
+      const uniqueFollowers = [...new Set(validFollowers)];
+      const uniqueFollowing = [...new Set(validFollowing)];
+      
+      // Find intersection using Set for better performance (mutual connections)
+      const followersSet = new Set(uniqueFollowers);
+      const followingSet = new Set(uniqueFollowing);
+      
+      const mutualStr = uniqueFollowers.filter(id => followingSet.has(id));
       connectionCount = mutualStr.length;
       
       console.log('📊 Stats - Mutual connections count:', connectionCount);
@@ -1171,20 +1209,86 @@ router.get('/:userId/connections', authenticateToken, async (req, res) => {
     // Get followers (users who follow the target user) from Follow model
     const followerRelations = await Follow.find({ followeeId: targetUserId })
       .populate('followerId', '_id name avatar type department batch');
-    const followers = followerRelations.map(rel => rel.followerId);
+    
+    // Filter out deleted users and null references - be very defensive
+    const followers = [];
+    for (const rel of followerRelations) {
+      try {
+        // Check if relation exists and has a populated followerId
+        if (!rel || !rel.followerId) {
+          continue;
+        }
+        // Handle both Mongoose document and plain object
+        const follower = rel.followerId.toObject ? rel.followerId.toObject() : rel.followerId;
+        // Check if followerId has _id (user exists)
+        if (!follower || !follower._id) {
+          continue;
+        }
+        followers.push(follower);
+      } catch (err) {
+        console.warn('⚠️ Error processing follower relation:', err.message);
+        continue;
+      }
+    }
 
     // Get following (users the target user follows) from Follow model
     const followingRelations = await Follow.find({ followerId: targetUserId })
       .populate('followeeId', '_id name avatar type department batch');
-    const following = followingRelations.map(rel => rel.followeeId);
+    
+    // Filter out deleted users and null references - be very defensive
+    const following = [];
+    for (const rel of followingRelations) {
+      try {
+        // Check if relation exists and has a populated followeeId
+        if (!rel || !rel.followeeId) {
+          continue;
+        }
+        // Handle both Mongoose document and plain object
+        const followee = rel.followeeId.toObject ? rel.followeeId.toObject() : rel.followeeId;
+        // Check if followeeId has _id (user exists)
+        if (!followee || !followee._id) {
+          continue;
+        }
+        following.push(followee);
+      } catch (err) {
+        console.warn('⚠️ Error processing following relation:', err.message);
+        continue;
+      }
+    }
 
     console.log('🔍 Follow model data:');
     console.log('👥 Followers from Follow model:', followers.length);
     console.log('👤 Following from Follow model:', following.length);
 
     // Get mutual connections using Follow model data (more reliable)
-    const followersIds = followers.map(f => f._id.toString());
-    const followingIds = following.map(f => f._id.toString());
+    // Additional safety check - ensure all items have valid _id before mapping
+    const followersIds = [];
+    for (const f of followers) {
+      try {
+        if (f && f._id) {
+          const idStr = f._id.toString ? f._id.toString() : String(f._id);
+          if (idStr && idStr.length > 0 && mongoose.Types.ObjectId.isValid(idStr)) {
+            followersIds.push(idStr);
+          }
+        }
+      } catch (err) {
+        console.warn('⚠️ Error extracting follower ID:', err.message);
+      }
+    }
+    
+    const followingIds = [];
+    for (const f of following) {
+      try {
+        if (f && f._id) {
+          const idStr = f._id.toString ? f._id.toString() : String(f._id);
+          if (idStr && idStr.length > 0 && mongoose.Types.ObjectId.isValid(idStr)) {
+            followingIds.push(idStr);
+          }
+        }
+      } catch (err) {
+        console.warn('⚠️ Error extracting following ID:', err.message);
+      }
+    }
 
     console.log('🔍 Debug mutual connections query:');
     console.log('📊 Target user ID:', targetUserId);
@@ -1193,12 +1297,28 @@ router.get('/:userId/connections', authenticateToken, async (req, res) => {
     console.log('🔢 Followers count:', followersIds.length);
     console.log('🔢 Following count:', followingIds.length);
 
-    // Find intersection of followers and following (mutual connections)
-    const followersSet = new Set(followersIds);
-    const followingSet = new Set(followingIds);
+    // Deduplicate IDs first to avoid counting duplicates
+    const uniqueFollowersIds = [...new Set(followersIds)];
+    const uniqueFollowingIds = [...new Set(followingIds)];
     
-    const mutualStr = followersIds.filter(id => followingSet.has(id));
-    const mutualIds = mutualStr.map(id => new mongoose.Types.ObjectId(id));
+    // Find intersection of followers and following (mutual connections)
+    const followersSet = new Set(uniqueFollowersIds);
+    const followingSet = new Set(uniqueFollowingIds);
+    
+    const mutualStr = uniqueFollowersIds.filter(id => followingSet.has(id) && mongoose.Types.ObjectId.isValid(id));
+    
+    // Safely convert to ObjectIds, filtering out invalid ones
+    const mutualIds = mutualStr
+      .filter(id => mongoose.Types.ObjectId.isValid(id))
+      .map(id => {
+        try {
+          return new mongoose.Types.ObjectId(id);
+        } catch (e) {
+          console.warn(`⚠️ Invalid ObjectId skipped: ${id}`, e.message);
+          return null;
+        }
+      })
+      .filter(id => id !== null);
     
     console.log('🤝 Mutual IDs found (string):', mutualStr);
     console.log('🤝 Mutual IDs found (ObjectId):', mutualIds);
@@ -1224,49 +1344,140 @@ router.get('/:userId/connections', authenticateToken, async (req, res) => {
       }
     }
 
-    const mutual = await User.find({
-      _id: { $in: mutualIds }
-    }).select('_id name avatar type department batch');
+    // Only query if we have valid mutual IDs
+    let mutual = [];
+    if (mutualIds.length > 0) {
+      mutual = await User.find({
+        _id: { $in: mutualIds }
+      }).select('_id name avatar type department batch').lean();
+      
+      // Filter out any null results (in case users were deleted after IDs were collected)
+      mutual = mutual.filter(m => m && m._id);
+    }
 
     console.log('🤝 Mutual connections found:', mutual.length);
     console.log('📋 Mutual connections data:', mutual);
-    console.log('🔍 Mutual IDs used in query:', mutualIds.map(id => id.toString()));
+    
+    // Safely log mutual IDs
+    try {
+      const mutualIdsStr = mutualIds
+        .filter(id => id !== null && id !== undefined)
+        .map(id => id.toString ? id.toString() : String(id));
+      console.log('🔍 Mutual IDs used in query:', mutualIdsStr);
+    } catch (err) {
+      console.warn('⚠️ Error logging mutual IDs:', err.message);
+    }
     
     // Check if any mutual IDs are missing from the result
-    const foundIds = mutual.map(m => m._id.toString());
-    const missingIds = mutualIds.filter(id => !foundIds.includes(id.toString()));
-    if (missingIds.length > 0) {
-      console.log('⚠️ Missing mutual connections:', missingIds.map(id => id.toString()));
+    try {
+      const foundIds = mutual
+        .filter(m => m && m._id)
+        .map(m => {
+          try {
+            return m._id.toString ? m._id.toString() : String(m._id);
+          } catch (e) {
+            return null;
+          }
+        })
+        .filter(id => id !== null);
+      
+      const missingIds = mutualIds
+        .filter(id => {
+          try {
+            const idStr = id.toString ? id.toString() : String(id);
+            return !foundIds.includes(idStr);
+          } catch (e) {
+            return false;
+          }
+        });
+      
+      if (missingIds.length > 0) {
+        const missingIdsStr = missingIds
+          .filter(id => id !== null)
+          .map(id => id.toString ? id.toString() : String(id));
+        console.log('⚠️ Missing mutual connections:', missingIdsStr);
+      }
+    } catch (err) {
+      console.warn('⚠️ Error checking missing mutual connections:', err.message);
     }
+
+    // Ensure all arrays are valid and safe to send
+    const safeFollowers = followers.filter(f => f && f._id);
+    const safeFollowing = following.filter(f => f && f._id);
+    const safeMutual = mutual.filter(m => m && m._id);
+    
+    // Deduplicate mutual connections by _id to ensure no duplicates
+    const uniqueMutualMap = new Map();
+    safeMutual.forEach(m => {
+      if (m && m._id) {
+        const idStr = m._id.toString ? m._id.toString() : String(m._id);
+        if (!uniqueMutualMap.has(idStr)) {
+          uniqueMutualMap.set(idStr, m);
+        }
+      }
+    });
+    const uniqueMutual = Array.from(uniqueMutualMap.values());
+    
+    // Final count should match the actual array length
+    const finalMutualCount = uniqueMutual.length;
+
+    console.log('✅ Final connections data:', {
+      mutualArrayLength: uniqueMutual.length,
+      mutualCount: finalMutualCount,
+      mutualIds: uniqueMutual.map(m => m._id.toString())
+    });
 
     const response = {
       success: true,
-      followers,
-      following,
-      mutual,
+      followers: safeFollowers,
+      following: safeFollowing,
+      mutual: uniqueMutual,
       counts: {
-        followers: followers.length,
-        following: following.length,
-        mutual: mutual.length
+        followers: safeFollowers.length,
+        following: safeFollowing.length,
+        mutual: finalMutualCount
       }
     };
 
-    console.log('📤 Sending connections response:', {
-      followersCount: followers.length,
-      followingCount: following.length,
-      mutualCount: mutual.length,
-      mutualData: mutual.map(m => ({ id: m._id, name: m.name }))
-    });
-    
-    console.log('🔍 Connections endpoint - Final mutual connections:');
-    mutual.forEach((m, index) => {
-      console.log(`  ${index + 1}. ${m.name} (${m._id})`);
-    });
+    try {
+      console.log('📤 Sending connections response:', {
+        followersCount: safeFollowers.length,
+        followingCount: safeFollowing.length,
+        mutualCount: finalMutualCount,
+        mutualData: uniqueMutual
+          .filter(m => m && m._id)
+          .map(m => ({
+            id: m._id ? (m._id.toString ? m._id.toString() : String(m._id)) : 'unknown',
+            name: m.name || 'Unknown'
+          }))
+      });
+      
+      console.log('🔍 Connections endpoint - Final mutual connections:');
+      uniqueMutual.forEach((m, index) => {
+        try {
+          const idStr = m && m._id ? (m._id.toString ? m._id.toString() : String(m._id)) : 'unknown';
+          console.log(`  ${index + 1}. ${m.name || 'Unknown'} (${idStr})`);
+        } catch (err) {
+          console.warn(`  ${index + 1}. Error logging mutual connection:`, err.message);
+        }
+      });
+    } catch (err) {
+      console.warn('⚠️ Error in final logging:', err.message);
+    }
 
     res.json(response);
   } catch (error) {
-    console.error('Error fetching user connections:', error);
-    res.status(500).json({ error: 'Failed to fetch user connections' });
+    console.error('❌ Error fetching user connections:', error);
+    console.error('❌ Error stack:', error.stack);
+    console.error('❌ Error details:', {
+      message: error.message,
+      name: error.name,
+      userId: req.params.userId
+    });
+    res.status(500).json({ 
+      error: 'Failed to fetch user connections',
+      message: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+    });
   }
 });
 

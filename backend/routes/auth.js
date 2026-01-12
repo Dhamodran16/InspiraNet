@@ -668,7 +668,7 @@ router.get('/callback', async (req, res) => {
     console.log('Method:', req.method);
     console.log('Query params:', req.query);
     const { code, state, error } = req.query;
-    const frontendUrl = process.env.FRONTEND_URL || 'https://inspiranet.onrender.com';
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:8083';
     
     // Handle OAuth errors
     if (error) {
@@ -764,7 +764,7 @@ router.get('/callback', async (req, res) => {
     return res.redirect(`${frontendUrl}/dashboard?section=meetings&google_auth=success`);
   } catch (error) {
     console.error('Error handling OAuth callback:', error);
-    const frontendUrl = process.env.FRONTEND_URL || 'https://inspiranet.onrender.com';
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:8083';
     return res.redirect(`${frontendUrl}/dashboard?section=meetings&google_auth=error&error=${encodeURIComponent(error.message)}`);
   }
 });
