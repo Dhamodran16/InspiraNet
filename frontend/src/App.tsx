@@ -91,6 +91,7 @@ function App() {
                 <Route path="/terms" element={<TermsPage />} />
                 <Route path="/cookie-policy" element={<CookiePolicyPage />} />
                 <Route path="/team" element={<TeamPage />} />
+                <Route path="/index.html" element={<Navigate to="/" replace />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </React.Suspense>
