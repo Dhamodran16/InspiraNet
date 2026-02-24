@@ -52,9 +52,9 @@ let currentPort = getBasePort();
 
 // Parse frontend URLs from environment variable, default to local SPA if nothing provided
 const defaultFrontendOrigins = ['http://localhost:8083'];
-const frontendUrls = process.env.FRONTEND_URL 
+const frontendUrls = process.env.FRONTEND_URL
   ? process.env.FRONTEND_URL.split(',').map(url => url.trim())
-  : process.env.CORS_ORIGIN 
+  : process.env.CORS_ORIGIN
     ? [process.env.CORS_ORIGIN]
     : defaultFrontendOrigins;
 
@@ -94,24 +94,24 @@ const corsOptions = {
   origin: function (origin, callback) {
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
-    
+
     // Check if origin is in allowed list
     if (frontendUrls.indexOf(origin) !== -1) {
       return callback(null, true);
     }
-    
+
     // For development, allow all localhost origins (any port)
     if (process.env.NODE_ENV === 'development' || !process.env.NODE_ENV) {
       if (origin.includes('localhost') || origin.includes('127.0.0.1')) {
         return callback(null, true);
       }
     }
-    
+
     // Additional check: if CORS_ORIGIN is set and matches, allow it
     if (process.env.CORS_ORIGIN && origin === process.env.CORS_ORIGIN) {
       return callback(null, true);
     }
-    
+
     // Log rejected origins for debugging
     console.log('CORS: Rejected origin:', origin);
     return callback(new Error('Not allowed by CORS'));
@@ -136,33 +136,34 @@ const io = new Server(server, {
     origin: function (origin, callback) {
       // Allow requests with no origin (like mobile apps or curl requests)
       if (!origin) return callback(null, true);
-      
+
       // Check if origin is in allowed list
       if (frontendUrls.indexOf(origin) !== -1) {
         return callback(null, true);
       }
-      
+
       // For development, allow all localhost origins (any port)
       if (process.env.NODE_ENV === 'development' || !process.env.NODE_ENV) {
-      if (origin.includes('localhost') || origin.includes('127.0.0.1')) {
-        return callback(null, true);
+        if (origin.includes('localhost') || origin.includes('127.0.0.1')) {
+          return callback(null, true);
+        }
       }
-      }
-      
+
       // Allow any explicitly configured frontend origins (e.g., for staging)
       if (process.env.FRONTEND_URL && process.env.FRONTEND_URL.split(',').map(url => url.trim()).includes(origin)) {
         return callback(null, true);
       }
-      
+
       return callback(new Error('Not allowed by CORS'));
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin']
   },
-  transports: ["websocket", "polling"],
-  pingTimeout: 60000,
-  pingInterval: 25000,
+  transports: ["websocket", "polling"], // Prioritize websocket
+  allowUpgrades: true,
+  pingTimeout: 30000,
+  pingInterval: 10000, // Faster heartbeat to keep connection alive on Render/Cloud proxies
 });
 
 // Initialize Socket Service for real-time messaging
@@ -175,7 +176,7 @@ app.set('io', io);
 // Socket.IO connection handling for real-time messaging and notifications
 io.on('connection', (socket) => {
   console.log('🔌 New socket connection:', socket.id);
-  
+
   // Handle user authentication
   socket.on('authenticate', async (data) => {
     try {
@@ -184,43 +185,43 @@ io.on('connection', (socket) => {
         socket.emit('auth_error', { message: 'No token provided' });
         return;
       }
-      
+
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
       const user = await User.findById(decoded.userId);
-      
+
       if (!user) {
         socket.emit('auth_error', { message: 'User not found' });
         return;
       }
-      
+
       // Store user info in socket
       socket.userId = user._id.toString();
       socket.user = user;
-      
+
       // Join user-specific room for notifications
       socket.join(`user_${user._id}`);
-      
+
       // Emit authentication success
-      socket.emit('authenticated', { 
-        userId: user._id, 
+      socket.emit('authenticated', {
+        userId: user._id,
         name: user.name,
         email: user.email,
         profilePicture: user.profilePicture
       });
-      
+
       console.log(`✅ Socket authenticated: ${user.name} (${socket.id})`);
     } catch (error) {
       console.error('Socket authentication error:', error);
       socket.emit('auth_error', { message: 'Authentication failed' });
     }
   });
-  
+
   // Handle disconnection
   socket.on('disconnect', () => {
     console.log('🔌 Socket disconnected:', socket.id);
     // Clean up any room memberships or other state
   });
-    
+
   // Real-time messaging events (not Google meetings)
   socket.on('join-conversation', (conversationId) => {
     if (socket.userId) {
@@ -260,7 +261,7 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // File upload middleware
 const storage = multer.memoryStorage();
-const upload = multer({ 
+const upload = multer({
   storage: storage,
   limits: {
     fileSize: 10 * 1024 * 1024, // 10MB limit
@@ -270,7 +271,7 @@ const upload = multer({
     const allowedTypes = /jpeg|jpg|png|gif|pdf|doc|docx|txt/;
     const extname = allowedTypes.test(file.originalname.toLowerCase());
     const mimetype = allowedTypes.test(file.mimetype);
-    
+
     if (mimetype && extname) {
       return cb(null, true);
     } else {
@@ -286,7 +287,7 @@ app.set('upload', upload);
 const connectDB = async () => {
   try {
     console.log('🔄 Attempting to connect to MongoDB...');
-    
+
     const conn = await mongoose.connect(process.env.MONGODB_URI, {
       serverSelectionTimeoutMS: 5000,
       socketTimeoutMS: 45000,
@@ -303,15 +304,15 @@ const connectDB = async () => {
 
     console.log('✅ MongoDB connection established');
     console.log(`📊 Connected to: ${conn.connection.host}`);
-    
+
     // Test the connection
-          await mongoose.connection.db.admin().ping();
+    await mongoose.connection.db.admin().ping();
     console.log('✅ Database ping successful - connection stable');
-    
+
     await ensureDemoUser();
-    
+
     // Realtime watchers are started once socket.io is ready (see below)
-    
+
   } catch (error) {
     console.error('❌ MongoDB connection error:', error.message);
     console.log('🔄 Retrying connection in 5 seconds...');
@@ -356,11 +357,11 @@ app.use('/api/groups', require('./routes/groups'));
 app.use('/api/meetings', meetingRoutes);
 app.use('/api', calendarMeetingRoutes);
 app.use('/api/google-meet', googleMeetRoutes);
-  
+
 // Health check endpoint
 // Root endpoint - API info
 app.get('/', (req, res) => {
-  res.json({ 
+  res.json({
     success: true,
     message: 'InspiraNet API Server',
     version: '1.0.0',
@@ -376,7 +377,7 @@ app.get('/', (req, res) => {
     }
   });
 });
-  
+
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString() });
@@ -388,8 +389,8 @@ app.get('/admin/system-stats', (req, res) => {
     res.json({
       success: true,
       data: {
-      timestamp: new Date().toISOString(),
-      system: {
+        timestamp: new Date().toISOString(),
+        system: {
           status: 'operational',
           uptime: process.uptime(),
           memory: process.memoryUsage(),
@@ -400,16 +401,16 @@ app.get('/admin/system-stats', (req, res) => {
           status: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
           host: mongoose.connection.host,
           name: mongoose.connection.name
-      },
-      limits: {
+        },
+        limits: {
           concurrentUsers: '1000 users max',
-        concurrentRooms: '100 rooms max',
+          concurrentRooms: '100 rooms max',
           fileUploadSize: '10MB max',
           rateLimit: '1000 requests per 15min'
-      },
-      recommendations: {
+        },
+        recommendations: {
           optimalConcurrentUsers: '500-800 users',
-        optimalTotalRooms: '50-80 rooms',
+          optimalTotalRooms: '50-80 rooms',
           recommendedFileSize: '5MB or less'
         }
       }
@@ -432,7 +433,7 @@ app.use((err, req, res, next) => {
       error: 'CORS policy violation: Origin not allowed'
     });
   }
-  
+
   console.error('Unhandled error:', err);
   res.status(500).json({
     success: false,
@@ -445,11 +446,11 @@ app.use('*', (req, res) => {
   console.log(`❌ Route not found: ${req.method} ${req.originalUrl}`);
   console.log(`   Path: ${req.path}`);
   console.log(`   Base URL: ${req.baseUrl}`);
-  
+
   // Return 400 for API routes that don't exist (bad request)
   // Return 404 for non-API routes (not found)
   const statusCode = req.path.startsWith('/api') ? 400 : 404;
-  
+
   res.status(statusCode).json({
     success: false,
     error: 'Route not found',
@@ -474,14 +475,14 @@ const startServer = (port) => {
     console.log(`🌐 Frontend URL: ${process.env.FRONTEND_URL || 'http://localhost:8083'}`);
     console.log(`🔌 WebSocket server ready for real-time messaging`);
     console.log(`🕐 Cron jobs: Initialized for email expiry processing`);
-    
+
     // Email service status
     if (process.env.SMTP_USER && process.env.SMTP_PASS) {
       console.log(`📧 Email service: Configured (${process.env.SMTP_HOST || 'smtp.gmail.com'})`);
     } else {
       console.log(`📧 Email service: Not configured (using console logging)`);
     }
-    
+
     console.log(`🔒 Security: Helmet, CORS, Rate limiting enabled`);
     console.log(`📁 File uploads: Enabled (max 10MB)`);
     console.log(`🔄 Auto-retry: Enabled for failed connections`);
