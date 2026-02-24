@@ -103,8 +103,10 @@ class SocketService {
       }
 
       this.socket = io(SOCKET_URL, {
-        transports: ['websocket', 'polling'],
-        timeout: 20000,
+        transports: ['websocket', 'polling'], // Prioritize websocket
+        upgrade: true,
+        rememberUpgrade: true,
+        timeout: 30000,
         reconnection: true,
         reconnectionAttempts: this.maxReconnectAttempts,
         reconnectionDelay: this.reconnectDelay,
