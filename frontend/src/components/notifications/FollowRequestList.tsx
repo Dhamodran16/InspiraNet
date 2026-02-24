@@ -319,11 +319,11 @@ export default function FollowRequestList({ onRequestProcessed }: { onRequestPro
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'pending':
-        return <Badge variant="secondary" className="bg-yellow-100 text-yellow-800"><Clock className="h-3 w-3 mr-1" />Pending</Badge>;
+        return <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400"><Clock className="h-3 w-3 mr-1" />Pending</Badge>;
       case 'accepted':
-        return <Badge variant="default" className="bg-green-100 text-green-800"><CheckCircle className="h-3 w-3 mr-1" />Accepted</Badge>;
+        return <Badge variant="default" className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"><CheckCircle className="h-3 w-3 mr-1" />Accepted</Badge>;
       case 'declined':
-        return <Badge variant="destructive" className="bg-red-100 text-red-800"><XCircle className="h-3 w-3 mr-1" />Declined</Badge>;
+        return <Badge variant="destructive" className="bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400"><XCircle className="h-3 w-3 mr-1" />Declined</Badge>;
       default:
         return null;
     }
@@ -627,7 +627,7 @@ export default function FollowRequestList({ onRequestProcessed }: { onRequestPro
                         <Button
                           variant="outline"
                           onClick={() => handleUnfollow(request.requester._id)}
-                          className="w-full sm:w-auto text-red-600 hover:text-red-700 hover:bg-red-50"
+                          className="w-full sm:w-auto text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
                         >
                           <UserMinus className="h-4 w-4 mr-2" />
                           Unfollow

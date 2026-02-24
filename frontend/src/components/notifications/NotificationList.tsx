@@ -3,14 +3,14 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import { 
-  Bell, 
-  UserPlus, 
-  Heart, 
-  MessageSquare, 
-  Share2, 
-  Clock, 
-  CheckCircle, 
+import {
+  Bell,
+  UserPlus,
+  Heart,
+  MessageSquare,
+  Share2,
+  Clock,
+  CheckCircle,
   XCircle,
   Trash2,
   Eye,
@@ -19,6 +19,7 @@ import {
 import { toast } from '@/hooks/use-toast';
 import api from '@/services/api';
 import { formatDistanceToNow } from 'date-fns';
+import { socketService } from '@/services/socketService';
 
 interface Notification {
   _id: string;
@@ -73,26 +74,21 @@ export function NotificationList({ onNotificationClick, onMarkAllRead }: Notific
   useEffect(() => {
     const handleNew = () => loadNotifications(currentPage, false);
     const handleRead = () => loadNotifications(currentPage, false);
-    try {
-      // Lazy import to avoid circular deps if any
-      const { socketService } = require('@/services/socketService');
-      socketService.onNewNotification(handleNew);
-      socketService.onNotificationRead(handleRead);
-      return () => {
-        socketService.offNewNotification();
-        socketService.offNotificationRead();
-      };
-    } catch (e) {
-      console.warn('Socket not available for NotificationList auto-refresh');
-    }
+
+    socketService.onNewNotification(handleNew);
+    socketService.onNotificationRead(handleRead);
+    return () => {
+      socketService.offNewNotification();
+      socketService.offNotificationRead();
+    };
   }, [currentPage]);
 
   const loadNotifications = async (page = 1, append = false) => {
     try {
       setLoading(true);
-      
+
       const params: any = { page, limit: 20 };
-      
+
       if (filter && filter !== 'all') {
         if (filter === 'follow_requests') {
           params.type = 'follow_request';
@@ -108,13 +104,13 @@ export function NotificationList({ onNotificationClick, onMarkAllRead }: Notific
       }
 
       const response = await api.get('/api/notifications', { params });
-      
+
       if (append) {
         setNotifications(prev => [...prev, ...response.data.notifications]);
       } else {
         setNotifications(response.data.notifications || []);
       }
-      
+
       setHasMore(response.data.pagination?.hasMore || false);
       setCurrentPage(page);
     } catch (error) {
@@ -132,7 +128,7 @@ export function NotificationList({ onNotificationClick, onMarkAllRead }: Notific
   const markAsRead = async (notificationId: string) => {
     try {
       await api.patch(`/api/notifications/${notificationId}/read`);
-      setNotifications(prev => 
+      setNotifications(prev =>
         prev.map(n => n._id === notificationId ? { ...n, isRead: true } : n)
       );
     } catch (error) {
@@ -201,21 +197,21 @@ export function NotificationList({ onNotificationClick, onMarkAllRead }: Notific
   const getNotificationColor = (type: string) => {
     switch (type) {
       case 'follow_request':
-        return 'border-l-blue-500 bg-blue-50';
+        return 'border-l-blue-500 bg-blue-50/50 dark:bg-blue-900/20';
       case 'follow_accepted':
-        return 'border-l-green-500 bg-green-50';
+        return 'border-l-green-500 bg-green-50/50 dark:bg-green-900/20';
       case 'follow_rejected':
-        return 'border-l-red-500 bg-red-50';
+        return 'border-l-red-500 bg-red-50/50 dark:bg-red-900/20';
       case 'post_like':
-        return 'border-l-red-500 bg-red-50';
+        return 'border-l-red-500 bg-red-50/50 dark:bg-red-900/20';
       case 'post_comment':
-        return 'border-l-blue-500 bg-blue-50';
+        return 'border-l-blue-500 bg-blue-50/50 dark:bg-blue-900/20';
       case 'post_share':
-        return 'border-l-purple-500 bg-purple-50';
+        return 'border-l-purple-500 bg-purple-50/50 dark:bg-purple-900/20';
       case 'message':
-        return 'border-l-green-500 bg-green-50';
+        return 'border-l-green-500 bg-green-50/50 dark:bg-green-900/20';
       default:
-        return 'border-l-gray-500 bg-gray-50';
+        return 'border-l-gray-500 bg-gray-50/50 dark:bg-slate-800/20';
     }
   };
 
@@ -295,7 +291,7 @@ export function NotificationList({ onNotificationClick, onMarkAllRead }: Notific
             Follow Requests
           </Button>
         </div>
-        
+
         <Button variant="outline" size="sm" onClick={handleMarkAllRead}>
           Mark All Read
         </Button>
@@ -304,18 +300,17 @@ export function NotificationList({ onNotificationClick, onMarkAllRead }: Notific
       {/* Notifications list */}
       <div className="space-y-3">
         {notifications.map((notification) => (
-          <Card 
-            key={notification._id} 
-            className={`border-l-4 ${getNotificationColor(notification.type)} ${
-              !notification.isRead ? 'ring-2 ring-blue-200' : ''
-            }`}
+          <Card
+            key={notification._id}
+            className={`border-l-4 ${getNotificationColor(notification.type)} ${!notification.isRead ? 'ring-2 ring-blue-200 dark:ring-blue-900/50' : ''
+              }`}
           >
             <CardContent className="p-4">
               <div className="flex items-start space-x-3">
                 <div className="flex-shrink-0">
                   {getNotificationIcon(notification.type)}
                 </div>
-                
+
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center space-x-2 mb-1">
                     <h4 className="font-medium text-sm">{notification.title}</h4>
@@ -328,11 +323,11 @@ export function NotificationList({ onNotificationClick, onMarkAllRead }: Notific
                       {notification.category}
                     </Badge>
                   </div>
-                  
+
                   <p className="text-sm text-muted-foreground mb-2">
                     {notification.message}
                   </p>
-                  
+
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-2 text-xs text-muted-foreground">
                       {notification.senderId && (
@@ -349,7 +344,7 @@ export function NotificationList({ onNotificationClick, onMarkAllRead }: Notific
                       <span>•</span>
                       <span>{formatDistanceToNow(new Date(notification.createdAt), { addSuffix: true })}</span>
                     </div>
-                    
+
                     <div className="flex space-x-1">
                       {!notification.isRead && (
                         <Button
