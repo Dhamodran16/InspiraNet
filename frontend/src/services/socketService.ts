@@ -11,10 +11,13 @@ export interface Message {
   senderId: string;
   senderName: string;
   content: string;
-  messageType: 'text' | 'image' | 'file';
+  messageType: 'text' | 'image' | 'video' | 'pdf' | 'file';
   mediaUrl?: string;
+  fileName?: string;
+  fileSize?: number;
   createdAt: string;
-  readBy: string[];
+  readBy: (string | { userId: string; readAt: string })[];
+  isOwn?: boolean;
 }
 
 export interface TypingIndicator {
@@ -90,7 +93,7 @@ class SocketService {
     if (this.socket || this.isConnected) return;
 
     this.isConnected = true;
-    
+
     try {
       const token = localStorage.getItem('authToken') || sessionStorage.getItem('authToken');
       if (!token) {
@@ -111,10 +114,10 @@ class SocketService {
       });
 
       this.setupEventHandlers();
-      
+
       // Authenticate with the backend
       this.socket.emit('authenticate', { token });
-      
+
     } catch (error) {
       console.error('Error setting up socket connection:', error);
       this.isConnected = false;
@@ -151,7 +154,7 @@ class SocketService {
       console.error('Socket connection error:', error);
       this.isConnected = false;
       this.reconnectAttempts++;
-      
+
       if (this.reconnectAttempts >= this.maxReconnectAttempts) {
         console.error('Max reconnection attempts reached');
       }
@@ -555,6 +558,26 @@ class SocketService {
   markMessagesAsRead(conversationId: string, messageIds: string[]) {
     if (this.socket?.connected) {
       this.socket.emit('mark_as_read', { conversationId, messageIds });
+    }
+  }
+
+  // Acknowledge message delivery (WhatsApp-style: triggers single→double tick)
+  emitMessageDelivered(conversationId: string, messageId: string) {
+    if (this.socket?.connected) {
+      this.socket.emit('message_delivered', { conversationId, messageId });
+    }
+  }
+
+  // Listen for individual message status updates (delivered / read)
+  onMessageStatusUpdate(callback: (data: { messageId: string; status: string; conversationId: string }) => void) {
+    if (this.socket) {
+      this.socket.on('message_status_update', callback);
+    }
+  }
+
+  offMessageStatusUpdate() {
+    if (this.socket) {
+      this.socket.off('message_status_update');
     }
   }
 

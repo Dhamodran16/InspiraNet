@@ -20,6 +20,7 @@ import {
 import { cn } from "@/lib/utils";
 import { socketService } from "@/services/socketService";
 
+
 interface SidebarProps {
   currentSection: string;
   onSectionChange: (section: string) => void;
@@ -34,12 +35,12 @@ export default function Sidebar({ currentSection, onSectionChange, onLogout, onC
   const [unreadNotifications, setUnreadNotifications] = useState(0);
   const [isHovered, setIsHovered] = useState(false);
   const { user, logout } = useAuth();
-  
+
   const userName = user?.name || "User";
 
   // Get current year for fallback
   const currentYear = new Date().getFullYear();
-  
+
   // Get user year display - only for students
   const getUserYearDisplay = () => {
     if (user?.type !== 'student') return null;
@@ -88,7 +89,7 @@ export default function Sidebar({ currentSection, onSectionChange, onLogout, onC
               if (c.unreadCount && typeof c.unreadCount === 'object') {
                 return acc + (c.unreadCount[userId] || 0);
               }
-            } catch {}
+            } catch { }
             return acc;
           }, 0);
           setUnreadMessages(totalUnread);
@@ -145,11 +146,11 @@ export default function Sidebar({ currentSection, onSectionChange, onLogout, onC
                 if (c.unreadCount && typeof c.unreadCount === 'object') {
                   return acc + (c.unreadCount[userId] || 0);
                 }
-              } catch {}
+              } catch { }
               return acc;
             }, 0);
             setUnreadMessages(totalUnread);
-          } catch {}
+          } catch { }
         })();
       });
 
@@ -223,9 +224,9 @@ export default function Sidebar({ currentSection, onSectionChange, onLogout, onC
             "transition-all duration-500 ease-out ring-2 ring-transparent group-hover:ring-purple-200",
             isHovered ? "h-10 w-10" : "h-8 w-8"
           )}>
-            <AvatarImage src={user?.avatar || "/placeholder.svg"} alt="User" />
-            <AvatarFallback className="bg-gradient-to-r from-purple-600 to-blue-600 text-white font-bold text-sm">
-              {userName.split(' ').map(n => n[0]).join('')}
+            <AvatarImage src={user?.avatar} alt="User" />
+            <AvatarFallback className="bg-slate-100 text-slate-600 font-bold text-sm">
+              {userName.charAt(0).toUpperCase()}
             </AvatarFallback>
           </Avatar>
 
@@ -293,15 +294,14 @@ export default function Sidebar({ currentSection, onSectionChange, onLogout, onC
           </div>
         </ScrollArea>
       </nav>
-
       {/* Footer Actions Section - Fixed at bottom */}
       <div className="flex-shrink-0 p-2 border-t border-border bg-gradient-to-r from-gray-50 to-white dark:from-slate-900 dark:to-slate-900">
         <div className="space-y-2">
           <Button
             variant="ghost"
             className={cn(
-              "w-full justify-start text-muted-foreground hover:text-purple-700 h-12 text-sm font-medium transition-all duration-500 ease-out hover:bg-gradient-to-r hover:from-purple-50 hover:to-blue-50 rounded-xl transform hover:scale-105 group dark:hover:from-slate-900 dark:hover:to-slate-800",
-              isHovered ? "justify-start" : "justify-center"
+              "w-full justify-start text-muted-foreground hover:text-purple-700 h-11 text-sm font-medium transition-all duration-500 ease-out hover:bg-gradient-to-r hover:from-purple-50 hover:to-blue-50 rounded-xl transform hover:scale-105 group dark:hover:from-slate-900 dark:hover:to-slate-800",
+              isHovered ? "px-3" : "px-0 justify-center"
             )}
             onClick={() => onSectionChange("settings")}
           >

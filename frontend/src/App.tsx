@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from '@/components/ui/toaster';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { ThemeProvider } from '@/contexts/ThemeContext';
@@ -83,7 +83,7 @@ function App() {
                 <Route path="/profile" element={<Profile />} />
                 <Route path="/profile/:userId" element={<OtherUserProfile />} />
                 <Route path="/profile/edit" element={<EditProfile />} />
-                <Route path="/messages" element={<EnhancedMessagesPage />} />
+                <Route path="/messages" element={<Navigate to="/dashboard?section=messages" replace />} />
                 <Route path="/notifications" element={<NotificationsPage />} />
                 <Route path="/create-post" element={<CreatePostPage />} />
                 <Route path="/profile-completion" element={<ProfileCompletionPage />} />

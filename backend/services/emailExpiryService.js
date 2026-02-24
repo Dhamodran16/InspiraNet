@@ -1,11 +1,11 @@
 const cron = require('node-cron');
 const User = require('../models/User');
 const Notification = require('../models/Notification');
-const { 
-  isEmailExpired, 
-  isEmailExpiringSoon, 
+const {
+  isEmailExpired,
+  isEmailExpiringSoon,
   getDaysUntilExpiration,
-  getExpirationDate 
+  getExpirationDate
 } = require('../utils/emailExpiration');
 const { migrateUserEmail, checkMigrationNeeded } = require('./emailMigrationService');
 const emailService = require('./emailService');
@@ -21,29 +21,29 @@ const emailService = require('./emailService');
 async function checkAndNotifyExpiringEmails() {
   try {
     console.log('🔍 Checking for expiring Kongu emails...');
-    
+
     const users = await User.find({
       'email.college': { $exists: true, $ne: null },
       'emailMigration.migrated': { $ne: true },
       type: 'student'
     });
-    
+
     let notifiedCount = 0;
     let expiredCount = 0;
-    
+
     for (const user of users) {
       const collegeEmail = user.email.college;
-      
+
       if (!collegeEmail) continue;
-      
+
       const isExpired = isEmailExpired(collegeEmail);
       const daysUntilExpiry = getDaysUntilExpiration(collegeEmail);
       const expirationDate = getExpirationDate(collegeEmail);
-      
+
       if (isExpired) {
         expiredCount++;
         console.log(`⚠️ User ${user._id} (${collegeEmail}) has expired email`);
-        
+
         // Create urgent notification
         await Notification.create({
           userId: user._id,
@@ -53,7 +53,7 @@ async function checkAndNotifyExpiringEmails() {
           priority: 'urgent',
           read: false
         });
-        
+
         // Send email notification if personal email exists
         if (user.email.personal) {
           try {
@@ -77,7 +77,7 @@ async function checkAndNotifyExpiringEmails() {
         // Email expiring within 30 days
         notifiedCount++;
         console.log(`📧 User ${user._id} (${collegeEmail}) email expiring in ${daysUntilExpiry} days`);
-        
+
         // Create warning notification
         await Notification.create({
           userId: user._id,
@@ -87,7 +87,7 @@ async function checkAndNotifyExpiringEmails() {
           priority: daysUntilExpiry <= 7 ? 'high' : 'medium',
           read: false
         });
-        
+
         // Send email notification if personal email exists
         if (user.email.personal) {
           try {
@@ -108,9 +108,9 @@ async function checkAndNotifyExpiringEmails() {
         }
       }
     }
-    
+
     console.log(`✅ Email expiry check completed: ${notifiedCount} users notified, ${expiredCount} expired`);
-    
+
   } catch (error) {
     console.error('❌ Error checking expiring emails:', error);
   }
@@ -122,26 +122,28 @@ async function checkAndNotifyExpiringEmails() {
 async function autoMigrateExpiredEmails() {
   try {
     console.log('🔄 Starting automatic email migration for expired emails...');
-    
+
     const users = await User.find({
       'email.college': { $exists: true, $ne: null },
       'email.personal': { $exists: true, $ne: null },
       'emailMigration.migrated': { $ne: true }
     });
-    
+
     let migratedCount = 0;
     let failedCount = 0;
-    
+
     for (const user of users) {
       const collegeEmail = user.email.college;
-      
+
       if (!collegeEmail) continue;
-      
+
       const isExpired = isEmailExpired(collegeEmail);
-      
-      if (isExpired && user.email.personal) {
+      const daysUntilExpiry = getDaysUntilExpiration(collegeEmail);
+
+      // Migrate if expired OR 1 day before expiry (per user requirement)
+      if ((isExpired || (daysUntilExpiry !== null && daysUntilExpiry <= 1)) && user.email.personal) {
         try {
-          console.log(`🔄 Migrating user ${user._id} from ${collegeEmail} to ${user.email.personal}`);
+          console.log(`🔄 Migrating user ${user._id} from ${collegeEmail} to ${user.email.personal} (${isExpired ? 'Expired' : '1 day before expiry'})`);
           await migrateUserEmail(user._id.toString(), user.email.personal);
           migratedCount++;
         } catch (error) {
@@ -150,9 +152,9 @@ async function autoMigrateExpiredEmails() {
         }
       }
     }
-    
+
     console.log(`✅ Auto-migration completed: ${migratedCount} migrated, ${failedCount} failed`);
-    
+
   } catch (error) {
     console.error('❌ Error in auto-migration:', error);
   }
@@ -166,12 +168,12 @@ function startEmailExpiryMonitoring() {
   cron.schedule('0 9 * * *', async () => {
     await checkAndNotifyExpiringEmails();
   });
-  
+
   // Auto-migrate expired emails daily at 10 AM
   cron.schedule('0 10 * * *', async () => {
     await autoMigrateExpiredEmails();
   });
-  
+
   console.log('✅ Email expiry monitoring started');
 }
 

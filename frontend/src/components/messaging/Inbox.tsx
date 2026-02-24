@@ -105,7 +105,7 @@ export default function Inbox() {
     const date = new Date(dateString);
     const now = new Date();
     const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60));
-    
+
     if (diffInMinutes < 1) return 'Just now';
     if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
     if (diffInMinutes < 1440) return `${Math.floor(diffInMinutes / 60)}h ago`;
@@ -157,7 +157,7 @@ export default function Inbox() {
                   <Avatar className="h-10 w-10">
                     <AvatarImage src={conversation.participants[0]?.avatar} />
                     <AvatarFallback>
-                      {conversation.participants[0]?.name?.charAt(0) || 'U'}
+                      {conversation.participants[0]?.name?.charAt(0).toUpperCase() || 'U'}
                     </AvatarFallback>
                   </Avatar>
                   <div className="flex-1 min-w-0">
@@ -211,7 +211,7 @@ export default function Inbox() {
                   <Avatar className="h-10 w-10">
                     <AvatarImage src={req.sender.avatar} />
                     <AvatarFallback>
-                      {req.sender.name?.charAt(0) || 'U'}
+                      {req.sender.name?.charAt(0).toUpperCase() || 'U'}
                     </AvatarFallback>
                   </Avatar>
                   <div className="flex-1 min-w-0">
@@ -228,15 +228,15 @@ export default function Inbox() {
                     </p>
                   </div>
                   <div className="flex gap-2">
-                    <Button 
-                      size="sm" 
+                    <Button
+                      size="sm"
                       onClick={() => handleAcceptRequest(req._id)}
                     >
                       Accept
                     </Button>
-                    <Button 
-                      size="sm" 
-                      variant="outline" 
+                    <Button
+                      size="sm"
+                      variant="outline"
                       onClick={() => handleDeclineRequest(req._id)}
                     >
                       Decline

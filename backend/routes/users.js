@@ -32,30 +32,30 @@ const { authenticateToken } = require('../middleware/auth');
 // This prevents reserved words like "profile" from being treated as userId
 const validateObjectId = (req, res, next) => {
   const userId = req.params.userId;
-  
+
   // List of reserved words that should not be treated as userId
   const reservedWords = ['profile', 'preferences', 'settings', 'search', 'directory', 'verify-email', 'change-password', 'delete-account', 'security-info'];
-  
+
   if (userId) {
     // Check if it's a reserved word first
     if (reservedWords.includes(userId.toLowerCase())) {
       console.log(`❌ Rejected reserved word "${userId}" as userId parameter`);
-      return res.status(400).json({ 
+      return res.status(400).json({
         error: 'Invalid user ID',
         message: `"${userId}" is a reserved route and cannot be used as a user ID`
       });
     }
-    
+
     // Validate ObjectId format
     if (!mongoose.Types.ObjectId.isValid(userId)) {
       console.log(`❌ Invalid ObjectId format: "${userId}"`);
-      return res.status(400).json({ 
+      return res.status(400).json({
         error: 'Invalid user ID format',
         message: 'User ID must be a valid MongoDB ObjectId'
       });
     }
   }
-  
+
   next();
 };
 
@@ -67,7 +67,7 @@ router.get('/', authenticateToken, async (req, res) => {
 
     // Build query
     const query = {};
-    
+
     if (search) {
       query.$or = [
         { name: { $regex: search, $options: 'i' } },
@@ -80,7 +80,7 @@ router.get('/', authenticateToken, async (req, res) => {
         { skills: { $regex: search, $options: 'i' } }
       ];
     }
-    
+
     if (type) query.type = type;
     if (department) {
       query.$and = query.$and || [];
@@ -137,9 +137,12 @@ router.put('/profile', authenticateToken, async (req, res) => {
       'content-type': req.headers['content-type'],
       'authorization': req.headers['authorization'] ? 'Bearer [TOKEN_PRESENT]' : 'MISSING'
     });
-    
+
     const userId = req.user._id;
     const updateData = req.body || {};
+    const profileUpdate = {};
+    const unsetFields = {};
+
     const normalizeEmail = (value) => typeof value === 'string' ? value.trim().toLowerCase() : undefined;
     const normalizeString = (value) => typeof value === 'string' ? value.trim() : '';
     const hasField = (key) => Object.prototype.hasOwnProperty.call(updateData, key);
@@ -148,13 +151,13 @@ router.put('/profile', authenticateToken, async (req, res) => {
     if (!currentUser) {
       return res.status(404).json({ success: false, error: 'User not found' });
     }
-    
+
     const resolvedName = hasField('name')
       ? normalizeString(updateData.name)
       : normalizeString(currentUser.name);
     if (!resolvedName) {
       console.log('❌ Validation failed: Name missing on payload and user record');
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
         error: 'Name is required',
         message: 'The name field is required for profile updates'
@@ -175,60 +178,57 @@ router.put('/profile', authenticateToken, async (req, res) => {
       keys: Object.keys(updateData)
     });
 
-    // Validate required fields
     // Handle email update (can be object with college/personal or string)
-    let emailUpdate = {};
     if (updateData.email) {
       if (typeof updateData.email === 'object') {
-        const currentCollege = normalizeEmail(req.user?.email?.college);
-        const currentPersonal = normalizeEmail(req.user?.email?.personal);
+        const currentCollege = normalizeEmail(currentUser.email?.college);
+        const currentPersonal = normalizeEmail(currentUser.email?.personal);
         const incomingCollege = normalizeEmail(updateData.email.college);
         const incomingPersonal = normalizeEmail(updateData.email.personal);
-        
+
         if (incomingCollege && incomingCollege !== currentCollege) {
-    const existingUser = await User.findOne({ 
-            'email.college': incomingCollege, 
-      _id: { $ne: userId } 
-    });
+          const existingUser = await User.findOne({
+            'email.college': incomingCollege,
+            _id: { $ne: userId }
+          });
           if (existingUser) {
             return res.status(400).json({ error: 'College email is already taken' });
           }
-          emailUpdate.college = incomingCollege;
+          profileUpdate['email.college'] = incomingCollege;
         }
+
         if (incomingPersonal && incomingPersonal !== currentPersonal) {
-          const existingUser = await User.findOne({ 
-            'email.personal': incomingPersonal, 
-            _id: { $ne: userId } 
+          const existingUser = await User.findOne({
+            'email.personal': incomingPersonal,
+            _id: { $ne: userId }
           });
           if (existingUser) {
             return res.status(400).json({ error: 'Personal email is already taken' });
           }
-          emailUpdate.personal = incomingPersonal;
+          profileUpdate['email.personal'] = incomingPersonal;
         }
       } else {
         // Email is a string (legacy support)
         const incomingEmail = normalizeEmail(updateData.email);
         if (incomingEmail) {
-        const existingUser = await User.findOne({ 
-            email: incomingEmail, 
-          _id: { $ne: userId } 
-        });
-    if (existingUser) {
-      return res.status(400).json({ error: 'Email is already taken' });
+          const existingUser = await User.findOne({
+            $or: [
+              { 'email.college': incomingEmail },
+              { 'email.personal': incomingEmail },
+              { email: incomingEmail }
+            ],
+            _id: { $ne: userId }
+          });
+          if (existingUser) {
+            return res.status(400).json({ error: 'Email is already taken' });
           }
-          emailUpdate = incomingEmail;
+          profileUpdate.email = incomingEmail;
         }
       }
     }
 
     // Prepare update object with all profile fields
-    const profileUpdate = {};
-    const unsetFields = {};
-
     profileUpdate.name = updateData.name;
-    if (Object.keys(emailUpdate).length > 0) {
-      profileUpdate.email = emailUpdate;
-    }
 
     const scalarFields = [
       'phone',
@@ -342,19 +342,24 @@ router.put('/profile', authenticateToken, async (req, res) => {
     }
 
     // Automatically set isProfileComplete to true if user has basic information
-    const hasBasicProfile = Boolean(
-      resolvedName &&
-      ((emailUpdate && Object.keys(emailUpdate).length > 0) || currentUser.email) &&
-      (
-        (hasField('department') ? updateData.department : currentUser.department) ||
-        (hasField('bio') ? updateData.bio : currentUser.bio) ||
-        (hasField('skills') ? updateData.skills?.length : currentUser.skills?.length) ||
-        updateData.studentInfo?.department ||
-        updateData.alumniInfo?.currentCompany ||
-        updateData.facultyInfo?.department
-      )
+    const hasEmail = Boolean(
+      profileUpdate['email.college'] ||
+      profileUpdate['email.personal'] ||
+      profileUpdate.email ||
+      currentUser.email?.college ||
+      currentUser.email?.personal
     );
-    
+
+    const hasBioOrSkills = Boolean(
+      (hasField('bio') ? updateData.bio : currentUser.bio) ||
+      (hasField('skills') ? updateData.skills?.length : currentUser.skills?.length) ||
+      updateData.studentInfo?.department ||
+      updateData.alumniInfo?.currentCompany ||
+      updateData.facultyInfo?.department
+    );
+
+    const hasBasicProfile = resolvedName && hasEmail && hasBioOrSkills;
+
     if (hasBasicProfile) {
       profileUpdate.isProfileComplete = true;
     }
@@ -401,11 +406,11 @@ router.put('/profile', authenticateToken, async (req, res) => {
     if (error.stack) {
       console.error('❌ Error stack:', error.stack);
     }
-    
+
     // Handle validation errors specifically
     if (error.name === 'ValidationError') {
       console.error('❌ Mongoose validation error:', error.errors);
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
         error: 'Validation failed',
         message: 'Some fields failed validation',
@@ -413,8 +418,8 @@ router.put('/profile', authenticateToken, async (req, res) => {
         validationErrors: error.errors
       });
     }
-    
-    res.status(500).json({ 
+
+    res.status(500).json({
       success: false,
       error: 'Failed to update profile',
       details: error.message,
@@ -427,7 +432,7 @@ router.put('/profile', authenticateToken, async (req, res) => {
 router.get('/verify-email', authenticateToken, async (req, res) => {
   try {
     const user = await User.findById(req.user._id).select('emailVerified');
-    
+
     res.json({
       success: true,
       verified: user?.emailVerified || false
@@ -442,7 +447,7 @@ router.get('/verify-email', authenticateToken, async (req, res) => {
 router.get('/preferences', authenticateToken, async (req, res) => {
   try {
     const user = await User.findById(req.user._id).select('notificationPreferences');
-    
+
     // Default preferences if none exist
     const defaultPreferences = {
       email: {
@@ -495,7 +500,7 @@ router.get('/preferences', authenticateToken, async (req, res) => {
     };
 
     const preferences = user?.notificationPreferences || defaultPreferences;
-    
+
     res.json({
       success: true,
       preferences
@@ -510,7 +515,7 @@ router.get('/preferences', authenticateToken, async (req, res) => {
 router.put('/preferences', authenticateToken, async (req, res) => {
   try {
     const { preferences } = req.body;
-    
+
     const updatedUser = await User.findByIdAndUpdate(
       req.user._id,
       { $set: { notificationPreferences: preferences } },
@@ -537,23 +542,23 @@ router.get('/profile', authenticateToken, async (req, res) => {
   try {
     // Explicitly log that this route was matched (not /:userId)
     console.log('✅ GET /api/users/profile - Current user profile route matched');
-    
+
     // Check if user is authenticated
     if (!req.user) {
       console.error('❌ No user in request object');
       return res.status(401).json({ error: 'User not authenticated', details: 'No user found in request' });
     }
-    
+
     // Get userId from req.user - req.user is already the user document from auth middleware
     const userId = req.user._id || req.user.id;
-    
+
     if (!userId) {
       console.error('❌ No userId found in req.user');
       console.error('❌ req.user type:', typeof req.user);
       console.error('❌ req.user keys:', req.user ? Object.keys(req.user) : 'req.user is null/undefined');
       return res.status(401).json({ error: 'User not authenticated', details: 'No user ID found' });
     }
-    
+
     console.log('🔍 Fetching profile for userId:', userId);
 
     // Use req.user directly since it's already populated from auth middleware
@@ -596,7 +601,7 @@ router.get('/profile', authenticateToken, async (req, res) => {
       console.warn('⚠️ Error populating followers:', populateError.message);
       user.followers = [];
     }
-    
+
     try {
       if (user.following && Array.isArray(user.following) && user.following.length > 0) {
         // Filter out any invalid ObjectIds
@@ -627,8 +632,8 @@ router.get('/profile', authenticateToken, async (req, res) => {
     if (error.stack) {
       console.error('❌ Error stack:', error.stack);
     }
-    res.status(500).json({ 
-      error: 'Failed to fetch profile', 
+    res.status(500).json({
+      error: 'Failed to fetch profile',
       details: error.message,
       errorName: error.name,
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
@@ -640,7 +645,7 @@ router.get('/profile', authenticateToken, async (req, res) => {
 router.get('/profile/:userId', async (req, res) => {
   try {
     const { userId } = req.params;
-    
+
     const user = await User.findById(userId)
       .select('-password -email -phone -dateOfBirth -notificationPreferences')
       .populate('followers', 'name avatar type')
@@ -666,14 +671,14 @@ router.get('/:userId', authenticateToken, validateObjectId, async (req, res) => 
     // Double-check: If somehow "profile" got through, reject it here too
     if (userId === 'profile' || userId === 'Profile') {
       console.error('❌ CRITICAL: "profile" matched /:userId route - this should not happen!');
-      return res.status(400).json({ 
+      return res.status(400).json({
         error: 'Invalid route',
         message: 'Use /api/users/profile to get your profile, not /api/users/:userId'
       });
     }
 
     console.log('✅ /:userId route matched - userId:', userId);
-    
+
     const user = await User.findById(userId)
       .select('-password -notificationPreferences')
       .populate('followers', 'name avatar type department batch')
@@ -702,24 +707,24 @@ router.get('/:userId', authenticateToken, validateObjectId, async (req, res) => 
     // Filter fields based on privacy settings if viewing other user's profile
     const currentUserId = req.user?._id?.toString();
     const isOwnProfile = currentUserId === userId;
-    
+
     const userWithStats = { ...user };
     userWithStats.followersCount = user.followers?.length || 0;
     userWithStats.followingCount = user.following?.length || 0;
     userWithStats.postsCount = 0; // Will be populated separately if needed
-    
+
     // Apply privacy filters if not own profile
     if (!isOwnProfile && settings) {
       // Hide email if privacy setting says so
       if (!settings.privacy?.showEmail) {
         delete userWithStats.email;
       }
-      
+
       // Hide phone if privacy setting says so
       if (!settings.privacy?.showPhone) {
         delete userWithStats.phone;
       }
-      
+
       // Hide location if privacy setting says so
       if (!settings.privacy?.showLocation) {
         delete userWithStats.location;
@@ -727,7 +732,7 @@ router.get('/:userId', authenticateToken, validateObjectId, async (req, res) => 
         delete userWithStats.state;
         delete userWithStats.country;
       }
-      
+
       // Hide company if privacy setting says so
       if (!settings.privacy?.showCompany) {
         delete userWithStats.company;
@@ -735,7 +740,7 @@ router.get('/:userId', authenticateToken, validateObjectId, async (req, res) => 
           delete userWithStats.alumniInfo.currentCompany;
         }
       }
-      
+
       // Hide batch if privacy setting says so
       if (!settings.privacy?.showBatch) {
         delete userWithStats.batch;
@@ -743,7 +748,7 @@ router.get('/:userId', authenticateToken, validateObjectId, async (req, res) => 
           delete userWithStats.studentInfo.batch;
         }
       }
-      
+
       // Hide department if privacy setting says so
       if (!settings.privacy?.showDepartment) {
         delete userWithStats.department;
@@ -938,11 +943,11 @@ router.get('/:userId/stats', authenticateToken, async (req, res) => {
     let connectionCount = 0;
     try {
       const Follow = require('../models/Follow');
-      
+
       // Get followers (users who follow the target user) - populate to check if users exist
       const followerRelations = await Follow.find({ followeeId: userId })
         .populate('followerId', '_id');
-      
+
       // Filter out deleted users - only count users that actually exist
       const validFollowers = [];
       for (const rel of followerRelations) {
@@ -958,11 +963,11 @@ router.get('/:userId/stats', authenticateToken, async (req, res) => {
           }
         }
       }
-      
+
       // Get following (users the target user follows) - populate to check if users exist
       const followingRelations = await Follow.find({ followerId: userId })
         .populate('followeeId', '_id');
-      
+
       // Filter out deleted users - only count users that actually exist
       const validFollowing = [];
       for (const rel of followingRelations) {
@@ -978,23 +983,23 @@ router.get('/:userId/stats', authenticateToken, async (req, res) => {
           }
         }
       }
-      
+
       console.log('📊 Stats - Valid followers count:', validFollowers.length);
       console.log('📊 Stats - Valid following count:', validFollowing.length);
       console.log('📊 Stats - Valid followers IDs:', validFollowers);
       console.log('📊 Stats - Valid following IDs:', validFollowing);
-      
+
       // Deduplicate IDs first to avoid counting duplicates
       const uniqueFollowers = [...new Set(validFollowers)];
       const uniqueFollowing = [...new Set(validFollowing)];
-      
+
       // Find intersection using Set for better performance (mutual connections)
       const followersSet = new Set(uniqueFollowers);
       const followingSet = new Set(uniqueFollowing);
-      
+
       const mutualStr = uniqueFollowers.filter(id => followingSet.has(id));
       connectionCount = mutualStr.length;
-      
+
       console.log('📊 Stats - Mutual connections count:', connectionCount);
       console.log('📊 Stats - Mutual connections IDs:', mutualStr);
     } catch (error) {
@@ -1142,7 +1147,7 @@ router.get('/search', authenticateToken, async (req, res) => {
 
     // Build search query
     const query = {};
-    
+
     if (q) {
       query.$or = [
         { name: { $regex: q, $options: 'i' } },
@@ -1157,7 +1162,7 @@ router.get('/search', authenticateToken, async (req, res) => {
         { designation: { $regex: q, $options: 'i' } }
       ];
     }
-    
+
     if (type) query.type = type;
     if (department) {
       query.$and = query.$and || [];
@@ -1205,11 +1210,11 @@ router.get('/:userId/connections', authenticateToken, async (req, res) => {
 
     // Get followers and following from Follow model (primary source of truth)
     const Follow = require('../models/Follow');
-    
+
     // Get followers (users who follow the target user) from Follow model
     const followerRelations = await Follow.find({ followeeId: targetUserId })
       .populate('followerId', '_id name avatar type department batch');
-    
+
     // Filter out deleted users and null references - be very defensive
     const followers = [];
     for (const rel of followerRelations) {
@@ -1234,7 +1239,7 @@ router.get('/:userId/connections', authenticateToken, async (req, res) => {
     // Get following (users the target user follows) from Follow model
     const followingRelations = await Follow.find({ followerId: targetUserId })
       .populate('followeeId', '_id name avatar type department batch');
-    
+
     // Filter out deleted users and null references - be very defensive
     const following = [];
     for (const rel of followingRelations) {
@@ -1275,7 +1280,7 @@ router.get('/:userId/connections', authenticateToken, async (req, res) => {
         console.warn('⚠️ Error extracting follower ID:', err.message);
       }
     }
-    
+
     const followingIds = [];
     for (const f of following) {
       try {
@@ -1300,13 +1305,13 @@ router.get('/:userId/connections', authenticateToken, async (req, res) => {
     // Deduplicate IDs first to avoid counting duplicates
     const uniqueFollowersIds = [...new Set(followersIds)];
     const uniqueFollowingIds = [...new Set(followingIds)];
-    
+
     // Find intersection of followers and following (mutual connections)
     const followersSet = new Set(uniqueFollowersIds);
     const followingSet = new Set(uniqueFollowingIds);
-    
+
     const mutualStr = uniqueFollowersIds.filter(id => followingSet.has(id) && mongoose.Types.ObjectId.isValid(id));
-    
+
     // Safely convert to ObjectIds, filtering out invalid ones
     const mutualIds = mutualStr
       .filter(id => mongoose.Types.ObjectId.isValid(id))
@@ -1319,7 +1324,7 @@ router.get('/:userId/connections', authenticateToken, async (req, res) => {
         }
       })
       .filter(id => id !== null);
-    
+
     console.log('🤝 Mutual IDs found (string):', mutualStr);
     console.log('🤝 Mutual IDs found (ObjectId):', mutualIds);
     console.log('🔍 Detailed intersection check:');
@@ -1350,14 +1355,14 @@ router.get('/:userId/connections', authenticateToken, async (req, res) => {
       mutual = await User.find({
         _id: { $in: mutualIds }
       }).select('_id name avatar type department batch').lean();
-      
+
       // Filter out any null results (in case users were deleted after IDs were collected)
       mutual = mutual.filter(m => m && m._id);
     }
 
     console.log('🤝 Mutual connections found:', mutual.length);
     console.log('📋 Mutual connections data:', mutual);
-    
+
     // Safely log mutual IDs
     try {
       const mutualIdsStr = mutualIds
@@ -1367,7 +1372,7 @@ router.get('/:userId/connections', authenticateToken, async (req, res) => {
     } catch (err) {
       console.warn('⚠️ Error logging mutual IDs:', err.message);
     }
-    
+
     // Check if any mutual IDs are missing from the result
     try {
       const foundIds = mutual
@@ -1380,7 +1385,7 @@ router.get('/:userId/connections', authenticateToken, async (req, res) => {
           }
         })
         .filter(id => id !== null);
-      
+
       const missingIds = mutualIds
         .filter(id => {
           try {
@@ -1390,7 +1395,7 @@ router.get('/:userId/connections', authenticateToken, async (req, res) => {
             return false;
           }
         });
-      
+
       if (missingIds.length > 0) {
         const missingIdsStr = missingIds
           .filter(id => id !== null)
@@ -1405,7 +1410,7 @@ router.get('/:userId/connections', authenticateToken, async (req, res) => {
     const safeFollowers = followers.filter(f => f && f._id);
     const safeFollowing = following.filter(f => f && f._id);
     const safeMutual = mutual.filter(m => m && m._id);
-    
+
     // Deduplicate mutual connections by _id to ensure no duplicates
     const uniqueMutualMap = new Map();
     safeMutual.forEach(m => {
@@ -1417,7 +1422,7 @@ router.get('/:userId/connections', authenticateToken, async (req, res) => {
       }
     });
     const uniqueMutual = Array.from(uniqueMutualMap.values());
-    
+
     // Final count should match the actual array length
     const finalMutualCount = uniqueMutual.length;
 
@@ -1451,7 +1456,7 @@ router.get('/:userId/connections', authenticateToken, async (req, res) => {
             name: m.name || 'Unknown'
           }))
       });
-      
+
       console.log('🔍 Connections endpoint - Final mutual connections:');
       uniqueMutual.forEach((m, index) => {
         try {
@@ -1474,7 +1479,7 @@ router.get('/:userId/connections', authenticateToken, async (req, res) => {
       name: error.name,
       userId: req.params.userId
     });
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Failed to fetch user connections',
       message: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
     });
@@ -1619,10 +1624,10 @@ router.delete('/:userId/achievements/:achievementId', authenticateToken, async (
 router.get('/directory/all', authenticateToken, async (req, res) => {
   try {
     const { search, batch, department, type, page = 1, limit = 20 } = req.query;
-    
+
     // Build filter object
     const filter = {};
-    
+
     if (search) {
       filter.$or = [
         { name: { $regex: search, $options: 'i' } },
@@ -1631,34 +1636,34 @@ router.get('/directory/all', authenticateToken, async (req, res) => {
         { location: { $regex: search, $options: 'i' } }
       ];
     }
-    
+
     if (batch) filter.batch = batch;
     if (department) filter.department = department;
     if (type) filter.type = type;
-    
+
     // Exclude the current user from results
     filter._id = { $ne: req.user._id };
-    
+
     const skip = (page - 1) * limit;
-    
+
     const users = await User.find(filter)
       .select('name email type batch department company designation location avatar bio skills interests')
       .sort({ name: 1 })
       .skip(skip)
       .limit(parseInt(limit));
-    
+
     const total = await User.countDocuments(filter);
-    
+
     // Get current user's following list to show follow status
     const currentUser = await User.findById(req.user._id).select('following');
     const followingIds = currentUser?.following || [];
-    
+
     const usersWithFollowStatus = users.map(user => ({
       ...user.toObject(),
       isFollowing: followingIds.includes(user._id),
       canMessage: followingIds.includes(user._id) && user.followers?.includes(req.user._id)
     }));
-    
+
     res.json({
       users: usersWithFollowStatus,
       total,
@@ -1713,7 +1718,7 @@ router.post('/change-password', authenticateToken, async (req, res) => {
     // Update user settings to track password change
     const updatedSettingsDoc = await UserSettings.findOneAndUpdate(
       { userId },
-      { 
+      {
         'security.lastPasswordChange': new Date(),
         'security.requirePasswordChange': false
       },
@@ -1735,7 +1740,7 @@ router.post('/change-password', authenticateToken, async (req, res) => {
       });
     }
 
-    res.json({ 
+    res.json({
       message: 'Password changed successfully',
       lastPasswordChange: user.lastPasswordChange,
       settings: settingsObj
@@ -1893,10 +1898,10 @@ router.delete('/delete-account', authenticateToken, async (req, res) => {
 router.get('/security-info', authenticateToken, async (req, res) => {
   try {
     const userId = req.user._id;
-    
+
     const user = await User.findById(userId).select('email createdAt lastLogin');
     const userSettings = await UserSettings.findOne({ userId });
-    
+
     const securityInfo = {
       email: user.email,
       accountCreated: user.createdAt,

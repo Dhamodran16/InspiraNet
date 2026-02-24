@@ -32,15 +32,15 @@ const CommentMenu = ({ commentId, onDelete }: { commentId: string; onDelete: (co
 
   return (
     <div className="relative ml-auto" ref={menuRef}>
-      <Button 
-        variant="ghost" 
-        size="icon" 
+      <Button
+        variant="ghost"
+        size="icon"
         className="h-6 w-6 p-0 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
         onClick={() => setShowMenu(!showMenu)}
       >
         <MoreVertical className="h-3 w-3" />
       </Button>
-      
+
       {showMenu && (
         <div className="absolute right-0 top-6 w-40 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-lg z-20">
           <div className="p-1">
@@ -96,6 +96,7 @@ interface BasePostProps {
   showShareButton?: boolean;
   postTypeLabel: string;
   postTypeIcon: React.ReactNode;
+  footerRight?: React.ReactNode;
   children?: React.ReactNode;
 }
 
@@ -116,13 +117,14 @@ export default function BasePost({
   showShareButton = true,
   postTypeLabel,
   postTypeIcon,
+  footerRight,
   children
 }: BasePostProps) {
   const [commentText, setCommentText] = useState('');
   const [showAllComments, setShowAllComments] = useState(false);
   const [showPostMenu, setShowPostMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
-  
+
   // Local like state management - rely on server state
   const [isLiked, setIsLiked] = useState(initialIsLiked);
   const [isDisabled, setIsDisabled] = useState(false);
@@ -157,18 +159,18 @@ export default function BasePost({
 
   const handleLike = async () => {
     if (isDisabled) return;
-    
+
     setIsDisabled(true);
-    
+
     try {
       console.log('🔄 Like button clicked for post:', post._id, 'Current state:', isLiked);
-      
+
       // Call parent handler (which will update server state)
       await onLike(post._id);
-      
+
       // Update local state immediately for better UX
       setIsLiked(!isLiked);
-      
+
       console.log('✅ Like action completed, new state:', !isLiked);
     } catch (error) {
       console.error('❌ Error in handleLike:', error);
@@ -182,14 +184,14 @@ export default function BasePost({
 
   const handleDeleteComment = async (commentId: string) => {
     if (!onDeleteComment) return;
-    
+
     // Find the comment to check if user is the author
     const comment = post.comments?.find(c => c._id === commentId);
     if (!comment || comment.author?._id?.toString() !== user?._id?.toString()) {
       console.warn('User is not the author of this comment, deletion not allowed');
       return;
     }
-    
+
     try {
       await onDeleteComment(post._id, commentId);
     } catch (error) {
@@ -201,7 +203,7 @@ export default function BasePost({
     const date = new Date(dateString);
     const now = new Date();
     const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
-    
+
     if (diffInSeconds < 60) return 'Just now';
     if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`;
     if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`;
@@ -212,7 +214,7 @@ export default function BasePost({
   // Function to deduplicate comments based on comment ID
   const getUniqueComments = (comments: any[]) => {
     if (!comments || !Array.isArray(comments)) return [];
-    
+
     const seen = new Set();
     return comments.filter(comment => {
       if (seen.has(comment._id)) {
@@ -225,50 +227,49 @@ export default function BasePost({
   };
 
   return (
-    <Card className="post-card border border-gray-200 dark:border-gray-700 shadow-sm mx-auto" style={{ display: 'flex', flexDirection: 'column' }}>
+    <Card className="post-card border border-gray-200 dark:border-gray-700 shadow-sm mx-auto max-w-[680px] w-full" style={{ display: 'flex', flexDirection: 'column' }}>
       {/* Post Header */}
-      <div className="post-header p-3 border-b border-gray-100 dark:border-gray-800 flex-shrink-0">
+      <div className="post-header px-3 py-1.5 border-b border-gray-100 dark:border-gray-800 flex-shrink-0">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2">
-            <Avatar className="h-10 w-10">
+            <Avatar className="h-7 w-7">
               <AvatarImage src={post.author?.avatar} />
-              <AvatarFallback className="bg-primary text-primary-foreground font-semibold">
-                {post.author?.name?.charAt(0) || 'U'}
+              <AvatarFallback className="bg-primary text-primary-foreground font-semibold text-[10px]">
+                {post.author?.name?.charAt(0).toUpperCase() || 'U'}
               </AvatarFallback>
             </Avatar>
             <div className="flex-1 min-w-0">
-              <div className="flex items-center space-x-2">
-                <p className="font-semibold text-gray-900 dark:text-gray-100 truncate">
+              <div className="flex items-center space-x-1.5 flex-wrap gap-y-0.5">
+                <p className="font-semibold text-[13px] text-gray-900 dark:text-gray-100 truncate">
                   {post.author?.name || 'Unknown User'}
                 </p>
                 {post.author?.type && (
-                  <Badge variant="secondary" className="text-xs">
+                  <Badge variant="secondary" className="text-[10px] px-1 py-0">
                     {post.author.type}
                   </Badge>
                 )}
-                {/* Post Type Badge - Enhanced Design */}
-                <Badge 
-                  variant="outline" 
-                  className={`text-xs font-semibold px-2.5 py-1 border-2 flex items-center gap-1.5 shadow-sm ${
-                    post.postType === 'poll' 
-                      ? 'bg-gradient-to-r from-orange-50 to-amber-50 dark:from-orange-900/20 dark:to-amber-900/20 border-orange-400 dark:border-orange-600 text-orange-700 dark:text-orange-300'
-                      : post.postType === 'job'
-                      ? 'bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border-green-400 dark:border-green-600 text-green-700 dark:text-green-300'
+                {/* Post Type Badge */}
+                <Badge
+                  variant="outline"
+                  className={`text-[10px] font-semibold px-1 py-0 border flex items-center gap-1 ${post.postType === 'poll'
+                    ? 'bg-orange-50 dark:bg-orange-900/20 border-orange-400 dark:border-orange-600 text-orange-700 dark:text-orange-300'
+                    : post.postType === 'job'
+                      ? 'bg-green-50 dark:bg-green-900/20 border-green-400 dark:border-green-600 text-green-700 dark:text-green-300'
                       : post.postType === 'event'
-                      ? 'bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-900/20 dark:to-cyan-900/20 border-blue-400 dark:border-blue-600 text-blue-700 dark:text-blue-300'
-                      : 'bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 border-purple-400 dark:border-purple-600 text-purple-700 dark:text-purple-300'
-                  }`}
+                        ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-400 dark:border-blue-600 text-blue-700 dark:text-blue-300'
+                        : 'bg-purple-50 dark:bg-purple-900/20 border-purple-400 dark:border-purple-600 text-purple-700 dark:text-purple-300'
+                    }`}
                 >
-                  <span className="text-sm leading-none">{postTypeIcon}</span>
-                  <span className="font-bold">{postTypeLabel}</span>
+                  <span className="text-[10px] leading-none">{postTypeIcon}</span>
+                  <span>{postTypeLabel}</span>
                 </Badge>
               </div>
-              <div className="flex items-center space-x-2 text-sm text-gray-500 dark:text-gray-400">
+              <div className="flex items-center space-x-1 text-[11px] text-gray-500 dark:text-gray-400">
                 <span>
-                  {post.author?.department || 
-                   (post.author as any)?.studentInfo?.department || 
-                   (post.author as any)?.facultyInfo?.department || 
-                   'Unknown Department'}
+                  {post.author?.department ||
+                    (post.author as any)?.studentInfo?.department ||
+                    (post.author as any)?.facultyInfo?.department ||
+                    'Unknown Department'}
                 </span>
                 {post.author?.batch && (
                   <>
@@ -281,19 +282,19 @@ export default function BasePost({
               </div>
             </div>
           </div>
-          
+
           {/* Post Actions Menu - Three dot menu */}
           <div className="flex items-center space-x-2">
             <div className="relative" ref={menuRef}>
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className="h-8 w-8 text-gray-500 dark:text-gray-400"
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 text-gray-500 dark:text-gray-400"
                 onClick={() => setShowPostMenu(!showPostMenu)}
               >
-                <MoreVertical className="h-4 w-4" />
+                <MoreVertical className="h-3.5 w-3.5" />
               </Button>
-              
+
               {showPostMenu && (
                 <div className="absolute right-0 mt-2 w-40 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-lg z-10">
                   <div className="p-1">
@@ -361,35 +362,39 @@ export default function BasePost({
       </div>
 
       {/* Post Actions */}
-      <div className="px-3 pb-2 flex-shrink-0 border-t border-gray-100 dark:border-gray-800">
+      <div className="px-3 py-1 pb-2 flex-shrink-0 border-t border-gray-100 dark:border-gray-800">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
             <Button
               variant="ghost"
               size="sm"
               onClick={handleLike}
-              className={`flex items-center space-x-2 ${
-                isLiked ? 'text-red-600 bg-red-50 dark:bg-red-900/20' : 'text-gray-600 dark:text-gray-400'
-              }`}
+              className={`flex items-center space-x-1.5 h-7 px-2 ${isLiked ? 'text-red-600 bg-red-50 dark:bg-red-900/20' : 'text-gray-600 dark:text-gray-400'
+                }`}
               disabled={isDisabled}
               title={`${isLiked ? 'Unlike' : 'Like'} this post`}
             >
-              <Heart className={`h-4 w-4 ${isLiked ? 'fill-current' : ''}`} />
-              <span className="font-medium">
+              <Heart className={`h-3.5 w-3.5 ${isLiked ? 'fill-current' : ''}`} />
+              <span className="font-medium text-[13px]">
                 {post.likes?.length || post.likeIds?.length || 0}
               </span>
             </Button>
-            
+
             <Button
               variant="ghost"
               size="sm"
               onClick={onToggleComments}
-              className="flex items-center space-x-2 text-gray-600 dark:text-gray-400"
+              className="flex items-center space-x-1.5 h-7 px-2 text-gray-600 dark:text-gray-400"
             >
-              <MessageCircle className="h-4 w-4" />
-              <span className="font-medium">{commentsCount || 0}</span>
+              <MessageCircle className="h-3.5 w-3.5" />
+              <span className="font-medium text-[13px]">{commentsCount || 0}</span>
             </Button>
           </div>
+          {footerRight && (
+            <div className="text-[11px] text-gray-500 dark:text-gray-400 font-medium">
+              {footerRight}
+            </div>
+          )}
         </div>
 
         {/* Comments Section */}
@@ -399,26 +404,26 @@ export default function BasePost({
               {(() => {
                 const uniqueComments = getUniqueComments(post.comments);
                 const commentsToShow = showAllComments ? uniqueComments : uniqueComments.slice(0, 3);
-                
+
                 return commentsToShow.map((comment, index) => {
                   // Ensure unique key by combining comment ID with index
                   const uniqueKey = `${comment._id}-${index}`;
                   return (
                     <div key={uniqueKey} className="flex space-x-2">
-                      <Avatar className="h-6 w-6">
+                      <Avatar className="h-5 w-5">
                         <AvatarImage src={comment.author?.avatar} />
-                        <AvatarFallback className="bg-gray-300 dark:bg-gray-600 text-gray-700 dark:text-gray-300 text-xs font-medium">
-                          {comment.author?.name?.charAt(0) || 'U'}
+                        <AvatarFallback className="bg-gray-300 dark:bg-gray-600 text-gray-700 dark:text-gray-300 text-[10px] font-medium">
+                          {comment.author?.name?.charAt(0).toUpperCase() || 'U'}
                         </AvatarFallback>
                       </Avatar>
                       <div className="flex-1 min-w-0">
                         <div className="bg-gray-50 dark:bg-gray-800 rounded-lg px-2.5 py-1.5">
                           <div className="flex items-center justify-between">
-                            <p className="text-sm">
-                              <span className="font-medium text-gray-900 dark:text-gray-100">
+                            <p className="text-[12px] leading-snug">
+                              <span className="font-semibold text-gray-900 dark:text-gray-100">
                                 {comment.author?.name || 'Unknown User'}
                               </span>
-                              <span className="text-gray-700 dark:text-gray-300 ml-2">
+                              <span className="text-gray-700 dark:text-gray-300 ml-1.5">
                                 {comment.content}
                               </span>
                             </p>
@@ -432,7 +437,7 @@ export default function BasePost({
                   );
                 });
               })()}
-              
+
               {getUniqueComments(post.comments).length > 3 && (
                 <Button
                   variant="ghost"
@@ -440,19 +445,19 @@ export default function BasePost({
                   onClick={() => setShowAllComments(!showAllComments)}
                   className="text-blue-600 dark:text-blue-400 text-sm"
                 >
-                  {showAllComments 
-                    ? `Hide comments` 
+                  {showAllComments
+                    ? `Hide comments`
                     : `View all ${getUniqueComments(post.comments).length} comments`
                   }
                 </Button>
               )}
-              
+
               {/* Add Comment */}
               <div className="flex space-x-2">
                 <Avatar className="h-6 w-6">
                   <AvatarImage src={user?.avatar} />
                   <AvatarFallback className="bg-gray-300 dark:bg-gray-600 text-gray-700 dark:text-gray-300 text-xs font-medium">
-                    {user?.name?.charAt(0) || 'U'}
+                    {user?.name?.charAt(0).toUpperCase() || 'U'}
                   </AvatarFallback>
                 </Avatar>
                 <div className="flex-1 flex items-center space-x-2">

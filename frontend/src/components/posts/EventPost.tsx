@@ -5,6 +5,7 @@ import { Calendar, Clock, MapPin, Users, Link, Repeat, Globe, Users2, CalendarDa
 import { Post } from '@/services/postsApi';
 import { User } from '@/contexts/AuthContext';
 import BasePost from './BasePost';
+import MediaLightbox from './MediaLightbox';
 
 interface EventPostProps {
   post: Post;
@@ -24,19 +25,7 @@ interface EventPostProps {
   showShareButton?: boolean;
 }
 
-// Utility function to determine Instagram-style aspect ratio
-const getInstagramAspectRatio = (width: number, height: number): string => {
-  const ratio = width / height;
-  
-  if (Math.abs(ratio - 1) < 0.1) {
-    return 'aspect-square'; // Square (1:1) - 1080 × 1080
-  } else if (ratio < 1) {
-    return 'aspect-[4/5]'; // Portrait (4:5) - 1080 × 1350
-  } else {
-    return 'aspect-[1.91/1]'; // Landscape (1.91:1) - 1080 × 566
-  }
-};
-
+// Event post images are now standardized to 4:5 (800x1000)
 export default function EventPost({
   post,
   user,
@@ -54,28 +43,13 @@ export default function EventPost({
   showDeleteButton = false,
   showShareButton = true
 }: EventPostProps) {
-  const [imageDimensions, setImageDimensions] = useState<{ [key: string]: { width: number; height: number } }>({});
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
 
-  const getImageAspectRatio = (mediaUrl: string): string => {
-    const dimensions = imageDimensions[mediaUrl];
-    if (dimensions) {
-      return getInstagramAspectRatio(dimensions.width, dimensions.height);
-    }
-    return 'aspect-square'; // Default to square
-  };
-
-  const handleImageLoad = (mediaUrl: string, event: React.SyntheticEvent<HTMLImageElement>) => {
-    const img = event.currentTarget;
-    setImageDimensions(prev => ({
-      ...prev,
-      [mediaUrl]: { width: img.naturalWidth, height: img.naturalHeight }
-    }));
-  };
-
-  const renderMedia = (mediaItem: any) => {
+  // Image logic standardized to 4:5 aspect ratio for single, square for grid
+  const renderMedia = (mediaItem: any, isGrid: boolean = false) => {
     // Handle both string (legacy) and object (new) media formats
     const mediaUrl = typeof mediaItem === 'string' ? mediaItem : mediaItem?.url;
-    
+
     // Safety check: ensure mediaUrl is a string
     if (!mediaUrl || typeof mediaUrl !== 'string') {
       console.warn('Invalid media item:', mediaItem);
@@ -84,26 +58,26 @@ export default function EventPost({
 
     // Determine media type based on file extension
     const fileExtension = mediaUrl.split('.').pop()?.toLowerCase();
-    
+
     if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(fileExtension || '')) {
-      const aspectRatio = getImageAspectRatio(mediaUrl);
-      
       return (
-        <div className={`w-full max-w-4xl ${aspectRatio} overflow-hidden rounded-xl mx-auto`}>
-          <img 
-            src={mediaUrl} 
+        <div
+          className={`w-full ${isGrid ? 'aspect-square' : 'max-w-[450px] aspect-[4/3]'} overflow-hidden rounded-xl mx-auto bg-muted cursor-zoom-in group shadow-sm`}
+          onClick={() => setLightboxUrl(mediaUrl)}
+        >
+          <img
+            src={mediaUrl}
             alt="Event image"
-            className="w-full h-full object-cover rounded-xl transition-transform duration-200 hover:scale-105"
+            className="w-full h-full object-cover rounded-xl transition-all duration-300 group-hover:scale-105"
             loading="lazy"
-            onLoad={(e) => handleImageLoad(mediaUrl, e)}
           />
         </div>
       );
     } else if (['mp4', 'avi', 'mov', 'webm'].includes(fileExtension || '')) {
       return (
-        <div className="w-full max-w-4xl aspect-video overflow-hidden rounded-xl mx-auto">
-          <video 
-            src={mediaUrl} 
+        <div className={`w-full ${isGrid ? 'aspect-square' : 'max-w-4xl aspect-video'} overflow-hidden rounded-xl mx-auto shadow-sm`}>
+          <video
+            src={mediaUrl}
             controls
             className="w-full h-full object-cover rounded-xl"
             preload="metadata"
@@ -112,16 +86,17 @@ export default function EventPost({
       );
     } else if (['pdf'].includes(fileExtension || '')) {
       return (
-        <div className="w-full max-w-4xl aspect-[4/5] overflow-hidden rounded-xl mx-auto">
+        <div className={`w-full ${isGrid ? 'aspect-square' : 'max-w-4xl aspect-[4/5]'} overflow-hidden rounded-xl mx-auto shadow-sm`}>
           <div className="w-full h-full bg-muted rounded-xl flex items-center justify-center border-2 border-dashed border-border hover:border-primary transition-colors">
-            <div className="text-center">
-              <File className="mx-auto mb-2 text-foreground" size={32} />
-              <p className="text-sm text-foreground">PDF Document</p>
-              <a 
-                href={mediaUrl} 
-                target="_blank" 
+            <div className="text-center p-2">
+              <File className="mx-auto mb-1 text-foreground" size={isGrid ? 24 : 32} />
+              <p className={`${isGrid ? 'text-[10px]' : 'text-sm'} text-foreground font-medium truncate max-w-full px-2`}>PDF Document</p>
+              <a
+                href={mediaUrl}
+                target="_blank"
                 rel="noopener noreferrer"
-                className="text-primary hover:text-primary/80 text-sm"
+                className="text-primary hover:text-primary/80 text-[10px] mt-1 inline-block"
+                onClick={(e) => e.stopPropagation()}
               >
                 View PDF
               </a>
@@ -130,89 +105,12 @@ export default function EventPost({
         </div>
       );
     }
-    
+
     return null;
   };
 
-  const getAttendanceModeIcon = (mode: string) => {
-    switch (mode) {
-      case 'in-person':
-        return <Users2 className="h-4 w-4 text-green-600" />;
-      case 'online':
-        return <Globe className="h-4 w-4 text-blue-600" />;
-      case 'hybrid':
-        return <Users2 className="h-4 w-4 text-purple-600" />;
-      default:
-        return <Users2 className="h-4 w-4 text-gray-600" />;
-    }
-  };
-
-  const getAttendanceModeColor = (mode: string) => {
-    switch (mode) {
-      case 'in-person':
-        return 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-300 border-green-200 dark:border-green-800';
-      case 'online':
-        return 'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-300 border-blue-200 dark:border-blue-800';
-      case 'hybrid':
-        return 'bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-300 border-purple-200 dark:border-purple-800';
-      default:
-        return 'bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-300 border-gray-200 dark:border-gray-800';
-    }
-  };
-
-  const isEventUpcoming = () => {
-    if (!post.eventDetails?.date) return false;
-    const eventDate = new Date(post.eventDetails.date);
-    const now = new Date();
-    return eventDate > now;
-  };
-
-  const isEventToday = () => {
-    if (!post.eventDetails?.date) return false;
-    const eventDate = new Date(post.eventDetails.date);
-    const today = new Date();
-    return eventDate.toDateString() === today.toDateString();
-  };
-
-  const getEventStatus = () => {
-    if (!post.eventDetails?.date) return 'unknown';
-    const eventDate = new Date(post.eventDetails.date);
-    const now = new Date();
-    
-    if (eventDate < now) return 'past';
-    if (isEventToday()) return 'today';
-    return 'upcoming';
-  };
-
-  const getEventStatusColor = () => {
-    const status = getEventStatus();
-    switch (status) {
-      case 'upcoming':
-        return 'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-300 border-blue-200 dark:border-blue-800';
-      case 'today':
-        return 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-300 border-green-200 dark:border-green-800';
-      case 'past':
-        return 'bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-300 border-gray-200 dark:border-gray-800';
-      default:
-        return 'bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-300 border-gray-200 dark:border-gray-800';
-    }
-  };
-
-  const getEventStatusText = () => {
-    const status = getEventStatus();
-    switch (status) {
-      case 'upcoming':
-        return 'Upcoming';
-      case 'today':
-        return 'Today';
-      case 'past':
-        return 'Past Event';
-      default:
-        return 'Unknown';
-    }
-  };
-
   const formatEventDate = (dateString: string) => {
+    if (!dateString) return 'Not specified';
     const date = new Date(dateString);
     return date.toLocaleDateString('en-US', {
       weekday: 'long',
@@ -222,164 +120,198 @@ export default function EventPost({
     });
   };
 
-  const formatEventTime = (timeString: string) => {
-    if (!timeString) return '';
-    return timeString;
+  const getAttendanceModeColor = (mode: string) => {
+    switch (mode) {
+      case 'in-person':
+        return 'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-300 border-blue-200 dark:border-blue-800';
+      case 'online':
+        return 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-300 border-green-200 dark:border-green-800';
+      case 'hybrid':
+        return 'bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-300 border-purple-200 dark:border-purple-800';
+      default:
+        return 'bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-300 border-gray-200 dark:border-gray-800';
+    }
   };
 
   return (
-            <BasePost
-              post={post}
-              user={user}
-              onLike={onLike}
-              onComment={onComment}
-              onEdit={onEdit}
-              onDelete={onDelete}
-              onDeleteComment={onDeleteComment}
-              onShare={onShare}
-              showComments={showComments}
-              onToggleComments={onToggleComments}
-              commentsCount={commentsCount}
-              isLiked={isLiked}
-              showDeleteButton={showDeleteButton}
-              showShareButton={showShareButton}
-              postTypeLabel="📅 Event"
-              postTypeIcon="📅"
-            >
-      {/* Images First - Media Content */}
-      {post.media && post.media.length > 0 && (
-        <div className="px-3 pt-3">
-          <div className="space-y-3">
-            {post.media.map((mediaItem, index) => (
-              <div key={index} className="w-full">
-                {renderMedia(mediaItem)}
-              </div>
-            ))}
+    <>
+      <BasePost
+        post={post}
+        user={user}
+        onLike={onLike}
+        onComment={onComment}
+        onEdit={onEdit}
+        onDelete={onDelete}
+        onDeleteComment={onDeleteComment}
+        onShare={onShare}
+        showComments={showComments}
+        onToggleComments={onToggleComments}
+        commentsCount={commentsCount}
+        isLiked={isLiked}
+        showDeleteButton={showDeleteButton}
+        showShareButton={showShareButton}
+        postTypeLabel="Event Post"
+        postTypeIcon="📅"
+      >
+        {/* Images First - Media Display */}
+        {post.media && post.media.length > 0 && (
+          <div className="px-4 pt-4">
+            <div className="space-y-3">
+              {post.media.length === 1 ? (
+                <div className="rounded-lg overflow-hidden">
+                  {renderMedia(post.media[0])}
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-2">
+                  {post.media.slice(0, 4).map((mediaItem, index) => (
+                    <div key={index} className="rounded-lg overflow-hidden shadow-sm">
+                      {renderMedia(mediaItem, true)}
+                    </div>
+                  ))}
+                  {post.media.length > 4 && (
+                    <div className="relative rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-800 flex items-center justify-center border border-gray-200 dark:border-gray-700 aspect-square shadow-sm">
+                      <div className="text-center">
+                        <span className="text-xl font-bold text-primary">+{post.media.length - 4}</span>
+                        <p className="text-[9px] uppercase tracking-wider font-semibold text-muted-foreground">more</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Event Details Below Images */}
-      {post.eventDetails && (
-        <div className="px-3 py-2">
-          <div className="space-y-3 p-3 bg-blue-50 dark:bg-blue-900/10 rounded-lg border border-blue-200 dark:border-blue-800">
-            {/* Event Title */}
-            {post.eventDetails.title && (
-              <div className="mb-3">
-                <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100">{post.eventDetails.title}</h3>
-              </div>
-            )}
-            
-            {/* Event Status */}
-            <div className="flex items-center justify-between">
-              <Badge className={getEventStatusColor()}>
-                {getEventStatusText()}
-              </Badge>
-              {post.eventDetails.recurring && (
-                <Badge variant="outline" className="flex items-center gap-1">
-                  <Repeat className="h-3 w-3" />
-                  Recurring
-                </Badge>
-              )}
-            </div>
-
-            {/* Event Date and Time */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <div className="flex items-center space-x-2">
-                <Calendar className="h-5 w-5 text-blue-600" />
+        {/* Event Details Below Images */}
+        {post.eventDetails && (
+          <div className="px-4 py-3">
+            <div className="space-y-3 p-3 bg-blue-50 dark:bg-blue-900/10 rounded-xl border border-blue-200 dark:border-blue-800">
+              {/* Event Title */}
+              {post.title && (
                 <div>
-                  <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Date</p>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">{formatEventDate(post.eventDetails.date)}</p>
+                  <h3 className="text-base font-bold text-gray-900 dark:text-gray-100">{post.title}</h3>
                 </div>
-              </div>
-              
-              {post.eventDetails.time && (
-                <div className="flex items-center space-x-2">
-                  <Clock className="h-5 w-5 text-blue-600" />
+              )}
+
+              {/* Date and Time */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="flex items-start space-x-2">
+                  <div className="mt-1 p-1.5 bg-white dark:bg-gray-800 rounded-lg shadow-sm font-semibold">
+                    <Calendar className="h-4 w-4 text-blue-600" />
+                  </div>
                   <div>
-                    <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Time</p>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">{formatEventTime(post.eventDetails.time)}</p>
+                    <p className="text-[11px] font-semibold text-gray-900 dark:text-gray-100 uppercase tracking-tight">Date</p>
+                    <p className="text-[12px] text-gray-600 dark:text-gray-400 leading-tight">{formatEventDate(post.eventDetails.date)}</p>
                   </div>
                 </div>
-              )}
-            </div>
 
-            {/* Event Location and Attendance */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {post.eventDetails.location && (
-                <div className="flex items-center space-x-2">
-                  <MapPin className="h-5 w-5 text-blue-600" />
-                  <div>
-                    <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Location</p>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">{post.eventDetails.location}</p>
+                {post.eventDetails.time && (
+                  <div className="flex items-start space-x-2">
+                    <div className="mt-1 p-1.5 bg-white dark:bg-gray-800 rounded-lg shadow-sm">
+                      <Clock className="h-4 w-4 text-blue-600" />
+                    </div>
+                    <div>
+                      <p className="text-[11px] font-semibold text-gray-900 dark:text-gray-100 uppercase tracking-tight">Time</p>
+                      <p className="text-[12px] text-gray-600 dark:text-gray-400 leading-tight">{post.eventDetails.time}</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Location and Mode */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="flex items-start space-x-2">
+                  <div className="mt-1 p-1.5 bg-white dark:bg-gray-800 rounded-lg shadow-sm">
+                    <MapPin className="h-4 w-4 text-blue-600" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[11px] font-semibold text-gray-900 dark:text-gray-100 uppercase tracking-tight">Location</p>
+                    <p className="text-[12px] text-gray-600 dark:text-gray-400 break-words leading-tight">{post.eventDetails.location}</p>
                   </div>
                 </div>
-              )}
-              
-              <div className="flex items-center space-x-2">
-                <Users className="h-5 w-5 text-blue-600" />
-                <div>
-                  <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Attendance</p>
-                  <div className="text-sm text-gray-600 dark:text-gray-400">
-                    {post.eventDetails.attendanceMode ? (
-                      <Badge className={getAttendanceModeColor(post.eventDetails.attendanceMode)}>
-                        {getAttendanceModeIcon(post.eventDetails.attendanceMode)}
+
+                {post.eventDetails.attendanceMode && (
+                  <div className="flex items-start space-x-2">
+                    <div className="mt-1 p-1.5 bg-white dark:bg-gray-800 rounded-lg shadow-sm">
+                      <Globe className="h-4 w-4 text-blue-600" />
+                    </div>
+                    <div>
+                      <p className="text-[11px] font-semibold text-gray-900 dark:text-gray-100 uppercase tracking-tight">Mode</p>
+                      <Badge className={`${getAttendanceModeColor(post.eventDetails.attendanceMode)} text-[10px] py-0 px-1.5 h-4`}>
                         {post.eventDetails.attendanceMode.charAt(0).toUpperCase() + post.eventDetails.attendanceMode.slice(1)}
                       </Badge>
-                    ) : 'Not specified'}
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
-            </div>
 
-            {/* Max Attendees */}
-            {post.eventDetails.maxAttendees && (
-              <div className="flex items-center space-x-2">
-                <Users2 className="h-5 w-5 text-blue-600" />
-                <div>
-                  <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Max Attendees</p>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">{post.eventDetails.maxAttendees}</p>
-                </div>
+              {/* Status and Recurring */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {post.eventDetails.maxAttendees && (
+                  <div className="flex items-start space-x-3">
+                    <div className="mt-1 p-2 bg-white dark:bg-gray-800 rounded-lg shadow-sm">
+                      <Users className="h-5 w-5 text-blue-600" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">Capacity</p>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">{post.eventDetails.maxAttendees} attendees max</p>
+                    </div>
+                  </div>
+                )}
+
+                {post.eventDetails.recurring && (
+                  <div className="flex items-start space-x-3">
+                    <div className="mt-1 p-2 bg-white dark:bg-gray-800 rounded-lg shadow-sm">
+                      <Repeat className="h-5 w-5 text-blue-600" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">Frequency</p>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">This is a recurring event</p>
+                    </div>
+                  </div>
+                )}
               </div>
-            )}
-            
-            {/* Registration Form */}
-            {post.eventDetails.registrationForm && (
-              <div className="flex items-center space-x-2">
-                <Link className="h-5 w-5 text-blue-600" />
-                <div>
-                  <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Registration</p>
-                  <a 
-                    href={post.eventDetails.registrationForm}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 text-sm underline"
+
+              {/* Registration Link */}
+              {post.eventDetails.registrationForm && (
+                <div className="pt-2">
+                  <Button
+                    asChild
+                    className="w-full bg-blue-600 hover:bg-blue-700 text-white shadow-md transition-all duration-200"
                   >
-                    Register for Event
-                  </a>
+                    <a
+                      href={post.eventDetails.registrationForm}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center justify-center space-x-2"
+                    >
+                      <Link className="h-4 w-4" />
+                      <span>Register for Event</span>
+                    </a>
+                  </Button>
                 </div>
-              </div>
-            )}
-
-            {/* Event Description */}
-            {post.eventDetails.description && (
-              <div className="mt-3">
-                <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-1.5">Event Description</h4>
-                <p className="text-sm text-gray-600 dark:text-gray-400">{post.eventDetails.description}</p>
-              </div>
-            )}
+              )}
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Post Content Below Event Details */}
-      {post.content && (
-        <div className="px-3 py-2">
-          <p className="text-gray-900 dark:text-gray-100 whitespace-pre-wrap">
-            {post.content}
-          </p>
-        </div>
+        {/* Post Content Below Event Details */}
+        {post.content && (
+          <div className="px-4 py-2">
+            <p className="text-gray-700 dark:text-gray-300 text-[13px] leading-relaxed line-clamp-3">
+              {post.content}
+            </p>
+          </div>
+        )}
+      </BasePost>
+
+      {lightboxUrl && (
+        <MediaLightbox
+          url={lightboxUrl}
+          onClose={() => setLightboxUrl(null)}
+          title={post.title || "Event Image"}
+        />
       )}
-    </BasePost>
+    </>
   );
 }

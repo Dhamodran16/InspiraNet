@@ -5,14 +5,15 @@ const { authenticateToken } = require('../middleware/auth');
 const Conversation = require('../models/Conversation');
 const Message = require('../models/Message');
 const User = require('../models/User');
+const NotificationService = require('../services/notificationService');
 
 // Get all conversations for the authenticated user (only with mutually followed users)
 router.get('/', authenticateToken, async (req, res) => {
   try {
     console.log('🔍 Conversations route accessed by user:', req.user._id);
-    
+
     const userId = req.user._id;
-    
+
     // Get current user's follow relationships
     console.log('🔍 Fetching user follow relationships...');
     const currentUser = await User.findById(userId).select('following followers');
@@ -20,38 +21,38 @@ router.get('/', authenticateToken, async (req, res) => {
       following: currentUser?.following?.length || 0,
       followers: currentUser?.followers?.length || 0
     });
-    
+
     if (!currentUser) {
       console.error('❌ Current user not found');
       return res.status(404).json({ error: 'User not found' });
     }
-    
+
     console.log('🔍 Fetching conversations...');
     const conversations = await Conversation.find({
       participants: userId,
       isActive: true
     })
-    .populate('participants', 'name email avatar type department')
-    .populate('lastMessage')
-    .populate('groupAdmin', 'name avatar')
-    .populate('groupAdmins', 'name avatar email')
-    .sort({ updatedAt: -1 });
+      .populate('participants', 'name email avatar type department')
+      .populate('lastMessage')
+      .populate('groupAdmin', 'name avatar')
+      .populate('groupAdmins', 'name avatar email')
+      .sort({ updatedAt: -1 });
 
     console.log('🔍 Found conversations:', conversations.length);
-    
+
     // Filter conversations to only include mutually followed users
     const filteredConversations = conversations.filter(conv => {
       if (conv.isGroupChat) {
         return true; // Keep group chats
       }
-      
+
       // For 1-on-1 conversations, check mutual follow
       const otherParticipant = conv.participants.find(p => p._id.toString() !== userId.toString());
       if (!otherParticipant) return false;
-      
+
       const isFollowing = currentUser.following.includes(otherParticipant._id);
       const isFollowedBy = currentUser.followers.includes(otherParticipant._id);
-      
+
       return isFollowing && isFollowedBy;
     });
 
@@ -72,7 +73,7 @@ router.get('/', authenticateToken, async (req, res) => {
         console.warn('Error accessing unreadCount for conversation:', conv._id, error);
         unreadCount = 0;
       }
-      
+
       return {
         ...conv.toObject(),
         unreadCount: unreadCount
@@ -89,7 +90,7 @@ router.get('/', authenticateToken, async (req, res) => {
       userId: req.user?._id,
       name: error.name
     });
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Failed to fetch conversations',
       details: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
     });
@@ -135,8 +136,8 @@ router.post('/', authenticateToken, async (req, res) => {
     }
 
     if (!canMessage) {
-      return res.status(403).json({ 
-        error: 'Cannot start conversation. Users must be mutually followed or have appropriate messaging permissions.' 
+      return res.status(403).json({
+        error: 'Cannot start conversation. Users must be mutually followed or have appropriate messaging permissions.'
       });
     }
 
@@ -164,10 +165,10 @@ router.post('/', authenticateToken, async (req, res) => {
     });
 
     await conversation.save();
-    
+
     // Populate participant details
     await conversation.populate('participants', 'name email avatar type department');
-    
+
     res.status(201).json({ conversation });
   } catch (error) {
     console.error('Error creating conversation:', error);
@@ -179,20 +180,20 @@ router.post('/', authenticateToken, async (req, res) => {
 router.get('/messageable-users', authenticateToken, async (req, res) => {
   try {
     const userId = req.user._id;
-    
+
     // Get current user's follow relationships
     const currentUser = await User.findById(userId).select('following followers');
-    
+
     // Find users who are mutually following each other
     const mutuallyFollowedUsers = await User.find({
-      _id: { 
-        $in: currentUser.following.filter(id => 
+      _id: {
+        $in: currentUser.following.filter(id =>
           currentUser.followers.includes(id)
         )
       }
     }).select('name email avatar type department');
 
-    res.json({ 
+    res.json({
       users: mutuallyFollowedUsers,
       count: mutuallyFollowedUsers.length
     });
@@ -234,10 +235,10 @@ router.post('/group', authenticateToken, async (req, res) => {
     });
 
     await conversation.save();
-    
+
     // Populate participant details
     await conversation.populate('participants', 'name email avatar type department');
-    
+
     res.status(201).json({ conversation });
   } catch (error) {
     console.error('Error creating group conversation:', error);
@@ -308,7 +309,7 @@ router.post('/:id/members', authenticateToken, async (req, res) => {
       });
     }
 
-    res.json({ 
+    res.json({
       success: true,
       conversation,
       message: 'Members added successfully'
@@ -376,7 +377,7 @@ router.delete('/:id/members/:memberId', authenticateToken, async (req, res) => {
       });
     }
 
-    res.json({ 
+    res.json({
       success: true,
       conversation,
       message: 'Member removed successfully'
@@ -454,7 +455,7 @@ router.post('/:id/admins', authenticateToken, async (req, res) => {
       });
     }
 
-    res.json({ 
+    res.json({
       success: true,
       conversation,
       message: 'Admin added successfully'
@@ -516,7 +517,7 @@ router.delete('/:id/admins/:adminId', authenticateToken, async (req, res) => {
       });
     }
 
-    res.json({ 
+    res.json({
       success: true,
       conversation,
       message: 'Admin removed successfully'
@@ -538,8 +539,8 @@ router.get('/:id', authenticateToken, async (req, res) => {
       participants: userId,
       isActive: true
     })
-    .populate('participants', 'name email avatar type department')
-    .populate('lastMessage');
+      .populate('participants', 'name email avatar type department')
+      .populate('lastMessage');
 
     if (!conversation) {
       return res.status(404).json({ error: 'Conversation not found' });
@@ -572,21 +573,21 @@ router.get('/:id/messages', authenticateToken, async (req, res) => {
     }
 
     // Ensure userId is ObjectId for proper comparison
-    const userIdObj = mongoose.Types.ObjectId.isValid(userId) 
-      ? new mongoose.Types.ObjectId(userId) 
+    const userIdObj = mongoose.Types.ObjectId.isValid(userId)
+      ? new mongoose.Types.ObjectId(userId)
       : userId;
 
     // Get messages with pagination - EXCLUDE messages deleted for this user
     // This is critical: User B should see all messages even if User A cleared the chat
     // The query excludes messages where deletedBy contains THIS user's ID with deleteMode 'forMe'
     // So if User A cleared, User B's query excludes messages deleted for User B (not User A)
-    
+
     // CRITICAL FIX: Ensure userIdObj is properly formatted as ObjectId for comparison
     // Don't create a new ObjectId if it's already one - use it directly
-    const userIdForQuery = userIdObj instanceof mongoose.Types.ObjectId 
-      ? userIdObj 
+    const userIdForQuery = userIdObj instanceof mongoose.Types.ObjectId
+      ? userIdObj
       : (mongoose.Types.ObjectId.isValid(userIdObj) ? new mongoose.Types.ObjectId(userIdObj) : userIdObj);
-    
+
     const query = {
       conversationId: conversationId,
       // Exclude messages hard deleted
@@ -613,14 +614,14 @@ router.get('/:id/messages', authenticateToken, async (req, res) => {
         }
       ]
     };
-    
+
     console.log('🔍 Loading messages for user:', userIdForQuery.toString(), 'in conversation:', conversationId);
     console.log('🔍 Query userId type:', userIdForQuery.constructor.name);
-    
+
     // First, get total count of ALL messages in conversation (for debugging)
     const totalMessagesInConversation = await Message.countDocuments({ conversationId: conversationId });
     console.log('📊 Total messages in conversation (before filtering):', totalMessagesInConversation);
-    
+
     // Get messages with the query
     const messages = await Message.find(query)
       .populate('senderId', 'name avatar type department')
@@ -630,7 +631,7 @@ router.get('/:id/messages', authenticateToken, async (req, res) => {
       .lean();
 
     console.log('✅ Found', messages.length, 'messages for user:', userIdForQuery.toString(), 'after filtering');
-    
+
     // Enhanced debug: Check a sample message's deletedBy array
     if (messages.length === 0 && totalMessagesInConversation > 0) {
       console.log('⚠️ WARNING: No messages found but conversation has', totalMessagesInConversation, 'messages');
@@ -644,7 +645,7 @@ router.get('/:id/messages', authenticateToken, async (req, res) => {
             matchesCurrentUser: d.userId?.toString() === userIdForQuery.toString()
           })) || [],
           currentUserId: userIdForQuery.toString(),
-          wouldBeExcluded: msg.deletedBy?.some(d => 
+          wouldBeExcluded: msg.deletedBy?.some(d =>
             d.userId?.toString() === userIdForQuery.toString() && d.deleteMode === 'forMe'
           ) || false
         });
@@ -694,7 +695,7 @@ router.post('/:id/messages', authenticateToken, async (req, res) => {
     console.log('📨 Message creation request received');
     console.log('📋 RAW Request body (full):', JSON.stringify(req.body, null, 2));
     console.log('📋 Request body keys:', Object.keys(req.body || {}));
-    
+
     const conversationId = req.params.id;
     const userId = req.user._id;
     const { content, mediaUrl, fileName, fileSize, messageType = 'text' } = req.body;
@@ -750,10 +751,10 @@ router.post('/:id/messages', authenticateToken, async (req, res) => {
     // Prepare message content - ensure it's not empty (required field)
     // Message model has trim: true, so we must ensure content is never empty or whitespace-only
     let messageContent;
-    
+
     // Check if content exists and is not just whitespace
     const hasValidContent = content && typeof content === 'string' && content.trim().length > 0;
-    
+
     if (hasValidContent) {
       // Use the trimmed content
       messageContent = content.trim();
@@ -767,7 +768,7 @@ router.post('/:id/messages', authenticateToken, async (req, res) => {
       messageContent = '[message]';
       console.log('✅ Using default placeholder:', messageContent);
     }
-    
+
     // CRITICAL: Ensure messageContent is never empty or whitespace
     // This is because Message model has trim: true which will fail validation if empty
     if (!messageContent || typeof messageContent !== 'string' || messageContent.trim().length === 0) {
@@ -775,7 +776,7 @@ router.post('/:id/messages', authenticateToken, async (req, res) => {
       messageContent = mediaUrl ? `[${normalizedMessageType}]` : '[message]';
       console.log('🔧 Applied emergency fallback:', messageContent);
     }
-    
+
     console.log('Content processing:', {
       originalContent: content,
       originalContentType: typeof content,
@@ -786,7 +787,7 @@ router.post('/:id/messages', authenticateToken, async (req, res) => {
       finalContentType: typeof messageContent,
       hasMediaUrl: !!mediaUrl
     });
-    
+
     // Final validation - ensure messageContent is never empty
     if (!messageContent || messageContent.trim().length === 0) {
       console.error('❌ CRITICAL: messageContent is empty after processing!');
@@ -800,7 +801,7 @@ router.post('/:id/messages', authenticateToken, async (req, res) => {
       messageContent = mediaUrl ? `[${normalizedMessageType}]` : '[message]';
       console.log('⚠️ Using fallback content:', messageContent);
     }
-    
+
     // Ensure messageContent is a string and not empty
     const finalContent = String(messageContent).trim();
     if (finalContent.length === 0) {
@@ -811,7 +812,7 @@ router.post('/:id/messages', authenticateToken, async (req, res) => {
     } else {
       messageContent = finalContent;
     }
-    
+
     console.log('Creating message with data:', {
       conversationId,
       senderId: userId.toString(),
@@ -895,7 +896,7 @@ router.post('/:id/messages', authenticateToken, async (req, res) => {
         messageType: message.messageType,
         hasMediaUrl: !!message.mediaUrl
       });
-      return res.status(400).json({ 
+      return res.status(400).json({
         error: 'Message validation failed',
         details: validationError.message,
         validationErrors: validationError.errors
@@ -904,7 +905,7 @@ router.post('/:id/messages', authenticateToken, async (req, res) => {
 
     console.log('💾 Saving message to database...');
     try {
-    await message.save();
+      await message.save();
       console.log('✅ Message saved successfully:', message._id);
     } catch (saveError) {
       console.error('❌ Error saving message:', saveError);
@@ -953,18 +954,32 @@ router.post('/:id/messages', authenticateToken, async (req, res) => {
     const io = req.app.get('io');
     if (io) {
       console.log('📡 Emitting socket event to conversation:', conversationId);
-      // Emit to all participants in the conversation room
-      io.to(conversationId).emit('new_message', {
+      // Emit to the conversation room (clients join 'conversation_<id>' room)
+      io.to(`conversation_${conversationId}`).emit('new_message', {
         message: message.toObject(),
         conversationId
       });
-      
-      // Also emit to individual user rooms for real-time updates
-      conversation.participants.forEach(participantId => {
-        io.to(`user_${participantId}`).emit('new_message', {
-        message: message.toObject(),
-        conversationId
-      });
+
+      // Create notifications for other participants and emit badge updates
+      conversation.participants.forEach(async (participantId) => {
+        if (participantId.toString() !== userId.toString()) {
+          try {
+            await NotificationService.createMessageNotification(
+              userId,
+              participantId,
+              messageContent,
+              conversationId
+            );
+            // Emit a notification event to trigger the badge update on frontend
+            io.to(`user_${participantId}`).emit('notification_new', {
+              type: 'message',
+              conversationId,
+              message: messageContent.substring(0, 100)
+            });
+          } catch (notifierError) {
+            console.error('Error creating message notification:', notifierError);
+          }
+        }
       });
     } else {
       console.warn('⚠️ Socket.io not available');
@@ -980,7 +995,7 @@ router.post('/:id/messages', authenticateToken, async (req, res) => {
     console.error('Error name:', error.name);
     console.error('Error message:', error.message);
     console.error('Error stack:', error.stack);
-    
+
     // Handle validation errors specifically
     if (error.name === 'ValidationError' && error.errors) {
       console.error('Validation error details:', error.errors);
@@ -993,16 +1008,16 @@ router.post('/:id/messages', authenticateToken, async (req, res) => {
           value: error.errors[key].value
         };
       });
-      
-      return res.status(400).json({ 
+
+      return res.status(400).json({
         error: 'Message validation failed',
         details: error.message,
         validationErrors: validationErrors
       });
     }
-    
+
     // Handle other errors
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Failed to post message',
       details: process.env.NODE_ENV === 'development' ? error.message : 'An error occurred while posting the message'
     });
@@ -1040,9 +1055,9 @@ router.put('/:id', authenticateToken, async (req, res) => {
     }
 
     await conversation.save();
-    
+
     await conversation.populate('participants', 'name email avatar type department');
-    
+
     res.json({ conversation });
   } catch (error) {
     console.error('Error updating conversation:', error);
@@ -1071,12 +1086,12 @@ router.delete('/:id', authenticateToken, async (req, res) => {
       conversation.participants = conversation.participants.filter(
         p => p.toString() !== userId
       );
-      
+
       // If no participants left, mark as inactive
       if (conversation.participants.length === 0) {
         conversation.isActive = false;
       }
-      
+
       // If admin is leaving, assign admin to first remaining participant
       if (conversation.groupAdmin.toString() === userId && conversation.participants.length > 0) {
         conversation.groupAdmin = conversation.participants[0];
@@ -1105,7 +1120,7 @@ router.post('/:id/read', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'Message IDs array is required' });
     }
 
-    // Update messages to mark as read
+    // Update messages to mark as read — must use $set for mixed operators
     await Message.updateMany(
       {
         _id: { $in: messageIds },
@@ -1114,17 +1129,25 @@ router.post('/:id/read', authenticateToken, async (req, res) => {
       },
       {
         $addToSet: { readBy: { userId, readAt: new Date() } },
-        isRead: true
+        $set: { isRead: true }
       }
     );
 
     // Update conversation unread count
     const conversation = await Conversation.findById(conversationId);
     if (conversation) {
-      const currentUnread = conversation.unreadCount.get(userId) || 0;
-      const newUnread = Math.max(0, currentUnread - messageIds.length);
-      conversation.unreadCount.set(userId, newUnread);
+      conversation.unreadCount.set(userId.toString(), 0);
       await conversation.save();
+    }
+
+    // Notify message senders via socket so their ticks update in real-time
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`conversation_${conversationId}`).emit('messages_read', {
+        userId: userId.toString(),
+        conversationId,
+        messageIds
+      });
     }
 
     res.json({ message: 'Messages marked as read' });
@@ -1138,7 +1161,7 @@ router.post('/:id/read', authenticateToken, async (req, res) => {
 router.get('/users/search', authenticateToken, async (req, res) => {
   try {
     const { q } = req.query;
-    
+
     if (!q || q.length < 2) {
       return res.json([]);
     }
@@ -1151,8 +1174,8 @@ router.get('/users/search', authenticateToken, async (req, res) => {
         { department: { $regex: q, $options: 'i' } }
       ]
     })
-    .select('name email avatar type department batch')
-    .limit(10);
+      .select('name email avatar type department batch')
+      .limit(10);
 
     res.json({ users });
   } catch (error) {
@@ -1178,7 +1201,7 @@ router.patch('/:conversationId/read', authenticateToken, async (req, res) => {
 
     // Mark all messages in the conversation as read for this user
     await Message.updateMany(
-      { 
+      {
         conversationId,
         senderId: { $ne: userId },
         'readBy.userId': { $ne: userId }

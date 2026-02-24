@@ -3,7 +3,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Bell, Settings, UserPlus, Trash2 } from 'lucide-react';
+import { Bell, UserPlus, Trash2 } from 'lucide-react';
 import { toast } from '../../hooks/use-toast';
 import { socketService } from '../../services/socketService';
 import FollowRequestList from './FollowRequestList';
@@ -17,12 +17,12 @@ export default function EnhancedNotificationSystem() {
 
   useEffect(() => {
     loadUnreadCount();
-    
+
     // Socket listeners for real-time updates
     const handleNewNotification = (notification: any) => {
       console.log('🔔 New notification received:', notification);
       loadUnreadCount();
-      
+
       // Show toast for new notifications
       toast({
         title: notification.title || "New Notification",
@@ -72,7 +72,7 @@ export default function EnhancedNotificationSystem() {
   };
 
   const handleMarkAllRead = () => {
-      setUnreadCount(0);
+    setUnreadCount(0);
   };
 
   const handleNotificationClick = (notification: any) => {
@@ -94,11 +94,11 @@ export default function EnhancedNotificationSystem() {
         </h1>
         <p className="text-muted-foreground mt-2">
           Stay updated with your network activities and connections
-            </p>
-          </div>
+        </p>
+      </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="notifications" className="flex items-center space-x-2">
             <Bell className="h-4 w-4" />
             <span>All Notifications</span>
@@ -112,11 +112,7 @@ export default function EnhancedNotificationSystem() {
             <UserPlus className="h-4 w-4" />
             <span>Follow Requests</span>
           </TabsTrigger>
-          <TabsTrigger value="settings" className="flex items-center space-x-2">
-            <Settings className="h-4 w-4" />
-            <span>Preferences</span>
-          </TabsTrigger>
-          </TabsList>
+        </TabsList>
 
         <TabsContent value="notifications">
           <Card>
@@ -127,13 +123,13 @@ export default function EnhancedNotificationSystem() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <NotificationList 
+              <NotificationList
                 onNotificationClick={handleNotificationClick}
                 onMarkAllRead={handleMarkAllRead}
               />
             </CardContent>
           </Card>
-          </TabsContent>
+        </TabsContent>
 
         <TabsContent value="follow-requests">
           <Card>
@@ -147,31 +143,9 @@ export default function EnhancedNotificationSystem() {
               <FollowRequestList onRequestProcessed={loadUnreadCount} />
             </CardContent>
           </Card>
-          </TabsContent>
+        </TabsContent>
 
-        <TabsContent value="settings">
-            <Card>
-              <CardHeader>
-              <CardTitle>Notification Preferences</CardTitle>
-                <CardDescription>
-                Customize your notification settings and preferences
-                </CardDescription>
-              </CardHeader>
-            <CardContent>
-              <div className="text-center py-8">
-                <Settings className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <h3 className="text-lg font-medium mb-2">Notification Settings</h3>
-                <p className="text-muted-foreground mb-4">
-                  Manage your notification preferences and privacy settings
-                </p>
-                <Button onClick={() => window.location.href = '/settings'}>
-                  Go to Settings
-                  </Button>
-                  </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
-      </div>
+      </Tabs>
+    </div>
   );
 }

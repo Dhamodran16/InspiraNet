@@ -101,12 +101,12 @@ const encryptMessage = (content, encryptionKey) => {
     const key = crypto.scryptSync(encryptionKey, 'salt', 32);
     const iv = crypto.randomBytes(16);
     const cipher = crypto.createCipheriv(algorithm, key, iv);
-    
+
     let encrypted = cipher.update(content, 'utf8', 'hex');
     encrypted += cipher.final('hex');
-    
+
     const authTag = cipher.getAuthTag();
-    
+
     return {
       encrypted: encrypted,
       iv: iv.toString('hex'),
@@ -125,12 +125,12 @@ const decryptMessage = (encryptedData, encryptionKey) => {
     const key = crypto.scryptSync(encryptionKey, 'salt', 32);
     const iv = Buffer.from(encryptedData.iv, 'hex');
     const decipher = crypto.createDecipheriv(algorithm, key, iv);
-    
+
     decipher.setAuthTag(Buffer.from(encryptedData.authTag, 'hex'));
-    
+
     let decrypted = decipher.update(encryptedData.encrypted, 'hex', 'utf8');
     decrypted += decipher.final('utf8');
-    
+
     return decrypted;
   } catch (error) {
     console.error('Decryption error:', error);
@@ -143,20 +143,20 @@ const canUsersMessage = async (user1Id, user2Id) => {
   try {
     const user1 = await User.findById(user1Id).select('following followers messagePolicy');
     const user2 = await User.findById(user2Id).select('following followers messagePolicy');
-    
+
     if (!user1 || !user2) return false;
-    
+
     const user1FollowingUser2 = user1.following.includes(user2Id);
     const user2FollowingUser1 = user2.following.includes(user1Id);
     const isMutual = user1FollowingUser2 && user2FollowingUser1;
-    
+
     // Mutual followers can always message each other
     if (isMutual) return true;
-    
+
     // Check individual message policies
     if (user2.messagePolicy === 'everyone') return true;
     if (user2.messagePolicy === 'followers' && user1FollowingUser2) return true;
-    
+
     return false;
   } catch (error) {
     console.error('Error checking messaging permissions:', error);
@@ -198,8 +198,8 @@ router.get('/download/:messageId', authenticateToken, async (req, res) => {
     }
 
     // Check if it's a PDF
-    const isPdf = message.messageType === 'pdf' || 
-                  (message.fileName && message.fileName.toLowerCase().endsWith('.pdf'));
+    const isPdf = message.messageType === 'pdf' ||
+      (message.fileName && message.fileName.toLowerCase().endsWith('.pdf'));
 
     if (!isPdf) {
       return res.status(400).json({ error: 'This endpoint only serves PDF files' });
@@ -207,7 +207,7 @@ router.get('/download/:messageId', authenticateToken, async (req, res) => {
 
     // Fetch the PDF from Cloudinary
     const cloudinaryUrl = message.mediaUrl;
-    
+
     // Convert /image/upload/ to /raw/upload/ if needed
     let downloadUrl = cloudinaryUrl;
     if (cloudinaryUrl.includes('/image/upload/')) {
@@ -234,7 +234,7 @@ router.get('/download/:messageId', authenticateToken, async (req, res) => {
     // Verify we got PDF data (check first bytes for PDF signature)
     const buffer = Buffer.from(response.data);
     const pdfSignature = buffer.slice(0, 4).toString();
-    
+
     if (pdfSignature !== '%PDF') {
       console.error('❌ Invalid PDF signature:', pdfSignature);
       return res.status(500).json({ error: 'Invalid PDF file received from Cloudinary' });
@@ -252,9 +252,9 @@ router.get('/download/:messageId', authenticateToken, async (req, res) => {
   } catch (error) {
     console.error('❌ Error downloading PDF:', error);
     if (!res.headersSent) {
-      res.status(500).json({ 
+      res.status(500).json({
         error: 'Failed to download PDF',
-        details: error.message 
+        details: error.message
       });
     }
   }
@@ -264,13 +264,13 @@ router.get('/download/:messageId', authenticateToken, async (req, res) => {
 router.get('/requests', authenticateToken, async (req, res) => {
   try {
     const userId = req.user._id;
-    
+
     // Get pending follow requests sent by the current user
     const followRequests = await FollowService.getPendingFollowRequests(userId);
-    
+
     // Get users who sent follow requests to the current user
     const receivedRequests = await FollowService.getReceivedFollowRequests(userId);
-    
+
     res.json({
       sentRequests: followRequests || [],
       receivedRequests: receivedRequests || []
@@ -279,7 +279,7 @@ router.get('/requests', authenticateToken, async (req, res) => {
     console.error('Error fetching message requests:', error);
     console.error('Error details:', error.message);
     console.error('Error stack:', error.stack);
-    
+
     // Return empty arrays instead of crashing
     res.json({
       sentRequests: [],
@@ -302,15 +302,15 @@ router.get('/conversations/:conversationId/messages', authenticateToken, async (
     }
 
     // Ensure userId is ObjectId for proper comparison
-    const userIdObj = mongoose.Types.ObjectId.isValid(req.user._id) 
-      ? new mongoose.Types.ObjectId(req.user._id) 
+    const userIdObj = mongoose.Types.ObjectId.isValid(req.user._id)
+      ? new mongoose.Types.ObjectId(req.user._id)
       : req.user._id;
-    
+
     // Check if user is participant (convert to ObjectId for comparison)
     const isParticipant = conversation.participants.some(
       p => p.toString() === userIdObj.toString()
     );
-    
+
     if (!isParticipant) {
       return res.status(403).json({ error: 'Access denied to this conversation' });
     }
@@ -318,13 +318,13 @@ router.get('/conversations/:conversationId/messages', authenticateToken, async (
     // Get messages excluding those deleted for this user
     // CRITICAL: This query excludes messages where deletedBy contains THIS user's ID
     // So if User B cleared chat, User A's query excludes messages deleted for User A (not User B)
-    
+
     // CRITICAL FIX: Ensure userIdObj is properly formatted as ObjectId for comparison
     // Don't create a new ObjectId if it's already one - use it directly
-    const userIdForQuery = userIdObj instanceof mongoose.Types.ObjectId 
-      ? userIdObj 
+    const userIdForQuery = userIdObj instanceof mongoose.Types.ObjectId
+      ? userIdObj
       : (mongoose.Types.ObjectId.isValid(userIdObj) ? new mongoose.Types.ObjectId(userIdObj) : userIdObj);
-    
+
     const query = {
       conversationId,
       // Exclude messages hard deleted
@@ -349,23 +349,23 @@ router.get('/conversations/:conversationId/messages', authenticateToken, async (
         }
       ]
     };
-    
+
     console.log('🔍 Loading messages for user:', userIdForQuery.toString(), 'in conversation:', conversationId);
     console.log('🔍 Query userId type:', userIdForQuery.constructor.name);
-    
+
     // First, get total count of ALL messages in conversation (for debugging)
     const totalMessagesInConversation = await Message.countDocuments({ conversationId });
     console.log('📊 Total messages in conversation (before filtering):', totalMessagesInConversation);
-    
+
     // Get messages with the query
     const messages = await Message.find(query)
       .sort({ createdAt: -1 })
       .limit(limit * 1)
       .skip((page - 1) * limit)
       .populate('senderId', 'name avatar');
-    
+
     console.log('✅ Found', messages.length, 'messages for user:', userIdForQuery.toString(), 'after filtering');
-    
+
     // Enhanced debug: Check a sample message's deletedBy array if no messages found
     if (messages.length === 0 && totalMessagesInConversation > 0) {
       console.log('⚠️ WARNING: No messages found but conversation has', totalMessagesInConversation, 'messages');
@@ -379,7 +379,7 @@ router.get('/conversations/:conversationId/messages', authenticateToken, async (
             matchesCurrentUser: d.userId?.toString() === userIdForQuery.toString()
           })) || [],
           currentUserId: userIdForQuery.toString(),
-          wouldBeExcluded: msg.deletedBy?.some(d => 
+          wouldBeExcluded: msg.deletedBy?.some(d =>
             d.userId?.toString() === userIdForQuery.toString() && d.deleteMode === 'forMe'
           ) || false
         });
@@ -389,20 +389,20 @@ router.get('/conversations/:conversationId/messages', authenticateToken, async (
     // Format messages for frontend
     const formattedMessages = messages.reverse().map(msg => {
       const isOwn = msg.senderId._id.toString() === req.user._id.toString();
-      
+
       return {
-      _id: msg._id,
-      senderId: msg.senderId._id,
-      senderName: msg.senderName,
-      content: msg.content,
-      messageType: msg.messageType,
-      mediaUrl: msg.mediaUrl,
-      fileName: msg.fileName,
-      fileSize: msg.fileSize,
-      isRead: msg.isRead,
-      readBy: msg.readBy,
-      createdAt: msg.createdAt,
-      timeAgo: msg.timeAgo,
+        _id: msg._id,
+        senderId: msg.senderId._id,
+        senderName: msg.senderName,
+        content: msg.content,
+        messageType: msg.messageType,
+        mediaUrl: msg.mediaUrl,
+        fileName: msg.fileName,
+        fileSize: msg.fileSize,
+        isRead: msg.isRead,
+        readBy: msg.readBy,
+        createdAt: msg.createdAt,
+        timeAgo: msg.timeAgo,
         isOwn: isOwn
       };
     });
@@ -465,9 +465,9 @@ router.post('/conversations/:conversationId/messages', authenticateToken, async 
       const otherParticipantId = conversation.participants.find(
         p => p.toString() !== senderId.toString()
       );
-      
+
       const canMessage = await FollowService.canMessage(senderId, otherParticipantId);
-      
+
       if (!canMessage.ok) {
         return res.status(403).json({
           error: 'Cannot send message',
@@ -502,7 +502,7 @@ router.post('/conversations/:conversationId/messages', authenticateToken, async 
 
     // Create notification for other participants
     const otherParticipants = conversation.participants.filter(p => p.toString() !== senderId.toString());
-    
+
     for (const participantId of otherParticipants) {
       const createdNotification = await Notification.create({
         recipient: participantId,
@@ -613,11 +613,11 @@ router.put('/messages/:messageId/read', authenticateToken, async (req, res) => {
 
     // Mark message as read
     await Message.findByIdAndUpdate(messageId, {
-      $addToSet: { 
-        readBy: { 
-          userId: userId, 
-          readAt: new Date() 
-        } 
+      $addToSet: {
+        readBy: {
+          userId: userId,
+          readAt: new Date()
+        }
       },
       isRead: true
     });
@@ -635,17 +635,17 @@ router.put('/messages/:messageId/read', authenticateToken, async (req, res) => {
 // File upload endpoint
 router.post('/upload', authenticateToken, (req, res, next) => {
   messageUpload.single('file')(req, res, (err) => {
-        if (err) {
-          if (err instanceof multer.MulterError) {
-            if (err.code === 'LIMIT_FILE_SIZE') {
+    if (err) {
+      if (err instanceof multer.MulterError) {
+        if (err.code === 'LIMIT_FILE_SIZE') {
           return res.status(400).json({ error: 'File too large. Maximum size is 10MB.' });
-            }
+        }
         return res.status(400).json({ error: `Upload error: ${err.message}` });
       }
       // This catches fileFilter errors
       console.error('❌ File upload error:', err.message);
       return res.status(400).json({ error: err.message || 'File upload failed' });
-        }
+    }
     next();
   });
 }, async (req, res) => {
@@ -654,18 +654,18 @@ router.post('/upload', authenticateToken, (req, res, next) => {
     'content-type': req.headers['content-type'],
     'content-length': req.headers['content-length']
   });
-  
+
   try {
     // Check if file was uploaded
-        if (!req.file) {
+    if (!req.file) {
       console.error('❌ No file in request');
       console.error('Request body keys:', Object.keys(req.body));
       console.error('Request files:', req.files);
-      return res.status(400).json({ 
+      return res.status(400).json({
         error: 'No file uploaded',
         hint: 'Make sure to send file with field name "file" in FormData'
       });
-        }
+    }
 
     console.log('✅ File received:', {
       originalname: req.file.originalname,
@@ -676,38 +676,38 @@ router.post('/upload', authenticateToken, (req, res, next) => {
     });
 
     // Get conversationId from request body
-      const { conversationId } = req.body;
+    const { conversationId } = req.body;
     console.log('Conversation ID from request:', conversationId);
 
     // Verify conversation access if conversationId is provided
-      if (conversationId) {
+    if (conversationId) {
       try {
         console.log('🔍 Verifying conversation access:', conversationId);
         const conversation = await Conversation.findById(conversationId);
-        
+
         if (!conversation) {
           console.error('❌ Conversation not found:', conversationId);
           return res.status(404).json({ error: 'Conversation not found' });
         }
-        
+
         // Check if user is a participant
         const isParticipant = conversation.participants.some(
           p => p.toString() === req.user._id.toString()
         );
-        
+
         if (!isParticipant) {
           console.error('❌ Access denied - user not a participant');
           console.error('User ID:', req.user._id);
           console.error('Participants:', conversation.participants);
           return res.status(403).json({ error: 'Access denied to this conversation' });
         }
-        
+
         console.log('✅ Conversation access verified');
       } catch (conversationError) {
         console.error('❌ Error verifying conversation:', conversationError);
-        return res.status(500).json({ 
+        return res.status(500).json({
           error: 'Failed to verify conversation access',
-          details: conversationError.message 
+          details: conversationError.message
         });
       }
     }
@@ -715,42 +715,42 @@ router.post('/upload', authenticateToken, (req, res, next) => {
     // Determine file type
     const isImage = req.file.mimetype.startsWith('image/');
     const isVideo = req.file.mimetype.startsWith('video/');
-    const isAudio = req.file.mimetype.startsWith('audio/') || 
-                    req.file.mimetype === 'audio/mpeg' || 
-                    req.file.mimetype === 'audio/mp3' ||
-                    req.file.mimetype === 'audio/wav' ||
-                    req.file.mimetype === 'audio/wave' ||
-                    req.file.mimetype === 'audio/x-wav';
+    const isAudio = req.file.mimetype.startsWith('audio/') ||
+      req.file.mimetype === 'audio/mpeg' ||
+      req.file.mimetype === 'audio/mp3' ||
+      req.file.mimetype === 'audio/wav' ||
+      req.file.mimetype === 'audio/wave' ||
+      req.file.mimetype === 'audio/x-wav';
     const isPdf = req.file.mimetype === 'application/pdf';
     const isDocument = req.file.mimetype.includes('wordprocessingml') ||
-                      req.file.mimetype.includes('presentationml') ||
-                      req.file.mimetype.includes('spreadsheetml') ||
-                      req.file.mimetype.includes('msword') ||
-                      req.file.mimetype.includes('ms-powerpoint') ||
-                      req.file.mimetype.includes('ms-excel') ||
-                      req.file.mimetype === 'text/csv' ||
-                      req.file.mimetype === 'application/csv';
-    const isText = req.file.mimetype.startsWith('text/') || 
-                  req.file.mimetype === 'application/json' ||
-                  req.file.mimetype === 'application/xml' ||
-                  req.file.mimetype === 'text/xml';
-    const isArchive = req.file.mimetype === 'application/zip' || 
-                     req.file.mimetype === 'application/x-zip-compressed';
-    
-    console.log('File type detection:', { 
-      isImage, 
-      isVideo, 
+      req.file.mimetype.includes('presentationml') ||
+      req.file.mimetype.includes('spreadsheetml') ||
+      req.file.mimetype.includes('msword') ||
+      req.file.mimetype.includes('ms-powerpoint') ||
+      req.file.mimetype.includes('ms-excel') ||
+      req.file.mimetype === 'text/csv' ||
+      req.file.mimetype === 'application/csv';
+    const isText = req.file.mimetype.startsWith('text/') ||
+      req.file.mimetype === 'application/json' ||
+      req.file.mimetype === 'application/xml' ||
+      req.file.mimetype === 'text/xml';
+    const isArchive = req.file.mimetype === 'application/zip' ||
+      req.file.mimetype === 'application/x-zip-compressed';
+
+    console.log('File type detection:', {
+      isImage,
+      isVideo,
       isAudio,
-      isPdf, 
+      isPdf,
       isDocument,
       isText,
       isArchive,
-      mimetype: req.file.mimetype 
+      mimetype: req.file.mimetype
     });
 
     // Upload to Cloudinary using buffer from memory storage
     let mediaUrl;
-    
+
     try {
       console.log('☁️ Starting Cloudinary upload...');
       console.log('Cloudinary config check:', {
@@ -758,7 +758,7 @@ router.post('/upload', authenticateToken, (req, res, next) => {
         hasApiKey: !!process.env.CLOUDINARY_API_KEY,
         hasApiSecret: !!process.env.CLOUDINARY_API_SECRET
       });
-      
+
       // Validate buffer
       if (!req.file.buffer || !Buffer.isBuffer(req.file.buffer)) {
         throw new Error('Invalid buffer - buffer is missing or not a Buffer instance');
@@ -807,13 +807,13 @@ router.post('/upload', authenticateToken, (req, res, next) => {
             }
           }
         );
-        
+
         // Handle stream errors
         uploadStream.on('error', (streamError) => {
           console.error('❌ Upload stream error event:', streamError);
           reject(streamError);
         });
-        
+
         // Write buffer to stream
         try {
           uploadStream.end(req.file.buffer);
@@ -822,16 +822,16 @@ router.post('/upload', authenticateToken, (req, res, next) => {
           reject(writeError);
         }
       });
-      
+
       mediaUrl = result.secure_url;
       console.log('✅ Cloudinary upload successful:', mediaUrl);
-      
+
     } catch (cloudinaryError) {
       console.error('❌ Cloudinary upload error:', cloudinaryError);
       console.error('Error type:', cloudinaryError.constructor.name);
       console.error('Error message:', cloudinaryError.message);
       console.error('Error stack:', cloudinaryError.stack);
-      
+
       // If Cloudinary is not configured or fails, use data URL as fallback for small files
       if (req.file.size < 100000) { // Less than 100KB
         console.log('⚠️ Using data URL fallback for small file');
@@ -840,7 +840,7 @@ router.post('/upload', authenticateToken, (req, res, next) => {
           console.log('✅ Data URL fallback created (length:', mediaUrl.length, ')');
         } catch (base64Error) {
           console.error('❌ Error creating data URL:', base64Error);
-          return res.status(500).json({ 
+          return res.status(500).json({
             error: 'Failed to process file',
             details: 'Both Cloudinary upload and data URL fallback failed',
             cloudinaryError: cloudinaryError.message,
@@ -849,7 +849,7 @@ router.post('/upload', authenticateToken, (req, res, next) => {
         }
       } else {
         console.error('❌ Cloudinary upload failed and file is too large for data URL fallback');
-        return res.status(500).json({ 
+        return res.status(500).json({
           error: 'Failed to upload file to storage',
           details: cloudinaryError.message || 'Cloudinary upload failed. Please check configuration.',
           hint: 'File size is too large for fallback. Ensure Cloudinary is properly configured.'
@@ -873,21 +873,21 @@ router.post('/upload', authenticateToken, (req, res, next) => {
 
     // Send success response
     const response = {
-        success: true,
+      success: true,
       mediaUrl: mediaUrl,
-        fileName: req.file.originalname,
-        fileSize: req.file.size,
+      fileName: req.file.originalname,
+      fileSize: req.file.size,
       messageType: messageType
     };
 
     console.log('✅ Upload successful, sending response:', {
       ...response,
       mediaUrl: mediaUrl.substring(0, 50) + '...'
-      });
+    });
 
     res.json(response);
 
-    } catch (error) {
+  } catch (error) {
     console.error('❌ Unexpected error in upload endpoint:', error);
     console.error('Error name:', error.name);
     console.error('Error message:', error.message);
@@ -898,10 +898,10 @@ router.post('/upload', authenticateToken, (req, res, next) => {
       size: req.file.size,
       hasBuffer: !!req.file.buffer
     } : 'No file');
-    
+
     // Ensure we haven't already sent a response
     if (!res.headersSent) {
-      res.status(500).json({ 
+      res.status(500).json({
         error: 'Failed to upload file',
         details: error.message,
         errorType: error.name
@@ -929,11 +929,11 @@ router.post('/conversations', authenticateToken, async (req, res) => {
 
     // Check messaging permissions
     const canMessage = await FollowService.canMessage(req.user._id, participantId);
-    
+
     if (!canMessage.ok) {
-      return res.status(403).json({ 
-        error: 'Cannot create conversation', 
-        reason: canMessage.reason 
+      return res.status(403).json({
+        error: 'Cannot create conversation',
+        reason: canMessage.reason
       });
     }
 
@@ -1004,18 +1004,18 @@ router.put('/conversations/:conversationId/read', authenticateToken, async (req,
     // Mark messages as read
     if (messageIds && messageIds.length > 0) {
       await Message.updateMany(
-        { 
-          _id: { $in: messageIds }, 
-          senderId: { $ne: req.user._id } 
+        {
+          _id: { $in: messageIds },
+          senderId: { $ne: req.user._id }
         },
-        { 
-          $addToSet: { 
-            readBy: { 
-              userId: req.user._id, 
-              readAt: new Date() 
-            } 
+        {
+          $addToSet: {
+            readBy: {
+              userId: req.user._id,
+              readAt: new Date()
+            }
           },
-          isRead: true
+          $set: { isRead: true }
         }
       );
     }
@@ -1051,9 +1051,9 @@ router.post('/send', authenticateToken, async (req, res) => {
       const otherParticipantId = conversation.participants.find(
         p => p.toString() !== senderId.toString()
       );
-      
+
       const canMessage = await FollowService.canMessage(senderId, otherParticipantId);
-      
+
       if (!canMessage.ok) {
         return res.status(403).json({
           error: 'Cannot send message',
@@ -1065,7 +1065,7 @@ router.post('/send', authenticateToken, async (req, res) => {
     // Encrypt message content if encryption key is provided
     let encryptedContent = null;
     let originalContent = content;
-    
+
     if (encryptionKey) {
       encryptedContent = encryptMessage(content, encryptionKey);
       if (!encryptedContent) {
@@ -1103,7 +1103,7 @@ router.post('/send', authenticateToken, async (req, res) => {
     // Create notification for other participants
     const Notification = require('../models/Notification');
     const otherParticipants = conversation.participants.filter(p => p.toString() !== senderId.toString());
-    
+
     for (const participantId of otherParticipants) {
       const createdNotification = await Notification.create({
         recipient: participantId,
@@ -1194,7 +1194,7 @@ router.get('/users/online', authenticateToken, async (req, res) => {
 router.get('/users/search', authenticateToken, async (req, res) => {
   try {
     const { q } = req.query;
-    
+
     if (!q || q.length < 2) {
       return res.json([]);
     }
@@ -1207,8 +1207,8 @@ router.get('/users/search', authenticateToken, async (req, res) => {
         { department: { $regex: q, $options: 'i' } }
       ]
     })
-    .select('name email avatar type department batch')
-    .limit(10);
+      .select('name email avatar type department batch')
+      .limit(10);
 
     res.json(users);
   } catch (error) {
@@ -1222,7 +1222,7 @@ router.get('/users/all', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.id;
     const { search = '', limit = 50 } = req.query;
-    
+
     // Build search query
     const searchQuery = search ? {
       $or: [
@@ -1236,9 +1236,9 @@ router.get('/users/all', authenticateToken, async (req, res) => {
       _id: { $ne: userId },
       ...searchQuery
     })
-    .select('name avatar email type department')
-    .limit(parseInt(limit))
-    .sort({ name: 1 });
+      .select('name avatar email type department')
+      .limit(parseInt(limit))
+      .sort({ name: 1 });
 
     res.json(users);
   } catch (error) {
@@ -1252,7 +1252,7 @@ router.post('/conversation/group', authenticateToken, async (req, res) => {
   try {
     const { participants, groupName, groupDescription } = req.body;
     const userId = req.user.id;
-    
+
     console.log('Group creation request:', { participants, groupName, groupDescription, userId });
 
     if (!participants || !Array.isArray(participants)) {
@@ -1321,10 +1321,10 @@ router.delete('/conversation/:conversationId/clear', authenticateToken, async (r
   try {
     const { conversationId } = req.params;
     const userId = req.user._id || req.user.id;
-    
+
     // Ensure userId is ObjectId for proper comparison
-    const userIdObj = mongoose.Types.ObjectId.isValid(userId) 
-      ? new mongoose.Types.ObjectId(userId) 
+    const userIdObj = mongoose.Types.ObjectId.isValid(userId)
+      ? new mongoose.Types.ObjectId(userId)
       : userId;
 
     // Verify user is participant in conversation
@@ -1337,14 +1337,14 @@ router.delete('/conversation/:conversationId/clear', authenticateToken, async (r
     const isParticipant = conversation.participants.some(
       p => p.toString() === userIdObj.toString()
     );
-    
+
     if (!isParticipant) {
       return res.status(403).json({ error: 'You are not a participant in this conversation' });
     }
 
     // Get all messages in the conversation that are NOT deleted for this user
     // We need to find messages where deletedBy array doesn't contain this userId with deleteMode 'forMe'
-    const allMessages = await Message.find({ 
+    const allMessages = await Message.find({
       conversationId,
       // Exclude messages hard deleted
       'deletionMetadata.hardDeleted': { $ne: true },
@@ -1370,13 +1370,13 @@ router.delete('/conversation/:conversationId/clear', authenticateToken, async (r
     });
 
     if (allMessages.length === 0) {
-      return res.json({ 
-        success: true, 
+      return res.json({
+        success: true,
         deletedCount: 0,
         message: 'Chat is already cleared for you'
       });
     }
-    
+
     console.log('Clear chat - Found', allMessages.length, 'messages to mark as deleted for user:', userIdObj.toString());
 
     const messageIds = allMessages.map(msg => msg._id.toString());
@@ -1405,19 +1405,19 @@ router.delete('/conversation/:conversationId/clear', authenticateToken, async (r
       // DO NOT use conversation_${conversationId} as that would notify all participants
       const userRoom = `user_${userIdObj.toString()}`;
       console.log('Clear chat - Emitting socket event ONLY to user:', userRoom, 'NOT to conversation room');
-      
+
       io.to(userRoom).emit('chat_cleared_for_me', {
         conversationId,
         clearedBy: userIdObj.toString(),
         deletedCount: result.deletedCount
       });
-      
+
       // Verify we're NOT emitting to conversation room
       // This ensures User B does NOT receive the clear event
     }
 
-    res.json({ 
-      success: true, 
+    res.json({
+      success: true,
       deletedCount: result.deletedCount,
       message: 'Chat cleared successfully (only for you)'
     });
@@ -1437,7 +1437,7 @@ router.delete('/conversation/:conversationId', authenticateToken, async (req, re
     // Verify user is participant in conversation
     const conversation = await Conversation.findById(conversationId)
       .populate('groupAdmin', '_id');
-    
+
     if (!conversation) {
       return res.status(404).json({ error: 'Conversation not found' });
     }
@@ -1451,10 +1451,10 @@ router.delete('/conversation/:conversationId', authenticateToken, async (req, re
       const groupAdminId = typeof conversation.groupAdmin === 'object' && conversation.groupAdmin !== null
         ? conversation.groupAdmin._id?.toString()
         : conversation.groupAdmin?.toString();
-      
+
       if (groupAdminId !== userId.toString()) {
-        return res.status(403).json({ 
-          error: 'Only group admin can delete the group' 
+        return res.status(403).json({
+          error: 'Only group admin can delete the group'
         });
       }
     }
@@ -1470,13 +1470,13 @@ router.delete('/conversation/:conversationId', authenticateToken, async (req, re
     if (io) {
       conversation.participants.forEach(participantId => {
         io.to(`user_${participantId}`).emit('conversation_deleted', {
-        conversationId,
-        deletedBy: userId
+          conversationId,
+          deletedBy: userId
         });
       });
     }
 
-    res.json({ 
+    res.json({
       success: true,
       message: 'Conversation deleted successfully'
     });
@@ -1540,8 +1540,8 @@ router.post('/delete-for-everyone', authenticateToken, async (req, res) => {
     }
 
     const result = await MessageDeletionService.deleteForEveryone(
-      messageIds, 
-      userId, 
+      messageIds,
+      userId,
       conversationId,
       { timeWindow }
     );
@@ -1583,8 +1583,8 @@ router.post('/grace-delete', authenticateToken, async (req, res) => {
     }
 
     const result = await MessageDeletionService.graceDelete(
-      messageIds, 
-      userId, 
+      messageIds,
+      userId,
       conversationId,
       participantIds
     );
@@ -1607,8 +1607,8 @@ router.post('/soft-delete', authenticateToken, async (req, res) => {
     }
 
     const result = await MessageDeletionService.softDelete(
-      messageIds, 
-      userId, 
+      messageIds,
+      userId,
       conversationId
     );
 
@@ -1649,15 +1649,15 @@ router.post('/hard-delete', authenticateToken, async (req, res) => {
       const groupAdminId = typeof conversation.groupAdmin === 'object' && conversation.groupAdmin !== null
         ? conversation.groupAdmin._id?.toString()
         : conversation.groupAdmin?.toString();
-      
+
       if (groupAdminId !== userId.toString()) {
         return res.status(403).json({ error: 'Only group admin can hard delete messages' });
       }
     }
 
     const result = await MessageDeletionService.hardDelete(
-      messageIds, 
-      userId, 
+      messageIds,
+      userId,
       conversationId,
       { deleteMedia }
     );
@@ -1698,8 +1698,8 @@ router.post('/set-auto-delete', authenticateToken, async (req, res) => {
     }
 
     const result = await MessageDeletionService.setAutoDelete(
-      messageIds, 
-      userId, 
+      messageIds,
+      userId,
       conversationId,
       duration
     );
@@ -1732,7 +1732,7 @@ router.post('/admin-delete', authenticateToken, async (req, res) => {
     const groupAdminId = typeof conversation.groupAdmin === 'object' && conversation.groupAdmin !== null
       ? conversation.groupAdmin._id?.toString()
       : conversation.groupAdmin?.toString();
-    
+
     let isGroupAdmin = groupAdminId === userId.toString();
 
     // Check additional admins
@@ -1754,8 +1754,8 @@ router.post('/admin-delete', authenticateToken, async (req, res) => {
 
     // Admin delete uses deleteForEveryone with skipTimeWindow
     const result = await MessageDeletionService.deleteForEveryone(
-      messageIds, 
-      userId, 
+      messageIds,
+      userId,
       conversationId,
       { skipTimeWindow: true }
     );
@@ -1776,7 +1776,7 @@ router.post('/admin-delete', authenticateToken, async (req, res) => {
   } catch (error) {
     console.error('Error in admin-delete:', error);
     res.status(500).json({ error: 'Failed to admin delete messages' });
-    }
+  }
 });
 
 // 8. Bulk Delete (Enhanced)
@@ -1794,8 +1794,8 @@ router.post('/bulk-delete-enhanced', authenticateToken, async (req, res) => {
     }
 
     const result = await MessageDeletionService.bulkDelete(
-      messageIds, 
-      userId, 
+      messageIds,
+      userId,
       conversationId,
       deleteMode,
       options
@@ -1842,8 +1842,8 @@ router.post('/media-delete', authenticateToken, async (req, res) => {
     }
 
     const result = await MessageDeletionService.mediaDelete(
-      messageIds, 
-      userId, 
+      messageIds,
+      userId,
       conversationId,
       { deleteMessage, deleteLocalOnly }
     );
@@ -1866,8 +1866,8 @@ router.post('/unsent-delete', authenticateToken, async (req, res) => {
     }
 
     const result = await MessageDeletionService.unsentMessageDelete(
-      messageIds, 
-      userId, 
+      messageIds,
+      userId,
       conversationId
     );
 
@@ -1893,7 +1893,7 @@ router.post('/server-cleanup', authenticateToken, async (req, res) => {
     // Check if user is admin (you may want to add admin check middleware)
     const userId = req.user._id;
     const user = await User.findById(userId);
-    
+
     if (user.type !== 'admin') {
       return res.status(403).json({ error: 'Only admins can run server cleanup' });
     }
@@ -1927,14 +1927,14 @@ const handleBulkDelete = async (req, res) => {
   try {
     const { messageIds, conversationId, isGroupChat, isGroupAdmin } = req.body;
     const userId = req.user._id || req.user.id;
-    
-    console.log('Bulk delete request:', { 
+
+    console.log('Bulk delete request:', {
       method: req.method,
-      messageIds, 
-      userId, 
-      conversationId, 
-      isGroupChat, 
-      isGroupAdmin 
+      messageIds,
+      userId,
+      conversationId,
+      isGroupChat,
+      isGroupAdmin
     });
 
     if (!messageIds || !Array.isArray(messageIds) || messageIds.length === 0) {
@@ -1947,7 +1947,7 @@ const handleBulkDelete = async (req, res) => {
     }).populate('conversationId');
 
     if (allMessages.length === 0) {
-      return res.status(200).json({ 
+      return res.status(200).json({
         success: true,
         deletedCount: 0,
         message: 'No messages found to delete. They may have already been removed.'
@@ -1992,9 +1992,9 @@ const handleBulkDelete = async (req, res) => {
     const conversation = await Conversation.findById(resolvedConversationId)
       .populate('groupAdmin', '_id')
       .populate('groupAdmins', '_id');
-    
+
     const isGroup = conversation?.isGroupChat || isGroupChat;
-    
+
     // Check if user is group admin (main admin or additional admin)
     let userIsGroupAdmin = false;
     if (isGroup && conversation) {
@@ -2004,7 +2004,7 @@ const handleBulkDelete = async (req, res) => {
           ? conversation.groupAdmin._id?.toString()
           : conversation.groupAdmin.toString();
         userIsGroupAdmin = groupAdminId === userId.toString();
-    }
+      }
 
       // Check additional admins
       if (!userIsGroupAdmin && conversation.groupAdmins && conversation.groupAdmins.length > 0) {
@@ -2026,7 +2026,7 @@ const handleBulkDelete = async (req, res) => {
 
     // Build delete query based on permissions
     let deleteQuery;
-    
+
     if (isGroup && userIsGroupAdmin) {
       // Group admin can delete any message in the group
       deleteQuery = { _id: { $in: existingMessageIds } };
@@ -2035,23 +2035,23 @@ const handleBulkDelete = async (req, res) => {
       // Regular users can only delete their own messages
       deleteQuery = {
         _id: { $in: existingMessageIds },
-      senderId: userId
+        senderId: userId
       };
-      
+
       // Check if user is trying to delete messages they don't own
-      const ownMessages = allMessages.filter(msg => 
+      const ownMessages = allMessages.filter(msg =>
         msg.senderId.toString() === userId.toString()
       );
-      
+
       if (ownMessages.length < allMessages.length) {
         console.log('Some messages cannot be deleted - user can only delete their own messages');
         if (isGroup) {
-          return res.status(403).json({ 
-            error: 'You can only delete your own messages. Group admin can delete any message.' 
+          return res.status(403).json({
+            error: 'You can only delete your own messages. Group admin can delete any message.'
           });
         }
-        return res.status(403).json({ 
-          error: 'You can only delete your own messages.' 
+        return res.status(403).json({
+          error: 'You can only delete your own messages.'
         });
       }
     }
@@ -2067,11 +2067,11 @@ const handleBulkDelete = async (req, res) => {
           .filter(Boolean)
       )
     ];
-    
+
     for (const conversationId of conversationIds) {
       const lastMessage = await Message.findOne({ conversationId })
         .sort({ createdAt: -1 });
-      
+
       await Conversation.findByIdAndUpdate(conversationId, {
         lastMessageContent: lastMessage ? lastMessage.content : '',
         lastMessageTime: lastMessage ? lastMessage.createdAt : new Date()
@@ -2090,8 +2090,8 @@ const handleBulkDelete = async (req, res) => {
       });
     }
 
-    res.json({ 
-      success: true, 
+    res.json({
+      success: true,
       deletedCount: result.deletedCount,
       message: `${result.deletedCount} messages deleted successfully`,
       missingMessageIds

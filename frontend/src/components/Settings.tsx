@@ -9,14 +9,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { 
-  User, 
-  Bell, 
-  Shield, 
-  Globe, 
-  Trash2, 
-  Key, 
-  Eye, 
+import {
+  User,
+  Bell,
+  Shield,
+  Globe,
+  Trash2,
+  Key,
+  Eye,
   EyeOff,
   Save,
   RefreshCw,
@@ -32,13 +32,16 @@ import {
   Plus,
   Mail,
   Link as LinkIcon,
-  ExternalLink
+  ExternalLink,
+  Palette
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { socketService } from '@/services/socketService';
 import api from '@/services/api';
 import EnhancedNotificationSettings from '@/components/notifications/EnhancedNotificationSettings';
+import { useTheme } from '@/contexts/ThemeContext';
+import { Monitor, Sun, Moon } from 'lucide-react';
 
 type ActivityStatus = 'success' | 'error' | 'pending';
 
@@ -111,20 +114,73 @@ interface UserSettings {
   };
 }
 
+/** Fallback settings used when backend settings are unavailable or not yet created. */
+const DEFAULT_SETTINGS: UserSettings = {
+  _id: '',
+  userId: '',
+  notifications: {
+    followRequests: true,
+    followAccepted: true,
+    followRejected: true,
+    postLikes: true,
+    postComments: true,
+    postShares: true,
+    postMentions: true,
+    newMessages: true,
+    messageReadReceipts: true,
+    eventReminders: true,
+    eventInvitations: true,
+    jobApplications: true,
+    jobUpdates: true,
+    systemAnnouncements: true,
+    securityAlerts: true,
+  },
+  privacy: {
+    profileVisibility: 'public',
+    showEmail: false,
+    showPhone: false,
+    showLocation: true,
+    showCompany: true,
+    showBatch: true,
+    showDepartment: true,
+    showOnlineStatus: true,
+  },
+  communication: {
+    emailNotifications: true,
+    pushNotifications: true,
+    inAppNotifications: true,
+    notificationFrequency: 'immediate',
+    quietHours: {
+      enabled: false,
+      startTime: '22:00',
+      endTime: '08:00',
+    },
+  },
+  security: {
+    twoFactorEnabled: false,
+    loginNotifications: true,
+    sessionTimeout: 30,
+    requirePasswordChange: false,
+    lastPasswordChange: new Date(),
+    passwordExpiryDays: 90,
+  },
+};
+
 export default function Settings() {
   const { user, logout, updateUser } = useAuth();
+  const { theme, setTheme } = useTheme();
   const [settings, setSettings] = useState<UserSettings | null>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  
+
   // Password change form
   const [passwordForm, setPasswordForm] = useState({
     currentPassword: '',
     newPassword: '',
     confirmPassword: ''
   });
-  
+
   // Account deletion form
   const [deleteForm, setDeleteForm] = useState({
     password: '',
@@ -148,6 +204,7 @@ export default function Settings() {
     designation: '',
     collegeEmail: '',
     personalEmail: '',
+    placementStatus: '',
     skills: [] as string[],
     interests: [] as string[],
     resume: '',
@@ -202,7 +259,7 @@ export default function Settings() {
       customLinks: (prev.customLinks || []).filter((_, i) => i !== index)
     }));
   };
-  
+
   // Email expiration status
   const [emailExpirationStatus, setEmailExpirationStatus] = useState<any>(null);
   const [loadingEmailStatus, setLoadingEmailStatus] = useState(false);
@@ -255,7 +312,7 @@ export default function Settings() {
               const idx = prev.findIndex(entry => entry.id === (response.data?.clientId || tempId));
               if (idx === -1) {
                 return [persisted, ...prev].slice(0, ACTIVITY_LOG_LIMIT);
-    }
+              }
               const updated = [...prev];
               updated[idx] = persisted;
               return updated;
@@ -326,10 +383,10 @@ export default function Settings() {
     try {
       setLoading(true);
       const response = await api.get('/api/notifications/settings');
-      
+
       // Handle different response structures from backend
       let userSettings: UserSettings | null = null;
-      
+
       if (response.data) {
         // Check for { success: true, settings: {...} } structure
         if (response.data.success && response.data.settings) {
@@ -344,7 +401,7 @@ export default function Settings() {
           userSettings = response.data;
         }
       }
-      
+
       if (userSettings && userSettings._id) {
         // Valid settings loaded from backend
         setSettings(userSettings);
@@ -353,182 +410,33 @@ export default function Settings() {
         // Settings don't exist yet - backend should create them, but if not, use defaults silently
         // Don't show warning as backend creates default settings automatically
         console.log('Settings not found, backend will create defaults on first save');
-        
+
         // Set minimal default structure to prevent UI errors
-        const defaultSettings: UserSettings = {
-          _id: '',
-          userId: user?._id || '',
-          notifications: {
-            followRequests: true,
-            followAccepted: true,
-            followRejected: true,
-            postLikes: true,
-            postComments: true,
-            postShares: true,
-            postMentions: true,
-            newMessages: true,
-            messageReadReceipts: true,
-            eventReminders: true,
-            eventInvitations: true,
-            jobApplications: true,
-            jobUpdates: true,
-            systemAnnouncements: true,
-            securityAlerts: true,
-          },
-          privacy: {
-            profileVisibility: 'public',
-            showEmail: false,
-            showPhone: false,
-            showLocation: true,
-            showCompany: true,
-            showBatch: true,
-            showDepartment: true,
-            showOnlineStatus: true,
-          },
-          communication: {
-            emailNotifications: true,
-            pushNotifications: true,
-            inAppNotifications: true,
-            notificationFrequency: 'immediate',
-            quietHours: {
-              enabled: false,
-              startTime: '22:00',
-              endTime: '08:00',
-            },
-          },
-          security: {
-            twoFactorEnabled: false,
-            loginNotifications: true,
-            sessionTimeout: 30,
-            requirePasswordChange: false,
-            lastPasswordChange: new Date(),
-            passwordExpiryDays: 90,
-          },
-        };
-        setSettings(defaultSettings);
+        setSettings({ ...DEFAULT_SETTINGS, userId: user?._id || '', security: { ...DEFAULT_SETTINGS.security, lastPasswordChange: new Date() } });
       }
     } catch (error: any) {
       console.error('Error loading settings:', error);
-      
+
       // Only show warning for actual errors, not for missing settings
       // Backend creates default settings automatically, so this is likely a network/auth error
       const errorMessage = error.response?.data?.error || error.message || 'Unknown error';
-      
+
       // Check if it's a network error (connection refused, etc.)
-      const isNetworkError = error.code === 'ERR_NETWORK' || error.code === 'ERR_CONNECTION_REFUSED' || 
-                             error.message?.includes('Network Error') || 
-                             error.message?.includes('ERR_CONNECTION_REFUSED');
-      
+      const isNetworkError = error.code === 'ERR_NETWORK' || error.code === 'ERR_CONNECTION_REFUSED' ||
+        error.message?.includes('Network Error') ||
+        error.message?.includes('ERR_CONNECTION_REFUSED');
+
       // Check if it's a 404 (settings don't exist) vs other errors
       if (error.response?.status === 404 || error.response?.status === 401) {
         // Settings don't exist or unauthorized - backend will create on first save
         // Use defaults silently without warning
-      const defaultSettings: UserSettings = {
-        _id: '',
-        userId: user?._id || '',
-        notifications: {
-          followRequests: true,
-          followAccepted: true,
-          followRejected: true,
-          postLikes: true,
-          postComments: true,
-          postShares: true,
-          postMentions: true,
-          newMessages: true,
-          messageReadReceipts: true,
-          eventReminders: true,
-          eventInvitations: true,
-          jobApplications: true,
-          jobUpdates: true,
-          systemAnnouncements: true,
-          securityAlerts: true,
-        },
-        privacy: {
-          profileVisibility: 'public',
-          showEmail: false,
-          showPhone: false,
-            showLocation: true,
-            showCompany: true,
-            showBatch: true,
-            showDepartment: true,
-          showOnlineStatus: true,
-        },
-        communication: {
-          emailNotifications: true,
-          pushNotifications: true,
-          inAppNotifications: true,
-          notificationFrequency: 'immediate',
-          quietHours: {
-            enabled: false,
-            startTime: '22:00',
-            endTime: '08:00',
-          },
-        },
-          security: {
-            twoFactorEnabled: false,
-            loginNotifications: true,
-            sessionTimeout: 30,
-            requirePasswordChange: false,
-            lastPasswordChange: new Date(),
-            passwordExpiryDays: 90,
-          },
-        };
-        setSettings(defaultSettings);
+        setSettings({ ...DEFAULT_SETTINGS, userId: user?._id || '', security: { ...DEFAULT_SETTINGS.security, lastPasswordChange: new Date() } });
       } else if (isNetworkError) {
         // Network error - server might be down, use defaults and show a warning
         console.warn('Network error - server may be down. Using default settings.');
-        const defaultSettings: UserSettings = {
-          _id: '',
-          userId: user?._id || '',
-          notifications: {
-            followRequests: true,
-            followAccepted: true,
-            followRejected: true,
-            postLikes: true,
-            postComments: true,
-            postShares: true,
-            postMentions: true,
-            newMessages: true,
-            messageReadReceipts: true,
-            eventReminders: true,
-            eventInvitations: true,
-            jobApplications: true,
-            jobUpdates: true,
-            systemAnnouncements: true,
-            securityAlerts: true,
-          },
-          privacy: {
-            profileVisibility: 'public',
-            showEmail: false,
-            showPhone: false,
-            showLocation: true,
-            showCompany: true,
-            showBatch: true,
-            showDepartment: true,
-            showOnlineStatus: true,
-          },
-          communication: {
-            emailNotifications: true,
-            pushNotifications: true,
-            inAppNotifications: true,
-            notificationFrequency: 'immediate',
-            quietHours: {
-              enabled: false,
-              startTime: '22:00',
-              endTime: '08:00',
-            },
-        },
-        security: {
-          twoFactorEnabled: false,
-          loginNotifications: true,
-          sessionTimeout: 30,
-          requirePasswordChange: false,
-          lastPasswordChange: new Date(),
-          passwordExpiryDays: 90,
-        },
-      };
-      setSettings(defaultSettings);
-      toast({
+        setSettings({ ...DEFAULT_SETTINGS, userId: user?._id || '', security: { ...DEFAULT_SETTINGS.security, lastPasswordChange: new Date() } });
+
+        toast({
           title: "Connection Error",
           description: "Cannot connect to server. Please ensure the backend server is running. Settings shown are defaults.",
           variant: "destructive"
@@ -542,57 +450,7 @@ export default function Settings() {
           variant: "destructive"
         });
         // Still set default settings so the UI doesn't break
-        const defaultSettings: UserSettings = {
-          _id: '',
-          userId: user?._id || '',
-          notifications: {
-            followRequests: true,
-            followAccepted: true,
-            followRejected: true,
-            postLikes: true,
-            postComments: true,
-            postShares: true,
-            postMentions: true,
-            newMessages: true,
-            messageReadReceipts: true,
-            eventReminders: true,
-            eventInvitations: true,
-            jobApplications: true,
-            jobUpdates: true,
-            systemAnnouncements: true,
-            securityAlerts: true,
-          },
-          privacy: {
-            profileVisibility: 'public',
-            showEmail: false,
-            showPhone: false,
-            showLocation: true,
-            showCompany: true,
-            showBatch: true,
-            showDepartment: true,
-            showOnlineStatus: true,
-          },
-          communication: {
-            emailNotifications: true,
-            pushNotifications: true,
-            inAppNotifications: true,
-            notificationFrequency: 'immediate',
-            quietHours: {
-              enabled: false,
-              startTime: '22:00',
-              endTime: '08:00',
-            },
-          },
-          security: {
-            twoFactorEnabled: false,
-            loginNotifications: true,
-            sessionTimeout: 30,
-            requirePasswordChange: false,
-            lastPasswordChange: new Date(),
-            passwordExpiryDays: 90,
-          },
-        };
-        setSettings(defaultSettings);
+        setSettings({ ...DEFAULT_SETTINGS, userId: user?._id || '', security: { ...DEFAULT_SETTINGS.security, lastPasswordChange: new Date() } });
       }
     } finally {
       setLoading(false);
@@ -602,18 +460,18 @@ export default function Settings() {
   useEffect(() => {
     // Only run once on mount - don't include dependencies that change frequently
     let mounted = true;
-    
+
     const initializeSettings = async () => {
       // Load settings only once
       if (mounted) {
         await loadSettingsMemoized();
       }
-      
+
       // Refresh user data only once on mount
       if (mounted) {
         await refreshUserData();
       }
-      
+
       // Initialize profile form with user data
       if (mounted && user) {
         setProfileForm({
@@ -631,6 +489,7 @@ export default function Settings() {
           designation: user.designation || user.facultyInfo?.designation || '',
           collegeEmail: user.email?.college || '',
           personalEmail: user.email?.personal || '',
+          placementStatus: user.studentInfo?.placementStatus || '',
           skills: user.skills || [],
           interests: user.interests || [],
           resume: user.resume || '',
@@ -642,9 +501,9 @@ export default function Settings() {
         });
       }
     };
-    
+
     initializeSettings();
-    
+
     // Load email expiration status
     const loadEmailExpirationStatus = async () => {
       try {
@@ -668,11 +527,11 @@ export default function Settings() {
         setLoadingEmailStatus(false);
       }
     };
-    
+
     if (mounted) {
       loadEmailExpirationStatus();
     }
-    
+
     // Real-time connection monitoring
     const checkConnection = () => {
       const quality = navigator.onLine ? 'excellent' : 'poor';
@@ -874,16 +733,16 @@ export default function Settings() {
   const updateSettings = async (section: string, data: any) => {
     const changeId = `${section}-${Date.now()}`;
     addPendingChange(changeId);
-    
+
     try {
       setSaving(true);
       setSyncStatus('syncing');
-      
+
       // Create a more descriptive activity log message based on the section and specific field changed
       let activityMessage = `${section} settings updated`;
       if (section === 'privacy') {
         // Detect which privacy field changed
-        const changedFields = Object.keys(data).filter(key => 
+        const changedFields = Object.keys(data).filter(key =>
           settings?.privacy && settings.privacy[key as keyof typeof settings.privacy] !== data[key]
         );
         if (changedFields.length > 0) {
@@ -908,11 +767,11 @@ export default function Settings() {
           }
         }
       }
-      
+
       const response = await api.put('/api/notifications/settings', {
         [section]: data
       });
-      
+
       // Validate response structure
       if (response.data && response.data.success && response.data.settings) {
         // Update settings immediately (optimistic update)
@@ -961,19 +820,19 @@ export default function Settings() {
           }
           return updatedSettings;
         });
-      setSyncStatus('synced');
-      setLastSync(new Date());
-      removePendingChange(changeId);
-      
+        setSyncStatus('synced');
+        setLastSync(new Date());
+        removePendingChange(changeId);
+
         // Note: Backend already emits 'settings_updated' event, which will sync all clients
         // The handleSettingsUpdate callback will handle the real-time update for other tabs/devices
-      
+
         addActivityLog(activityMessage, 'success');
-      
-      toast({
-        title: "Success",
+
+        toast({
+          title: "Success",
           description: response.data.message || "Settings updated successfully"
-      });
+        });
       } else {
         throw new Error('Invalid response structure');
       }
@@ -981,14 +840,14 @@ export default function Settings() {
       console.error('Error updating settings:', error);
       setSyncStatus('error');
       removePendingChange(changeId);
-      
-      const errorMessage = error.response?.data?.error || 
-                          error.response?.data?.details || 
-                          error.message || 
-                          'Failed to update settings';
-      
+
+      const errorMessage = error.response?.data?.error ||
+        error.response?.data?.details ||
+        error.message ||
+        'Failed to update settings';
+
       addActivityLog(`${section} settings update failed`, 'error', errorMessage);
-      
+
       toast({
         title: "Error",
         description: errorMessage,
@@ -1002,10 +861,10 @@ export default function Settings() {
   // Helper function to safely access settings
   const getSetting = (path: string, defaultValue: any = null) => {
     if (!settings) return defaultValue;
-    
+
     const keys = path.split('.');
     let value = settings;
-    
+
     for (const key of keys) {
       if (value && typeof value === 'object' && key in value) {
         value = value[key];
@@ -1013,7 +872,7 @@ export default function Settings() {
         return defaultValue;
       }
     }
-    
+
     return value;
   };
 
@@ -1041,19 +900,19 @@ export default function Settings() {
         currentPassword: passwordForm.currentPassword,
         newPassword: passwordForm.newPassword
       });
-      
+
       if (response.data?.settings) {
         setSettings(response.data.settings);
       } else {
         // Reload settings to update lastPasswordChange
         await loadSettingsMemoized();
       }
-      
+
       toast({
         title: "Success",
         description: "Password changed successfully"
       });
-      
+
       setPasswordForm({
         currentPassword: '',
         newPassword: '',
@@ -1094,12 +953,12 @@ export default function Settings() {
           confirmDelete: deleteForm.confirmDelete
         }
       });
-      
+
       toast({
         title: "Account Deleted",
         description: "Your account has been permanently deleted"
       });
-      
+
       logout();
     } catch (error: any) {
       toast({
@@ -1114,15 +973,15 @@ export default function Settings() {
     try {
       setSaving(true);
       setSyncStatus('syncing');
-      
+
       const response = await api.post('/api/notifications/settings/reset');
-      
+
       if (response.data && response.data.success && response.data.settings) {
-      setSettings(response.data.settings);
+        setSettings(response.data.settings);
         setSyncStatus('synced');
         setLastSync(new Date());
         addActivityLog('Settings reset to defaults', 'success');
-        
+
         toast({
           title: "Success",
           description: response.data.message || "Settings reset to defaults"
@@ -1133,25 +992,25 @@ export default function Settings() {
         setSyncStatus('synced');
         setLastSync(new Date());
         addActivityLog('Settings reset to defaults', 'success');
-        
-      toast({
-        title: "Success",
-        description: "Settings reset to defaults"
-      });
+
+        toast({
+          title: "Success",
+          description: "Settings reset to defaults"
+        });
       } else {
         throw new Error('Invalid response structure');
       }
     } catch (error: any) {
       console.error('Error resetting settings:', error);
       setSyncStatus('error');
-      
-      const errorMessage = error.response?.data?.error || 
-                          error.response?.data?.details || 
-                          error.message || 
-                          'Failed to reset settings';
-      
+
+      const errorMessage = error.response?.data?.error ||
+        error.response?.data?.details ||
+        error.message ||
+        'Failed to reset settings';
+
       addActivityLog('Settings reset failed', 'error', errorMessage);
-      
+
       toast({
         title: "Error",
         description: errorMessage,
@@ -1197,14 +1056,14 @@ export default function Settings() {
                   {isOnline ? 'Online' : 'Offline'}
                 </span>
               </div>
-              
+
               <div className="flex items-center space-x-2">
                 <Activity className="h-4 w-4 text-blue-500" />
                 <span className="text-sm text-muted-foreground">
                   Connection: {connectionQuality}
                 </span>
               </div>
-              
+
               <div className="flex items-center space-x-2">
                 {syncStatus === 'synced' && <CheckCircle className="h-4 w-4 text-green-500" />}
                 {syncStatus === 'syncing' && <RefreshCw className="h-4 w-4 text-blue-500 animate-spin" />}
@@ -1214,14 +1073,14 @@ export default function Settings() {
                 </span>
               </div>
             </div>
-            
+
             <div className="flex items-center space-x-2">
               {pendingChanges.length > 0 && (
                 <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">
                   {pendingChanges.length} pending
                 </Badge>
               )}
-              
+
               <Button
                 size="sm"
                 variant="outline"
@@ -1254,6 +1113,7 @@ export default function Settings() {
           <TabsTrigger value="privacy">Privacy</TabsTrigger>
           <TabsTrigger value="communication">Communication</TabsTrigger>
           <TabsTrigger value="security">Security</TabsTrigger>
+          <TabsTrigger value="appearance">Appearance</TabsTrigger>
           <TabsTrigger value="activity">Activity</TabsTrigger>
         </TabsList>
 
@@ -1263,13 +1123,13 @@ export default function Settings() {
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
-              <CardTitle className="flex items-center space-x-2">
-                <User className="h-5 w-5" />
-                <span>Profile Information</span>
-              </CardTitle>
-              <CardDescription>
-                Update your personal information and preferences
-              </CardDescription>
+                  <CardTitle className="flex items-center space-x-2">
+                    <User className="h-5 w-5" />
+                    <span>Profile Information</span>
+                  </CardTitle>
+                  <CardDescription>
+                    Update your personal information and preferences
+                  </CardDescription>
                 </div>
                 {!isEditingProfile ? (
                   <Button onClick={() => setIsEditingProfile(true)} variant="outline">
@@ -1278,7 +1138,7 @@ export default function Settings() {
                   </Button>
                 ) : (
                   <div className="flex space-x-2">
-                    <Button 
+                    <Button
                       onClick={async () => {
                         try {
                           setSaving(true);
@@ -1293,8 +1153,8 @@ export default function Settings() {
                           const updateData: any = {
                             name: profileForm.name,
                             email: {
-                              college: profileForm.collegeEmail || user?.email?.college || '',
-                              personal: profileForm.personalEmail || user?.email?.personal || ''
+                              // Only send personal email by default
+                              personal: profileForm.personalEmail || ''
                             },
                             phone: profileForm.phone,
                             bio: profileForm.bio,
@@ -1316,15 +1176,21 @@ export default function Settings() {
                             }
                           };
 
+                          // Allow restoring college email if it's missing in the DB
+                          if (!user?.email?.college && profileForm.collegeEmail) {
+                            updateData.email.college = profileForm.collegeEmail.trim().toLowerCase();
+                          }
                           // Handle type-specific fields
                           if (user?.type === 'student') {
                             updateData.studentInfo = {
                               department: profileForm.department,
-                              batch: profileForm.batch
+                              batch: profileForm.batch,
+                              placementStatus: profileForm.placementStatus
                             };
                             // Also set at root level for easy access
                             updateData.department = profileForm.department;
                             updateData.batch = profileForm.batch;
+                            updateData.placementStatus = profileForm.placementStatus;
                           } else if (user?.type === 'alumni') {
                             updateData.alumniInfo = {
                               currentCompany: profileForm.company,
@@ -1346,7 +1212,7 @@ export default function Settings() {
                             title: "Success",
                             description: "Profile updated successfully"
                           });
-                          
+
                           // Update user in AuthContext with response data
                           if (response.data && response.data.user && updateUser) {
                             updateUser(response.data.user);
@@ -1354,9 +1220,9 @@ export default function Settings() {
                             // Fallback: refresh user data
                             await refreshUserData();
                           }
-                          
+
                           setIsEditingProfile(false);
-                          
+
                           // Update profile form with new data
                           if (response.data && response.data.user) {
                             const updatedUser = response.data.user;
@@ -1382,7 +1248,8 @@ export default function Settings() {
                               linkedin: updatedUser.socialLinks?.linkedin || '',
                               github: updatedUser.socialLinks?.github || '',
                               leetcode: updatedUser.socialLinks?.leetcode || '',
-                              customLinks: updatedUser.socialLinks?.customLinks ? [...updatedUser.socialLinks.customLinks] : []
+                              customLinks: updatedUser.socialLinks?.customLinks ? [...updatedUser.socialLinks.customLinks] : [],
+                              placementStatus: updatedUser.studentInfo?.placementStatus || 'seeking'
                             });
                             setCustomLinkName('');
                             setCustomLinkUrl('');
@@ -1402,7 +1269,7 @@ export default function Settings() {
                       <Save className="h-4 w-4 mr-2" />
                       {saving ? 'Saving...' : 'Save Changes'}
                     </Button>
-                    <Button 
+                    <Button
                       onClick={() => {
                         setIsEditingProfile(false);
                         // Reset form to original values
@@ -1429,7 +1296,8 @@ export default function Settings() {
                             linkedin: user.socialLinks?.linkedin || '',
                             github: user.socialLinks?.github || '',
                             leetcode: user.socialLinks?.leetcode || '',
-                            customLinks: user.socialLinks?.customLinks ? [...user.socialLinks.customLinks] : []
+                            customLinks: user.socialLinks?.customLinks ? [...user.socialLinks.customLinks] : [],
+                            placementStatus: user.studentInfo?.placementStatus || 'seeking'
                           });
                           setSkillInput('');
                           setInterestInput('');
@@ -1450,21 +1318,44 @@ export default function Settings() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="name">Full Name</Label>
-                  <Input 
-                    id="name" 
-                    value={isEditingProfile ? profileForm.name : (user?.name || '')} 
+                  <Input
+                    id="name"
+                    value={isEditingProfile ? profileForm.name : (user?.name || '')}
                     disabled={!isEditingProfile}
                     onChange={(e) => setProfileForm({ ...profileForm, name: e.target.value })}
                   />
                 </div>
                 <div>
-                  <Label htmlFor="email">Email</Label>
-                  <Input 
-                    id="email" 
-                    value={user?.email?.college || user?.email?.personal || ''} 
-                    disabled 
+                  <Label htmlFor="collegeEmail">College Email ID</Label>
+                  <Input
+                    id="collegeEmail"
+                    value={isEditingProfile ? profileForm.collegeEmail : (user?.email?.college || '')}
+                    disabled={!isEditingProfile || !!user?.email?.college}
+                    onChange={(e) => setProfileForm({ ...profileForm, collegeEmail: e.target.value })}
+                    className={`font-mono ${(!isEditingProfile || !!user?.email?.college) ? 'bg-gray-50/50' : ''}`}
+                    placeholder="name.yydept@kongu.edu"
                   />
-                  <p className="text-xs text-muted-foreground mt-1">Email cannot be changed</p>
+                  {isEditingProfile && !user?.email?.college && (
+                    <p className="text-xs text-amber-600 mt-1">
+                      Your college email is missing. Please enter it to restore full account access.
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <Label htmlFor="personalEmail">Personal Email ID</Label>
+                  <Input
+                    id="personalEmail"
+                    value={isEditingProfile ? profileForm.personalEmail : (user?.email?.personal || '')}
+                    disabled={!isEditingProfile}
+                    onChange={(e) => setProfileForm({ ...profileForm, personalEmail: e.target.value })}
+                    className={`font-mono ${!isEditingProfile ? 'bg-gray-50/50' : ''}`}
+                    placeholder="Enter your personal email"
+                  />
+                  {isEditingProfile && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Secondary email for account recovery and migration.
+                    </p>
+                  )}
                 </div>
                 <div>
                   <Label htmlFor="type">User Type</Label>
@@ -1473,51 +1364,84 @@ export default function Settings() {
                 </div>
                 <div>
                   <Label htmlFor="phone">Phone</Label>
-                  <Input 
-                    id="phone" 
-                    value={isEditingProfile ? profileForm.phone : (user?.phone || '')} 
+                  <Input
+                    id="phone"
+                    value={isEditingProfile ? profileForm.phone : (user?.phone || '')}
                     disabled={!isEditingProfile}
                     onChange={(e) => setProfileForm({ ...profileForm, phone: e.target.value })}
                   />
                 </div>
                 <div>
                   <Label htmlFor="department">Department</Label>
-                  <Input 
-                    id="department" 
-                    value={isEditingProfile ? profileForm.department : (user?.department || user?.studentInfo?.department || user?.facultyInfo?.department || '')} 
+                  <Input
+                    id="department"
+                    value={isEditingProfile ? profileForm.department : (user?.department || user?.studentInfo?.department || user?.facultyInfo?.department || '')}
                     disabled={!isEditingProfile}
                     onChange={(e) => setProfileForm({ ...profileForm, department: e.target.value })}
                   />
                 </div>
                 {user?.type === 'student' && (
-                <div>
+                  <div>
                     <Label htmlFor="batch">Batch</Label>
-                    <Input 
-                      id="batch" 
-                      value={isEditingProfile ? profileForm.batch : (user?.batch || user?.studentInfo?.batch || '')} 
+                    <Input
+                      id="batch"
+                      value={isEditingProfile ? profileForm.batch : (user?.batch || user?.studentInfo?.batch || '')}
                       disabled={!isEditingProfile}
                       onChange={(e) => setProfileForm({ ...profileForm, batch: e.target.value })}
                     />
-                </div>
+                  </div>
+                )}
+                {user?.type === 'student' && (
+                  <div>
+                    <Label htmlFor="rollNumber">Roll Number</Label>
+                    <Input
+                      id="rollNumber"
+                      value={user?.studentInfo?.rollNumber || ''}
+                      disabled
+                      className="font-mono"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">Set during profile creation</p>
+                  </div>
+                )}
+                {user?.type === 'student' && (
+                  <div>
+                    <Label htmlFor="placementStatus">Placement Status</Label>
+                    <Select
+                      disabled={!isEditingProfile}
+                      value={isEditingProfile ? profileForm.placementStatus : (user?.studentInfo?.placementStatus || 'seeking')}
+                      onValueChange={(value) => setProfileForm({ ...profileForm, placementStatus: value })}
+                    >
+                      <SelectTrigger id="placementStatus" className="w-full">
+                        <SelectValue placeholder="Select Placement Status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="seeking">Seeking Placement</SelectItem>
+                        <SelectItem value="placed">Placed</SelectItem>
+                        <SelectItem value="higher_studies">Higher Studies</SelectItem>
+                        <SelectItem value="entrepreneur">Entrepreneur</SelectItem>
+                        <SelectItem value="not_interested">Not Interested</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 )}
                 {(user?.type === 'alumni' || user?.type === 'faculty') && (
                   <>
                     {user?.type === 'alumni' && (
                       <>
-                <div>
-                  <Label htmlFor="company">Company</Label>
-                          <Input 
-                            id="company" 
-                            value={isEditingProfile ? profileForm.company : (user?.company || user?.alumniInfo?.currentCompany || '')} 
+                        <div>
+                          <Label htmlFor="company">Company</Label>
+                          <Input
+                            id="company"
+                            value={isEditingProfile ? profileForm.company : (user?.company || user?.alumniInfo?.currentCompany || '')}
                             disabled={!isEditingProfile}
                             onChange={(e) => setProfileForm({ ...profileForm, company: e.target.value })}
                           />
                         </div>
                         <div>
                           <Label htmlFor="jobTitle">Job Title</Label>
-                          <Input 
-                            id="jobTitle" 
-                            value={isEditingProfile ? profileForm.jobTitle : (user?.alumniInfo?.jobTitle || '')} 
+                          <Input
+                            id="jobTitle"
+                            value={isEditingProfile ? profileForm.jobTitle : (user?.alumniInfo?.jobTitle || '')}
                             disabled={!isEditingProfile}
                             onChange={(e) => setProfileForm({ ...profileForm, jobTitle: e.target.value })}
                           />
@@ -1527,9 +1451,9 @@ export default function Settings() {
                     {user?.type === 'faculty' && (
                       <div>
                         <Label htmlFor="designation">Designation</Label>
-                        <Input 
-                          id="designation" 
-                          value={isEditingProfile ? profileForm.designation : (user?.designation || user?.facultyInfo?.designation || '')} 
+                        <Input
+                          id="designation"
+                          value={isEditingProfile ? profileForm.designation : (user?.designation || user?.facultyInfo?.designation || '')}
                           disabled={!isEditingProfile}
                           onChange={(e) => setProfileForm({ ...profileForm, designation: e.target.value })}
                         />
@@ -1542,43 +1466,43 @@ export default function Settings() {
                   <textarea
                     id="bio"
                     className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                    value={isEditingProfile ? profileForm.bio : (user?.bio || '')} 
+                    value={isEditingProfile ? profileForm.bio : (user?.bio || '')}
                     disabled={!isEditingProfile}
                     onChange={(e) => setProfileForm({ ...profileForm, bio: e.target.value })}
                   />
                 </div>
                 <div>
                   <Label htmlFor="location">Location</Label>
-                  <Input 
-                    id="location" 
-                    value={isEditingProfile ? profileForm.location : (user?.location || '')} 
+                  <Input
+                    id="location"
+                    value={isEditingProfile ? profileForm.location : (user?.location || '')}
                     disabled={!isEditingProfile}
                     onChange={(e) => setProfileForm({ ...profileForm, location: e.target.value })}
                   />
                 </div>
                 <div>
                   <Label htmlFor="city">City</Label>
-                  <Input 
-                    id="city" 
-                    value={isEditingProfile ? profileForm.city : (user?.city || '')} 
+                  <Input
+                    id="city"
+                    value={isEditingProfile ? profileForm.city : (user?.city || '')}
                     disabled={!isEditingProfile}
                     onChange={(e) => setProfileForm({ ...profileForm, city: e.target.value })}
                   />
                 </div>
                 <div>
                   <Label htmlFor="state">State</Label>
-                  <Input 
-                    id="state" 
-                    value={isEditingProfile ? profileForm.state : (user?.state || '')} 
+                  <Input
+                    id="state"
+                    value={isEditingProfile ? profileForm.state : (user?.state || '')}
                     disabled={!isEditingProfile}
                     onChange={(e) => setProfileForm({ ...profileForm, state: e.target.value })}
                   />
                 </div>
                 <div>
                   <Label htmlFor="country">Country</Label>
-                  <Input 
-                    id="country" 
-                    value={isEditingProfile ? profileForm.country : (user?.country || '')} 
+                  <Input
+                    id="country"
+                    value={isEditingProfile ? profileForm.country : (user?.country || '')}
                     disabled={!isEditingProfile}
                     onChange={(e) => setProfileForm({ ...profileForm, country: e.target.value })}
                   />
@@ -1589,29 +1513,27 @@ export default function Settings() {
 
               {/* Email Expiration Warning */}
               {emailExpirationStatus && emailExpirationStatus.hasKonguEmail && (
-                <div className={`p-4 rounded-lg border ${
-                  emailExpirationStatus.expired 
-                    ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800' 
-                    : emailExpirationStatus.daysUntilExpiry && emailExpirationStatus.daysUntilExpiry <= 30
+                <div className={`p-4 rounded-lg border ${emailExpirationStatus.expired
+                  ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'
+                  : emailExpirationStatus.daysUntilExpiry && emailExpirationStatus.daysUntilExpiry <= 30
                     ? 'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800'
                     : 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800'
-                }`}>
+                  }`}>
                   <div className="flex items-start space-x-3">
-                    <AlertCircle className={`h-5 w-5 mt-0.5 ${
-                      emailExpirationStatus.expired 
-                        ? 'text-red-600 dark:text-red-400' 
-                        : 'text-yellow-600 dark:text-yellow-400'
-                    }`} />
+                    <AlertCircle className={`h-5 w-5 mt-0.5 ${emailExpirationStatus.expired
+                      ? 'text-red-600 dark:text-red-400'
+                      : 'text-yellow-600 dark:text-yellow-400'
+                      }`} />
                     <div className="flex-1">
                       <h5 className="font-semibold mb-1">
-                        {emailExpirationStatus.expired 
-                          ? 'Kongu Email Expired' 
+                        {emailExpirationStatus.expired
+                          ? 'Kongu Email Expired'
                           : `Kongu Email Expiring in ${emailExpirationStatus.daysUntilExpiry} Days`}
                       </h5>
                       <p className="text-sm text-muted-foreground mb-2">
                         Your Kongu email ({emailExpirationStatus.konguEmail}) will expire on{' '}
-                        {emailExpirationStatus.expirationDate 
-                          ? new Date(emailExpirationStatus.expirationDate).toLocaleDateString() 
+                        {emailExpirationStatus.expirationDate
+                          ? new Date(emailExpirationStatus.expirationDate).toLocaleDateString()
                           : 'N/A'}.
                         {!emailExpirationStatus.hasPersonalEmail && (
                           <span className="block mt-1 font-medium">
@@ -1662,10 +1584,10 @@ export default function Settings() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="collegeEmail">College Email</Label>
-                    <Input 
-                      id="collegeEmail" 
+                    <Input
+                      id="collegeEmail"
                       type="email"
-                      value={isEditingProfile ? profileForm.collegeEmail : (user?.email?.college || '')} 
+                      value={isEditingProfile ? profileForm.collegeEmail : (user?.email?.college || '')}
                       disabled={!isEditingProfile}
                       onChange={(e) => setProfileForm({ ...profileForm, collegeEmail: e.target.value })}
                       placeholder="college-email@kongu.edu"
@@ -1673,10 +1595,10 @@ export default function Settings() {
                   </div>
                   <div>
                     <Label htmlFor="personalEmail">Personal Email</Label>
-                    <Input 
-                      id="personalEmail" 
+                    <Input
+                      id="personalEmail"
                       type="email"
-                      value={isEditingProfile ? profileForm.personalEmail : (user?.email?.personal || '')} 
+                      value={isEditingProfile ? profileForm.personalEmail : (user?.email?.personal || '')}
                       disabled={!isEditingProfile}
                       onChange={(e) => setProfileForm({ ...profileForm, personalEmail: e.target.value })}
                       placeholder="your.personal@email.com"
@@ -1841,9 +1763,9 @@ export default function Settings() {
                   Resume
                   <span className="text-xs text-muted-foreground">(optional)</span>
                 </h4>
-                <Input 
-                  id="resume" 
-                  value={isEditingProfile ? profileForm.resume : (user?.resume || '')} 
+                <Input
+                  id="resume"
+                  value={isEditingProfile ? profileForm.resume : (user?.resume || '')}
                   disabled={!isEditingProfile}
                   onChange={(e) => setProfileForm({ ...profileForm, resume: e.target.value })}
                   placeholder="Resume URL or file path"
@@ -1856,9 +1778,9 @@ export default function Settings() {
                   Portfolio URL
                   <span className="text-xs text-muted-foreground">(optional)</span>
                 </h4>
-                <Input 
-                  id="portfolio" 
-                  value={isEditingProfile ? profileForm.portfolio : (user?.portfolio || '')} 
+                <Input
+                  id="portfolio"
+                  value={isEditingProfile ? profileForm.portfolio : (user?.portfolio || '')}
                   disabled={!isEditingProfile}
                   onChange={(e) => setProfileForm({ ...profileForm, portfolio: e.target.value })}
                   placeholder="https://yourportfolio.com"
@@ -1877,9 +1799,9 @@ export default function Settings() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="linkedin">LinkedIn</Label>
-                    <Input 
-                      id="linkedin" 
-                      value={isEditingProfile ? profileForm.linkedin : (user?.socialLinks?.linkedin || '')} 
+                    <Input
+                      id="linkedin"
+                      value={isEditingProfile ? profileForm.linkedin : (user?.socialLinks?.linkedin || '')}
                       disabled={!isEditingProfile}
                       onChange={(e) => setProfileForm({ ...profileForm, linkedin: e.target.value })}
                       placeholder="https://linkedin.com/in/yourprofile"
@@ -1887,9 +1809,9 @@ export default function Settings() {
                   </div>
                   <div>
                     <Label htmlFor="github">GitHub</Label>
-                    <Input 
-                      id="github" 
-                      value={isEditingProfile ? profileForm.github : (user?.socialLinks?.github || '')} 
+                    <Input
+                      id="github"
+                      value={isEditingProfile ? profileForm.github : (user?.socialLinks?.github || '')}
                       disabled={!isEditingProfile}
                       onChange={(e) => setProfileForm({ ...profileForm, github: e.target.value })}
                       placeholder="https://github.com/yourusername"
@@ -1897,9 +1819,9 @@ export default function Settings() {
                   </div>
                   <div>
                     <Label htmlFor="leetcode">LeetCode</Label>
-                    <Input 
-                      id="leetcode" 
-                      value={isEditingProfile ? profileForm.leetcode : (user?.socialLinks?.leetcode || '')} 
+                    <Input
+                      id="leetcode"
+                      value={isEditingProfile ? profileForm.leetcode : (user?.socialLinks?.leetcode || '')}
                       disabled={!isEditingProfile}
                       onChange={(e) => setProfileForm({ ...profileForm, leetcode: e.target.value })}
                       placeholder="https://leetcode.com/yourusername"
@@ -1914,13 +1836,13 @@ export default function Settings() {
                   </div>
                   {isEditingProfile && (
                     <div className="flex flex-col md:flex-row gap-2">
-                      <Input 
-                        placeholder="Label (e.g., Portfolio, Blog)" 
+                      <Input
+                        placeholder="Label (e.g., Portfolio, Blog)"
                         value={customLinkName}
                         onChange={(e) => setCustomLinkName(e.target.value)}
                       />
-                      <Input 
-                        placeholder="https://example.com/your-link" 
+                      <Input
+                        placeholder="https://example.com/your-link"
                         value={customLinkUrl}
                         onChange={(e) => setCustomLinkUrl(e.target.value)}
                       />
@@ -1934,7 +1856,7 @@ export default function Settings() {
                     <div className="space-y-2">
                       {effectiveCustomLinks.map((link, index) => (
                         <div key={`${link.label}-${index}`} className="flex items-center justify-between rounded-md border border-border px-3 py-2">
-                          <a 
+                          <a
                             href={link.url}
                             target="_blank"
                             rel="noopener noreferrer"
@@ -1945,9 +1867,9 @@ export default function Settings() {
                             <ExternalLink className="h-3 w-3" />
                           </a>
                           {isEditingProfile && (
-                            <Button 
-                              type="button" 
-                              variant="ghost" 
+                            <Button
+                              type="button"
+                              variant="ghost"
                               size="icon"
                               onClick={() => handleRemoveCustomLink(index)}
                             >
@@ -1968,7 +1890,7 @@ export default function Settings() {
 
         {/* Notification Settings */}
         <TabsContent value="notifications" className="space-y-6">
-          <EnhancedNotificationSettings 
+          <EnhancedNotificationSettings
             notifications={settings.notifications}
             onUpdate={(notifications) => updateSettings('notifications', notifications)}
           />
@@ -1980,13 +1902,13 @@ export default function Settings() {
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
-              <CardTitle className="flex items-center space-x-2">
-                <Eye className="h-5 w-5" />
-                <span>Privacy & Visibility</span>
-              </CardTitle>
-              <CardDescription>
-                Control who can see your information and contact you
-              </CardDescription>
+                  <CardTitle className="flex items-center space-x-2">
+                    <Eye className="h-5 w-5" />
+                    <span>Privacy & Visibility</span>
+                  </CardTitle>
+                  <CardDescription>
+                    Control who can see your information and contact you
+                  </CardDescription>
                 </div>
                 {isOnline && realTimeUpdates && (
                   <Badge variant="outline" className="flex items-center space-x-1">
@@ -2001,7 +1923,7 @@ export default function Settings() {
                 <Label htmlFor="profileVisibility">Profile Visibility</Label>
                 <Select
                   value={settings.privacy.profileVisibility}
-                  onValueChange={(value) => 
+                  onValueChange={(value) =>
                     updateSettings('privacy', { ...settings.privacy, profileVisibility: value })
                   }
                 >
@@ -2016,7 +1938,7 @@ export default function Settings() {
               </div>
 
 
-                  <div>
+              <div>
                 <h4 className="font-medium mb-3">Information Visibility</h4>
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
@@ -2024,7 +1946,7 @@ export default function Settings() {
                     <Switch
                       id="showEmail"
                       checked={settings.privacy.showEmail}
-                      onCheckedChange={(checked) => 
+                      onCheckedChange={(checked) =>
                         updateSettings('privacy', { ...settings.privacy, showEmail: checked })
                       }
                     />
@@ -2034,7 +1956,7 @@ export default function Settings() {
                     <Switch
                       id="showPhone"
                       checked={settings.privacy.showPhone}
-                      onCheckedChange={(checked) => 
+                      onCheckedChange={(checked) =>
                         updateSettings('privacy', { ...settings.privacy, showPhone: checked })
                       }
                     />
@@ -2044,7 +1966,7 @@ export default function Settings() {
                     <Switch
                       id="showLocation"
                       checked={settings.privacy.showLocation}
-                      onCheckedChange={(checked) => 
+                      onCheckedChange={(checked) =>
                         updateSettings('privacy', { ...settings.privacy, showLocation: checked })
                       }
                     />
@@ -2054,7 +1976,7 @@ export default function Settings() {
                     <Switch
                       id="showCompany"
                       checked={settings.privacy.showCompany}
-                      onCheckedChange={(checked) => 
+                      onCheckedChange={(checked) =>
                         updateSettings('privacy', { ...settings.privacy, showCompany: checked })
                       }
                     />
@@ -2064,17 +1986,17 @@ export default function Settings() {
                     <Switch
                       id="showBatch"
                       checked={settings.privacy.showBatch}
-                      onCheckedChange={(checked) => 
+                      onCheckedChange={(checked) =>
                         updateSettings('privacy', { ...settings.privacy, showBatch: checked })
                       }
                     />
                   </div>
                   <div className="flex items-center justify-between">
                     <Label htmlFor="showDepartment">Show Department</Label>
-                  <Switch
+                    <Switch
                       id="showDepartment"
                       checked={settings.privacy.showDepartment}
-                      onCheckedChange={(checked) => 
+                      onCheckedChange={(checked) =>
                         updateSettings('privacy', { ...settings.privacy, showDepartment: checked })
                       }
                     />
@@ -2084,7 +2006,7 @@ export default function Settings() {
                     <Switch
                       id="showOnlineStatus"
                       checked={settings.privacy.showOnlineStatus}
-                      onCheckedChange={(checked) => 
+                      onCheckedChange={(checked) =>
                         updateSettings('privacy', { ...settings.privacy, showOnlineStatus: checked })
                       }
                     />
@@ -2129,7 +2051,7 @@ export default function Settings() {
                     <Switch
                       id="pushNotifications"
                       checked={settings.communication.pushNotifications}
-                      onCheckedChange={(checked) => 
+                      onCheckedChange={(checked) =>
                         updateSettings('communication', { ...settings.communication, pushNotifications: checked })
                       }
                     />
@@ -2142,7 +2064,7 @@ export default function Settings() {
                     <Switch
                       id="inAppNotifications"
                       checked={settings.communication.inAppNotifications}
-                      onCheckedChange={(checked) => 
+                      onCheckedChange={(checked) =>
                         updateSettings('communication', { ...settings.communication, inAppNotifications: checked })
                       }
                     />
@@ -2156,7 +2078,7 @@ export default function Settings() {
                 <Label htmlFor="notificationFrequency">Notification Frequency</Label>
                 <Select
                   value={settings.communication.notificationFrequency}
-                  onValueChange={(value) => 
+                  onValueChange={(value) =>
                     updateSettings('communication', { ...settings.communication, notificationFrequency: value as 'immediate' | 'hourly' | 'daily' | 'weekly' })
                   }
                 >
@@ -2255,7 +2177,7 @@ export default function Settings() {
                     <Switch
                       id="loginNotifications"
                       checked={settings.security.loginNotifications}
-                      onCheckedChange={(checked) => 
+                      onCheckedChange={(checked) =>
                         updateSettings('security', { ...settings.security, loginNotifications: checked })
                       }
                     />
@@ -2269,7 +2191,7 @@ export default function Settings() {
                     <Switch
                       id="requirePasswordChange"
                       checked={settings.security.requirePasswordChange}
-                      onCheckedChange={(checked) => 
+                      onCheckedChange={(checked) =>
                         updateSettings('security', { ...settings.security, requirePasswordChange: checked })
                       }
                     />
@@ -2283,7 +2205,7 @@ export default function Settings() {
                       min="5"
                       max="1440"
                       value={settings.security.sessionTimeout}
-                      onChange={(e) => 
+                      onChange={(e) =>
                         updateSettings('security', { ...settings.security, sessionTimeout: parseInt(e.target.value) || 30 })
                       }
                       className="mt-1"
@@ -2299,7 +2221,7 @@ export default function Settings() {
                       min="30"
                       max="365"
                       value={settings.security.passwordExpiryDays}
-                      onChange={(e) => 
+                      onChange={(e) =>
                         updateSettings('security', { ...settings.security, passwordExpiryDays: parseInt(e.target.value) || 90 })
                       }
                       className="mt-1"
@@ -2310,12 +2232,12 @@ export default function Settings() {
                   <div>
                     <Label>Last Password Change</Label>
                     <div className="mt-1 p-2 bg-gray-50 rounded-md text-sm">
-                      {settings.security.lastPasswordChange 
-                        ? new Date(settings.security.lastPasswordChange).toLocaleDateString('en-US', { 
-                            year: 'numeric', 
-                            month: 'long', 
-                            day: 'numeric' 
-                          })
+                      {settings.security.lastPasswordChange
+                        ? new Date(settings.security.lastPasswordChange).toLocaleDateString('en-US', {
+                          year: 'numeric',
+                          month: 'long',
+                          day: 'numeric'
+                        })
                         : 'Never'}
                     </div>
                     <p className="text-xs text-muted-foreground mt-1">Date when your password was last changed</p>
@@ -2351,9 +2273,9 @@ export default function Settings() {
                       placeholder="Type DELETE to confirm deletion"
                     />
                   </div>
-                  <Button 
-                    onClick={handleAccountDeletion} 
-                    variant="destructive" 
+                  <Button
+                    onClick={handleAccountDeletion}
+                    variant="destructive"
                     className="w-full"
                     disabled={deleteForm.confirmDelete !== 'DELETE' || !deleteForm.password}
                   >
@@ -2365,6 +2287,80 @@ export default function Settings() {
             </CardContent>
           </Card>
         </TabsContent>
+        {/* Appearance Settings */}
+        <TabsContent value="appearance" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <Palette className="h-5 w-5" />
+                <span>Appearance</span>
+              </CardTitle>
+              <CardDescription>
+                Customize how the application looks to you
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-6">
+                <div>
+                  <h4 className="font-medium mb-4">Theme Mode</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <Card
+                      className={`cursor-pointer transition-all hover:border-primary ${theme === 'light' ? 'border-primary ring-1 ring-primary' : ''}`}
+                      onClick={() => setTheme('light')}
+                    >
+                      <CardContent className="pt-6 text-center space-y-2">
+                        <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center mx-auto mb-2 text-slate-900">
+                          <Sun className="h-6 w-6" />
+                        </div>
+                        <p className="font-semibold">Light</p>
+                        <p className="text-xs text-muted-foreground">Clean and bright for day use</p>
+                      </CardContent>
+                    </Card>
+
+                    <Card
+                      className={`cursor-pointer transition-all hover:border-primary ${theme === 'dark' ? 'border-primary ring-1 ring-primary' : ''}`}
+                      onClick={() => setTheme('dark')}
+                    >
+                      <CardContent className="pt-6 text-center space-y-2">
+                        <div className="w-12 h-12 rounded-full bg-slate-800 flex items-center justify-center mx-auto mb-2 text-slate-100">
+                          <Moon className="h-6 w-6" />
+                        </div>
+                        <p className="font-semibold">Dark</p>
+                        <p className="text-xs text-muted-foreground">Easier on the eyes in low light</p>
+                      </CardContent>
+                    </Card>
+
+                    <Card
+                      className={`cursor-pointer transition-all hover:border-primary ${theme === 'system' ? 'border-primary ring-1 ring-primary' : ''}`}
+                      onClick={() => setTheme('system')}
+                    >
+                      <CardContent className="pt-6 text-center space-y-2">
+                        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-slate-100 to-slate-800 flex items-center justify-center mx-auto mb-2 text-primary">
+                          <Monitor className="h-6 w-6" />
+                        </div>
+                        <p className="font-semibold">System</p>
+                        <p className="text-xs text-muted-foreground">Follow your device settings</p>
+                      </CardContent>
+                    </Card>
+                  </div>
+                </div>
+
+                <Separator />
+
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label className="text-base">Glassmorphism Effects</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Use blurred backgrounds and translucent effects
+                    </p>
+                  </div>
+                  <Switch checked={true} />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
 
         {/* Activity Log */}
         <TabsContent value="activity" className="space-y-6">
@@ -2390,7 +2386,7 @@ export default function Settings() {
                       />
                       <Label>Real-time Updates</Label>
                     </div>
-                    
+
                     <div className="flex items-center space-x-2">
                       <Switch
                         checked={autoSave}
@@ -2398,7 +2394,7 @@ export default function Settings() {
                       />
                       <Label>Auto Save</Label>
                     </div>
-                    
+
                     <div className="flex items-center space-x-2">
                       <Switch
                         checked={livePreview}
@@ -2407,7 +2403,7 @@ export default function Settings() {
                       <Label>Live Preview</Label>
                     </div>
                   </div>
-                  
+
                   <Button
                     size="sm"
                     variant="outline"
@@ -2441,7 +2437,7 @@ export default function Settings() {
                             {log.status === 'pending' && (
                               <Clock className="h-4 w-4 text-yellow-500" />
                             )}
-                            
+
                             <div>
                               <p className="text-sm font-medium">{log.action}</p>
                               {log.details && (
@@ -2449,7 +2445,7 @@ export default function Settings() {
                               )}
                             </div>
                           </div>
-                          
+
                           <div className="text-xs text-muted-foreground">
                             {log.timestamp.toLocaleTimeString()}
                           </div>
@@ -2463,6 +2459,6 @@ export default function Settings() {
           </Card>
         </TabsContent>
       </Tabs>
-    </div>
+    </div >
   );
 }

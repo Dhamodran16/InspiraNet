@@ -12,7 +12,7 @@ class SocketService {
     this.connectedUsers = new Map(); // userId -> socketId
     this.userSockets = new Map(); // userId -> socket object
     this.userRooms = new Map(); // userId -> array of room names
-    
+
     this.setupMiddleware();
     this.setupEventHandlers();
   }
@@ -28,7 +28,7 @@ class SocketService {
 
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
         const user = await User.findById(decoded.userId).select('-password');
-        
+
         if (!user) {
           return next(new Error('Authentication error: Invalid token'));
         }
@@ -45,7 +45,7 @@ class SocketService {
   setupEventHandlers() {
     this.io.on('connection', (socket) => {
       console.log(`User connected: ${socket.user.name} (${socket.userId}) - Type: ${socket.user.type}`);
-      
+
       // Store user connection
       this.connectedUsers.set(socket.userId, socket.id);
       this.userSockets.set(socket.userId, socket);
@@ -91,7 +91,7 @@ class SocketService {
       socket.on('send_message', async (data) => {
         try {
           const { conversationId, content, messageType = 'text', mediaUrl = null } = data;
-          
+
           // Create new message
           const message = new Message({
             conversationId,
@@ -110,14 +110,14 @@ class SocketService {
             conversation.lastMessage = message._id;
             conversation.lastMessageContent = content;
             conversation.lastMessageTime = new Date();
-            
+
             // Increment unread count for other participants
             for (const participantId of conversation.participants) {
               if (participantId.toString() !== socket.userId) {
                 await conversation.incrementUnreadForUser(participantId);
               }
             }
-            
+
             await conversation.save();
           }
 
@@ -147,7 +147,8 @@ class SocketService {
       });
 
       // Handle typing indicators
-      socket.on('typing_start', (conversationId) => {
+      socket.on('typing_start', (data) => {
+        const conversationId = data?.conversationId || data;
         socket.to(`conversation_${conversationId}`).emit('user_typing', {
           userId: socket.userId,
           userName: socket.user.name,
@@ -155,7 +156,8 @@ class SocketService {
         });
       });
 
-      socket.on('typing_stop', (conversationId) => {
+      socket.on('typing_stop', (data) => {
+        const conversationId = data?.conversationId || data;
         socket.to(`conversation_${conversationId}`).emit('user_stop_typing', {
           userId: socket.userId,
           conversationId
@@ -221,18 +223,18 @@ class SocketService {
       socket.on('mark_as_read', async (data) => {
         try {
           const { conversationId, messageIds } = data;
-          
-          // Mark messages as read
+
+          // Mark messages as read in DB — must use $set for mixed operators
           await Message.updateMany(
             { _id: { $in: messageIds }, senderId: { $ne: socket.userId } },
-            { 
-              $addToSet: { 
-                readBy: { 
-                  userId: socket.userId, 
-                  readAt: new Date() 
-                } 
+            {
+              $addToSet: {
+                readBy: {
+                  userId: socket.userId,
+                  readAt: new Date()
+                }
               },
-              isRead: true
+              $set: { isRead: true }
             }
           );
 
@@ -254,11 +256,35 @@ class SocketService {
         }
       });
 
+      // Handle message delivered acknowledgment (WhatsApp-style)
+      socket.on('message_delivered', async (data) => {
+        try {
+          const { messageId, conversationId } = data;
+          if (!messageId || !conversationId) return;
+
+          // Update message status to delivered in DB
+          await Message.findOneAndUpdate(
+            { _id: messageId, senderId: { $ne: socket.userId } },
+            { $set: { status: 'delivered' } }
+          );
+
+          // Notify sender so their UI updates single-tick → double-tick
+          socket.to(`conversation_${conversationId}`).emit('message_status_update', {
+            messageId,
+            status: 'delivered',
+            conversationId,
+            userId: socket.userId
+          });
+        } catch (error) {
+          console.error('Error handling message_delivered:', error);
+        }
+      });
+
       // Handle follow/unfollow events
       socket.on('follow_user', async (data) => {
         try {
           const { targetUserId } = data;
-          
+
           // Broadcast follow event to relevant users
           this.io.to(`user_${targetUserId}`).emit('new_follower', {
             followerId: socket.userId,
@@ -280,10 +306,10 @@ class SocketService {
       socket.on('post_created', async (data) => {
         try {
           const { postId } = data;
-          
+
           // Broadcast new post to relevant users based on user type and department
           const post = await Post.findById(postId).populate('author', 'name type department batch');
-          
+
           if (post) {
             // Broadcast to all users (general posts) and typed channels for filtering on client
             this.io.emit('new_post', {
@@ -308,10 +334,10 @@ class SocketService {
       socket.on('event_updated', async (data) => {
         try {
           const { eventId } = data;
-          
+
           // Broadcast event update to relevant users
           const event = await Event.findById(eventId).populate('creator', 'name type department');
-          
+
           if (event) {
             // Broadcast to all users
             this.io.emit('event_update', {
@@ -333,7 +359,7 @@ class SocketService {
       socket.on('achievement_added', async (data) => {
         try {
           const { userId, achievement } = data;
-          
+
           // Broadcast achievement to relevant users
           this.io.to(`type_${socket.user.type}`).emit('new_achievement', {
             userId: socket.userId,
@@ -355,7 +381,7 @@ class SocketService {
       socket.on('update_notification_preferences', async (data) => {
         try {
           const { preferences } = data;
-          
+
           // Update user's notification preferences in database
           await User.findByIdAndUpdate(socket.userId, {
             notificationPreferences: preferences
@@ -377,11 +403,11 @@ class SocketService {
       // Handle disconnection
       socket.on('disconnect', () => {
         console.log(`User disconnected: ${socket.user.name} (${socket.userId})`);
-        
+
         this.connectedUsers.delete(socket.userId);
         this.userSockets.delete(socket.userId);
         this.userRooms.delete(socket.userId);
-        
+
         // Broadcast user offline status
         this.broadcastUserStatus(socket.userId, 'offline');
       });
@@ -406,7 +432,7 @@ class SocketService {
       const eventCount = await Event.countDocuments({
         $or: [{ creator: userId }, { attendees: userId }]
       });
-      
+
       const user = await User.findById(userId).select('achievements followers following');
       const achievementCount = user?.achievements?.length || 0;
       const connectionCount = (user?.followers?.length || 0) + (user?.following?.length || 0);
@@ -434,13 +460,13 @@ class SocketService {
 
       for (const participant of conversation.participants) {
         const participantId = participant._id.toString();
-        
+
         // Skip sender
         if (participantId === messageData.senderId) continue;
 
         // Check if user is online
         const isOnline = this.connectedUsers.has(participantId);
-        
+
         if (!isOnline) {
           // Send notification to user's personal room (for future push notifications)
           this.io.to(`user_${participantId}`).emit('message_notification', {
@@ -490,9 +516,9 @@ class SocketService {
   // Get online users by type
   async getOnlineUsersByType(userType) {
     const onlineUserIds = Array.from(this.connectedUsers.keys());
-    const users = await User.find({ 
-      _id: { $in: onlineUserIds }, 
-      type: userType 
+    const users = await User.find({
+      _id: { $in: onlineUserIds },
+      type: userType
     }).select('name type department batch');
     return users;
   }
@@ -524,7 +550,7 @@ class SocketService {
   async getConnectedUsersCountByType() {
     const onlineUserIds = Array.from(this.connectedUsers.keys());
     const users = await User.find({ _id: { $in: onlineUserIds } }).select('type');
-    
+
     const countByType = {
       alumni: 0,
       student: 0,

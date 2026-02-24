@@ -25,7 +25,7 @@ const DashboardPage = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [refreshing, setRefreshing] = useState(false);
   const { isAuthenticated, isLoading, user } = useAuth();
-  
+
   // Handle URL parameters for section navigation
   useEffect(() => {
     const searchParams = new URLSearchParams(location.search);
@@ -37,7 +37,7 @@ const DashboardPage = () => {
       setCurrentSection('home');
     }
   }, [location.search, location.pathname]);
-  
+
   // Scroll to top functionality
   const scrollToTop = () => {
     const sectionContent = document.querySelector('.dashboard-section');
@@ -45,7 +45,7 @@ const DashboardPage = () => {
       sectionContent.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
-  
+
   // Handle scroll events
   useEffect(() => {
     const handleScroll = () => {
@@ -54,7 +54,7 @@ const DashboardPage = () => {
         setShowScrollTop(sectionContent.scrollTop > 300);
       }
     };
-    
+
     const sectionContent = document.querySelector('.dashboard-section');
     if (sectionContent) {
       sectionContent.addEventListener('scroll', handleScroll);
@@ -129,9 +129,9 @@ const DashboardPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background flex">
+    <div className="h-screen bg-background flex overflow-hidden">
       {/* Sidebar - Fixed to left side */}
-      <Sidebar 
+      <Sidebar
         currentSection={currentSection}
         onSectionChange={handleSectionChange}
         onLogout={onLogout}
@@ -152,7 +152,7 @@ const DashboardPage = () => {
                 <Plus className="h-4 w-4 mr-2" />
                 Create Post
               </Button>
-              
+
               {/* Right side - Search and Refresh buttons */}
               <div className="flex items-center gap-2">
                 <Button
@@ -182,10 +182,10 @@ const DashboardPage = () => {
             </div>
           </div>
         )}
-        
+
         {/* Content Area */}
-        <main className="flex-1">
-          <div className="h-full dashboard-section">
+        <main className="flex-1 overflow-hidden">
+          <div className={`h-full ${currentSection === 'messages' ? 'overflow-hidden' : 'dashboard-section overflow-y-auto'}`}>
             <ErrorBoundary>
               {renderSection()}
             </ErrorBoundary>

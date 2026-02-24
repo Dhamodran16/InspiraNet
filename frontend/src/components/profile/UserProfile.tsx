@@ -20,7 +20,7 @@ interface ProfileFormData {
   firstName: string;
   lastName: string;
   email: string;
-  type: 'alumni' | 'student' | 'teacher';
+  type: 'alumni' | 'student' | 'teacher' | 'faculty';
   batch: string;
   department: string;
   company: string;
@@ -37,8 +37,10 @@ interface PasswordFormData {
   confirmPassword: string;
 }
 
+const currentYear = new Date().getFullYear();
+
 export default function UserProfile() {
-  const { user, login } = useAuth();
+  const { user, login, updateUser } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [showPasswords, setShowPasswords] = useState({
@@ -74,12 +76,12 @@ export default function UserProfile() {
     if (user) {
       const [firstName, ...lastNameParts] = user.name.split(' ');
       const lastName = lastNameParts.join(' ');
-      
+
       setProfileData({
         firstName: firstName || '',
         lastName: lastName || '',
-        email: user.email || '',
-        type: user.type || 'alumni',
+        email: typeof user.email === 'string' ? user.email : (user.email?.college || user.email?.personal || ''),
+        type: (user.type as any) || 'alumni',
         batch: user.batch || '',
         department: user.department || '',
         company: user.company || '',
@@ -148,10 +150,10 @@ export default function UserProfile() {
       };
 
       const response = await authService.updateProfile(updateData, localStorage.getItem('authToken') || '');
-      
+
       // Update local user state
       if (response.user) {
-        login(response.user, localStorage.getItem('authToken') || '');
+        updateUser(response.user as any);
       }
 
       toast({
@@ -195,7 +197,7 @@ export default function UserProfile() {
 
     try {
       setIsLoading(true);
-      
+
       await authService.changePassword(
         passwordData.currentPassword,
         passwordData.newPassword,
@@ -260,10 +262,10 @@ export default function UserProfile() {
                 <Avatar className="w-24 h-24">
                   <AvatarImage src={avatarPreview || user.avatar || undefined} />
                   <AvatarFallback className="text-2xl">
-                    {user.name.split(' ').map(n => n[0]).join('')}
+                    {user.name.charAt(0).toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
-                
+
                 <div className="space-y-2">
                   <Label htmlFor="avatar-upload">Upload new picture</Label>
                   <Input
@@ -300,7 +302,7 @@ export default function UserProfile() {
                     disabled={!isEditing}
                   />
                 </div>
-                
+
                 <div className="space-y-2">
                   <Label htmlFor="lastName">Last Name *</Label>
                   <Input
@@ -323,7 +325,7 @@ export default function UserProfile() {
                     disabled={!isEditing}
                   />
                 </div>
-                
+
                 <div className="space-y-2">
                   <Label htmlFor="type">User Type *</Label>
                   <Select
@@ -354,7 +356,7 @@ export default function UserProfile() {
                     disabled={!isEditing}
                   />
                 </div>
-                
+
                 <div className="space-y-2">
                   <Label htmlFor="department">Department</Label>
                   <Input
@@ -389,7 +391,7 @@ export default function UserProfile() {
                     disabled={!isEditing}
                   />
                 </div>
-                
+
                 <div className="space-y-2">
                   <Label htmlFor="designation">Designation</Label>
                   <Input
@@ -413,7 +415,7 @@ export default function UserProfile() {
                     disabled={!isEditing}
                   />
                 </div>
-                
+
                 <div className="space-y-2">
                   <Label htmlFor="experience">Experience</Label>
                   <Input

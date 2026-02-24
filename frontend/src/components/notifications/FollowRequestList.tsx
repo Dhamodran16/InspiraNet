@@ -1,27 +1,28 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { 
-  UserPlus, 
-  UserCheck, 
-  UserX, 
-  Clock, 
-  CheckCircle, 
+import {
+  UserPlus,
+  UserCheck,
+  UserX,
+  Clock,
+  CheckCircle,
   XCircle,
   MessageSquare,
   Eye,
   UserMinus
 } from 'lucide-react';
-import api, { 
-  getPendingFollowRequests, 
+import api, {
+  getPendingFollowRequests,
   getSentFollowRequests,
   getAcceptedConnections,
-  acceptFollowRequest, 
-  rejectFollowRequest, 
+  acceptFollowRequest,
+  rejectFollowRequest,
   cancelFollowRequest,
   unfollowUser
 } from '@/services/api';
@@ -48,6 +49,7 @@ interface FollowRequest {
 
 export default function FollowRequestList({ onRequestProcessed }: { onRequestProcessed?: () => void } = {}) {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [pendingRequests, setPendingRequests] = useState<FollowRequest[]>([]);
   const [sentRequests, setSentRequests] = useState<FollowRequest[]>([]);
   const [acceptedConnections, setAcceptedConnections] = useState<FollowRequest[]>([]);
@@ -57,7 +59,7 @@ export default function FollowRequestList({ onRequestProcessed }: { onRequestPro
 
   useEffect(() => {
     loadFollowRequests();
-    
+
     // Set up real-time socket listeners
     const handleFollowRequestAccepted = (data: any) => {
       console.log('🔔 Follow request accepted:', data);
@@ -99,7 +101,7 @@ export default function FollowRequestList({ onRequestProcessed }: { onRequestPro
   const loadFollowRequests = async () => {
     try {
       setLoading(true);
-      
+
       const [pending, sent, accepted] = await Promise.all([
         getPendingFollowRequests(),
         getSentFollowRequests(),
@@ -162,11 +164,11 @@ export default function FollowRequestList({ onRequestProcessed }: { onRequestPro
   const handleAcceptRequest = async (requestId: string, requesterId: string) => {
     try {
       await acceptFollowRequest(requestId);
-      
+
       // Update local state
-      setPendingRequests(prev => 
-        prev.map(req => 
-          req._id === requestId 
+      setPendingRequests(prev =>
+        prev.map(req =>
+          req._id === requestId
             ? { ...req, status: 'accepted' as const }
             : req
         )
@@ -193,11 +195,11 @@ export default function FollowRequestList({ onRequestProcessed }: { onRequestPro
   const handleRejectRequest = async (requestId: string, requesterId: string) => {
     try {
       await rejectFollowRequest(requestId);
-      
+
       // Update local state
-      setPendingRequests(prev => 
-        prev.map(req => 
-          req._id === requestId 
+      setPendingRequests(prev =>
+        prev.map(req =>
+          req._id === requestId
             ? { ...req, status: 'declined' as const }
             : req
         )
@@ -224,7 +226,7 @@ export default function FollowRequestList({ onRequestProcessed }: { onRequestPro
   const handleCancelRequest = async (requestId: string) => {
     try {
       await cancelFollowRequest(requestId);
-      
+
       // Remove from local state
       setSentRequests(prev => prev.filter(req => req._id !== requestId));
 
@@ -245,21 +247,11 @@ export default function FollowRequestList({ onRequestProcessed }: { onRequestPro
 
   const handleMessage = async (userId: string) => {
     try {
-      // Create or get conversation
-      const response = await fetch('/api/conversations', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
-        },
-        body: JSON.stringify({ participantId: userId })
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        // Navigate to messages page or open chat
-        window.location.href = `/messages?conversation=${data.conversation._id}`;
-      }
+      // Create or get conversation using the api service (correct base URL + auth)
+      const response = await api.post('/api/conversations', { participantId: userId });
+      const data = response.data;
+      // Navigate to messages page with the conversation pre-selected
+      navigate(`/messages?conversation=${data.conversation._id}`);
     } catch (error) {
       console.error('Error starting conversation:', error);
       toast({
@@ -271,31 +263,31 @@ export default function FollowRequestList({ onRequestProcessed }: { onRequestPro
   };
 
   const handleViewProfile = (userId: string) => {
-    window.location.href = `/profile/${userId}`;
+    navigate(`/profile/${userId}`);
   };
 
   const handleUnfollow = async (userId: string) => {
     try {
       setLoading(true);
       await unfollowUser(userId);
-      
+
       // Remove from accepted connections
       setAcceptedConnections(prev => prev.filter(conn => conn.requester._id !== userId));
-      
+
       toast({
         title: "Unfollowed",
         description: "You are no longer following this user",
       });
-      
+
       // Refresh all data
       loadFollowRequests();
     } catch (error: any) {
       console.error('Error unfollowing user:', error);
-      
+
       // Handle specific error cases
       let errorMessage = "Failed to unfollow user";
       let errorTitle = "Error";
-      
+
       if (error.response?.status === 400) {
         errorTitle = "Cannot Unfollow";
         errorMessage = error.response.data?.error || "You are not following this user or cannot unfollow";
@@ -305,7 +297,7 @@ export default function FollowRequestList({ onRequestProcessed }: { onRequestPro
       } else if (error.response?.data?.error) {
         errorMessage = error.response.data.error;
       }
-      
+
       toast({
         title: errorTitle,
         description: errorMessage,
@@ -339,10 +331,7 @@ export default function FollowRequestList({ onRequestProcessed }: { onRequestPro
 
   return (
     <div className="w-full">
-      <div className="mb-6">
-        <h2 className="text-2xl sm:text-3xl font-bold text-foreground mb-2">Follow Requests</h2>
-        <p className="text-muted-foreground">Manage your follow requests and connections</p>
-      </div>
+      {/* Header handled by parent component */}
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="grid w-full grid-cols-3 mb-6">
@@ -377,7 +366,7 @@ export default function FollowRequestList({ onRequestProcessed }: { onRequestPro
             <h3 className="text-lg font-semibold text-foreground mb-2">Received Requests</h3>
             <p className="text-sm text-muted-foreground">People who want to follow you</p>
           </div>
-          
+
           {loading ? (
             <div className="text-center py-8">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
@@ -405,18 +394,20 @@ export default function FollowRequestList({ onRequestProcessed }: { onRequestPro
                             {request.requester.name.charAt(0).toUpperCase()}
                           </AvatarFallback>
                         </Avatar>
-                        
+
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center space-x-2 mb-2">
-                            <h4 className="text-lg sm:text-xl font-semibold text-foreground truncate">
+                          <div className="flex flex-wrap items-center gap-2 mb-2">
+                            <h4 className="text-lg font-semibold text-foreground truncate max-w-[150px] sm:max-w-[250px]">
                               {request.requester.name}
                             </h4>
-                            <Badge variant="secondary" className="text-xs">
-                              {request.requester.type}
-                            </Badge>
-                            {getStatusBadge(request.status)}
+                            <div className="flex items-center gap-2">
+                              <Badge variant="secondary" className="text-[10px] sm:text-xs uppercase px-2">
+                                {request.requester.type}
+                              </Badge>
+                              {getStatusBadge(request.status)}
+                            </div>
                           </div>
-                          
+
                           <div className="space-y-1 text-sm text-muted-foreground">
                             {request.requester.department && (
                               <p className="flex items-center space-x-2">
@@ -468,7 +459,7 @@ export default function FollowRequestList({ onRequestProcessed }: { onRequestPro
             <h3 className="text-lg font-semibold text-foreground mb-2">Sent Requests</h3>
             <p className="text-sm text-muted-foreground">Requests you've sent to others</p>
           </div>
-          
+
           {loading ? (
             <div className="text-center py-8">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
@@ -496,18 +487,20 @@ export default function FollowRequestList({ onRequestProcessed }: { onRequestPro
                             {request.requester.name.charAt(0).toUpperCase()}
                           </AvatarFallback>
                         </Avatar>
-                        
+
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center space-x-2 mb-2">
-                            <h4 className="text-lg sm:text-xl font-semibold text-foreground truncate">
+                          <div className="flex flex-wrap items-center gap-2 mb-2">
+                            <h4 className="text-lg font-semibold text-foreground truncate max-w-[150px] sm:max-w-[250px]">
                               {request.requester.name}
                             </h4>
-                            <Badge variant="secondary" className="text-xs">
-                              {request.requester.type}
-                            </Badge>
-                            {getStatusBadge(request.status)}
+                            <div className="flex items-center gap-2">
+                              <Badge variant="secondary" className="text-[10px] sm:text-xs uppercase px-2">
+                                {request.requester.type}
+                              </Badge>
+                              {getStatusBadge(request.status)}
+                            </div>
                           </div>
-                          
+
                           <div className="space-y-1 text-sm text-muted-foreground">
                             {request.requester.department && (
                               <p className="flex items-center space-x-2">
@@ -552,7 +545,7 @@ export default function FollowRequestList({ onRequestProcessed }: { onRequestPro
             <h3 className="text-lg font-semibold text-foreground mb-2">Accepted Connections</h3>
             <p className="text-sm text-muted-foreground">People you can now message</p>
           </div>
-          
+
           {loading ? (
             <div className="text-center py-8">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
@@ -580,18 +573,20 @@ export default function FollowRequestList({ onRequestProcessed }: { onRequestPro
                             {request.requester.name.charAt(0).toUpperCase()}
                           </AvatarFallback>
                         </Avatar>
-                        
+
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center space-x-2 mb-2">
-                            <h4 className="text-lg sm:text-xl font-semibold text-foreground truncate">
+                          <div className="flex flex-wrap items-center gap-2 mb-2">
+                            <h4 className="text-lg font-semibold text-foreground truncate max-w-[150px] sm:max-w-[250px]">
                               {request.requester.name}
                             </h4>
-                            <Badge variant="secondary" className="text-xs">
-                              {request.requester.type}
-                            </Badge>
-                            {getStatusBadge(request.status)}
+                            <div className="flex items-center gap-2">
+                              <Badge variant="secondary" className="text-[10px] sm:text-xs uppercase px-2">
+                                {request.requester.type}
+                              </Badge>
+                              {getStatusBadge(request.status)}
+                            </div>
                           </div>
-                          
+
                           <div className="space-y-1 text-sm text-muted-foreground">
                             {request.requester.department && (
                               <p className="flex items-center space-x-2">
@@ -615,7 +610,7 @@ export default function FollowRequestList({ onRequestProcessed }: { onRequestPro
                       {/* Action Buttons */}
                       <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
                         <Button
-                          onClick={() => handleMessage(request.targetId)}
+                          onClick={() => handleMessage(request.requester._id)}
                           className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700"
                         >
                           <MessageSquare className="h-4 w-4 mr-2" />
@@ -623,7 +618,7 @@ export default function FollowRequestList({ onRequestProcessed }: { onRequestPro
                         </Button>
                         <Button
                           variant="outline"
-                          onClick={() => handleViewProfile(request.targetId)}
+                          onClick={() => handleViewProfile(request.requester._id)}
                           className="w-full sm:w-auto"
                         >
                           <Eye className="h-4 w-4 mr-2" />

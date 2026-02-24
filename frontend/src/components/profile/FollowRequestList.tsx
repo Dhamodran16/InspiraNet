@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { toast } from '@/hooks/use-toast';
-import { api } from '@/services/api';
+import api, { getFollowRequests, acceptFollowRequest, rejectFollowRequest } from '@/services/api';
 
 export interface FollowRequest {
   id: string;
@@ -15,8 +15,8 @@ export default function FollowRequestList() {
   useEffect(() => {
     (async () => {
       try {
-        const res = await api.getFollowRequests();
-        setRequests(res || []);
+        const res = await getFollowRequests();
+        setRequests(res.data || []);
       } catch {
         setRequests([]);
       }
@@ -25,7 +25,7 @@ export default function FollowRequestList() {
 
   const handleAccept = async (reqId: string) => {
     try {
-      await api.acceptFollowRequest(reqId);
+      await acceptFollowRequest(reqId);
       setRequests(prev => prev.filter(r => r.id !== reqId));
       toast({ title: 'Request Accepted', description: 'You have a new follower.' });
     } catch {
@@ -35,7 +35,7 @@ export default function FollowRequestList() {
 
   const handleDecline = async (reqId: string) => {
     try {
-      await api.declineFollowRequest(reqId);
+      await rejectFollowRequest(reqId);
       setRequests(prev => prev.filter(r => r.id !== reqId));
       toast({ title: 'Request Declined', description: 'Request has been declined.' });
     } catch {
@@ -51,7 +51,7 @@ export default function FollowRequestList() {
         <div key={req.id} className="flex items-center space-x-4 p-3 border rounded-lg bg-background">
           <Avatar className="h-10 w-10">
             <AvatarImage src={req.requester.avatar} />
-            <AvatarFallback>{req.requester.name.split(' ').map(n => n[0]).join('')}</AvatarFallback>
+            <AvatarFallback>{req.requester.name.charAt(0).toUpperCase()}</AvatarFallback>
           </Avatar>
           <div className="flex-1 min-w-0">
             <div className="font-medium">{req.requester.name}</div>

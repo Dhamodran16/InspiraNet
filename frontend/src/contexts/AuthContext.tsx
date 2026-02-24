@@ -29,6 +29,7 @@ export interface User {
   designation?: string;
   company?: string;
   bio?: string;
+  areaOfInterest?: string;
   professionalEmail?: string;
   experience?: string;
   skills?: string[];
@@ -161,7 +162,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
         // Verify token with backend
         const authPromise = api.get('/api/auth/verify');
-        
+
         const response = await Promise.race([authPromise, timeoutPromise]) as any;
 
         if (response.data && response.data.user) {
@@ -178,10 +179,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }
       } catch (error: any) {
         console.error('Auth check error:', error);
-        
+
         // Remove invalid token
         removeAuthToken();
-        
+
         // Only show error toast for network errors, not for missing tokens
         if (error.message !== 'Auth check timeout' && error.response?.status !== 401) {
           toast({
@@ -202,28 +203,28 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const login = async (email: string, password: string): Promise<boolean> => {
     try {
       setIsLoading(true);
-      
+
       const response = await api.post('/api/auth/login', { email, password });
 
       if (response.data && response.data.token) {
         // Store token (you can add a rememberMe checkbox to your login form)
         setAuthToken(response.data.token, true);
-        
+
         // Set user data
         setUser(response.data.user);
         setIsAuthenticated(true);
-        
+
         toast({
           title: "Login Successful",
           description: `Welcome back, ${response.data.user.name}!`,
         });
-        
+
         navigate('/dashboard');
         return true;
       }
     } catch (error: any) {
       console.error('Login error:', error);
-      
+
       // Handle specific error types
       if (error.response?.status === 503) {
         // Check if it's a database-specific error
@@ -272,7 +273,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           variant: "destructive",
         });
       }
-      
+
       return false;
     } finally {
       setIsLoading(false);
@@ -319,12 +320,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setUser(null);
     setIsAuthenticated(false);
     removeAuthToken();
-    
+
     toast({
       title: "Logged Out",
       description: "You have been successfully logged out.",
     });
-    
+
     navigate('/signin');
   };
 
@@ -358,7 +359,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
       return { ...prev, ...userData };
     });
-    
+
     if (userData) {
       setIsAuthenticated(true);
     }
@@ -369,7 +370,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       // Get the auth URL from backend (which includes userId in state)
       const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
       const response = await api.get(`${backendUrl}/api/auth/google`);
-      
+
       if (response.data && response.data.authUrl) {
         // Redirect to Google OAuth (full page redirect, not popup)
         window.location.href = response.data.authUrl;

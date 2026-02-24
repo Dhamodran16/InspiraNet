@@ -19,9 +19,9 @@ const upload = multer({
     fileSize: 10 * 1024 * 1024, // 10MB limit
   },
   fileFilter: (req, file, cb) => {
-    if (file.mimetype.startsWith('image/') || 
-        file.mimetype.startsWith('video/') || 
-        file.mimetype === 'application/pdf') {
+    if (file.mimetype.startsWith('image/') ||
+      file.mimetype.startsWith('video/') ||
+      file.mimetype === 'application/pdf') {
       cb(null, true);
     } else {
       cb(new Error('Invalid file type. Only images, videos, and PDFs are allowed.'), false);
@@ -131,7 +131,7 @@ router.post('/debug', authenticateToken, (req, res) => {
     pollDetails: typeof req.body.pollDetails,
     eventDetails: typeof req.body.eventDetails
   });
-  
+
   res.json({
     message: 'Debug data received',
     body: req.body,
@@ -150,29 +150,29 @@ router.post('/', authenticateToken, upload.array('media', 5), async (req, res) =
     console.log('Post creation request received');
     console.log('Request body:', JSON.stringify(req.body, null, 2));
     console.log('Files:', req.files ? req.files.length : 0);
-    
-    const { 
+
+    const {
       postType = 'general',
       title: originalTitle,
-      content, 
-      tags, 
-      isPublic, 
+      content,
+      tags,
+      isPublic,
       allowComments,
       jobDetails,
       pollDetails,
       eventDetails
     } = req.body;
-    
+
     console.log('Post type:', postType);
     console.log('Job details:', jobDetails);
     console.log('Poll details:', pollDetails);
     console.log('Event details:', eventDetails);
-    
+
     // Log the raw data types
     console.log('Data types - jobDetails:', typeof jobDetails);
     console.log('Data types - pollDetails:', typeof pollDetails);
     console.log('Data types - eventDetails:', typeof eventDetails);
-    
+
     const userId = req.user._id;
 
     if (!content || !content.trim()) {
@@ -192,7 +192,7 @@ router.post('/', authenticateToken, upload.array('media', 5), async (req, res) =
     }
 
     let mediaFiles = [];
-    
+
     // Handle file uploads to Cloudinary
     if (req.files && req.files.length > 0) {
       console.log('Processing', req.files.length, 'media files...');
@@ -220,8 +220,8 @@ router.post('/', authenticateToken, upload.array('media', 5), async (req, res) =
           });
 
           mediaFiles.push({
-            type: file.mimetype.startsWith('image/') ? 'image' : 
-                  file.mimetype.startsWith('video/') ? 'video' : 'pdf',
+            type: file.mimetype.startsWith('image/') ? 'image' :
+              file.mimetype.startsWith('video/') ? 'video' : 'pdf',
             url: result.secure_url,
             filename: file.originalname,
             size: file.size,
@@ -230,9 +230,9 @@ router.post('/', authenticateToken, upload.array('media', 5), async (req, res) =
         } catch (uploadError) {
           console.error('File upload error:', uploadError);
           console.error('Upload error details:', uploadError.message);
-          return res.status(500).json({ 
+          return res.status(500).json({
             error: 'Failed to upload media file',
-            details: uploadError.message 
+            details: uploadError.message
           });
         }
       }
@@ -243,21 +243,21 @@ router.post('/', authenticateToken, upload.array('media', 5), async (req, res) =
       author: userId,
       userType: user.type,
       batch: user.batch,
-      department: user.department || 
-                  user.studentInfo?.department || 
-                  user.facultyInfo?.department || 
-                  'Unknown Department',
+      department: user.department ||
+        user.studentInfo?.department ||
+        user.facultyInfo?.department ||
+        'Unknown Department',
       postType,
       title: title?.trim(),
       content: content.trim(),
       media: mediaFiles,
-      tags: tags ? (Array.isArray(tags) ? tags.map(tag => tag.trim()) : 
-                   typeof tags === 'string' ? (
-                     // Try to parse as JSON first, then fall back to comma-separated
-                      tags.startsWith('[') ? JSON.parse(tags).map(tag => tag.trim()) :
-                      tags.split(',').map(tag => tag.trim()).filter(tag => tag)
-                   ) : 
-                   []) : [],
+      tags: tags ? (Array.isArray(tags) ? tags.map(tag => tag.trim()) :
+        typeof tags === 'string' ? (
+          // Try to parse as JSON first, then fall back to comma-separated
+          tags.startsWith('[') ? JSON.parse(tags).map(tag => tag.trim()) :
+            tags.split(',').map(tag => tag.trim()).filter(tag => tag)
+        ) :
+          []) : [],
       isPublic: isPublic !== 'false',
       allowComments: allowComments !== 'false'
     };
@@ -268,22 +268,22 @@ router.post('/', authenticateToken, upload.array('media', 5), async (req, res) =
         console.log('Raw jobDetails received:', jobDetails);
         const parsedJobDetails = typeof jobDetails === 'string' ? JSON.parse(jobDetails) : jobDetails;
         console.log('Parsed jobDetails:', parsedJobDetails);
-        
+
         // Validate required job fields
         if (!parsedJobDetails.title || !parsedJobDetails.title.trim()) {
           console.error('Job validation failed - missing title');
-          return res.status(400).json({ 
-            error: 'Job title is required' 
+          return res.status(400).json({
+            error: 'Job title is required'
           });
         }
-        
+
         if (!parsedJobDetails.company || !parsedJobDetails.company.trim()) {
           console.error('Job validation failed - missing company');
-          return res.status(400).json({ 
-            error: 'Company name is required' 
+          return res.status(400).json({
+            error: 'Company name is required'
           });
         }
-        
+
         postData.jobDetails = parsedJobDetails;
         console.log('Job details processed successfully:', postData.jobDetails);
       } catch (error) {
@@ -291,28 +291,28 @@ router.post('/', authenticateToken, upload.array('media', 5), async (req, res) =
         return res.status(400).json({ error: 'Invalid job details format' });
       }
     }
-    
+
     if (postType === 'poll' && pollDetails) {
       try {
         console.log('Raw pollDetails received:', pollDetails);
         const parsedPollDetails = typeof pollDetails === 'string' ? JSON.parse(pollDetails) : pollDetails;
         console.log('Parsed pollDetails:', parsedPollDetails);
-        
+
         // Validate required poll fields
         if (!parsedPollDetails.question || !parsedPollDetails.question.trim()) {
           console.error('Poll validation failed - missing question');
-          return res.status(400).json({ 
-            error: 'Poll question is required' 
+          return res.status(400).json({
+            error: 'Poll question is required'
           });
         }
-        
+
         if (!parsedPollDetails.options || !Array.isArray(parsedPollDetails.options) || parsedPollDetails.options.length < 2) {
           console.error('Poll validation failed - invalid options');
-          return res.status(400).json({ 
-            error: 'Poll must have at least 2 options' 
+          return res.status(400).json({
+            error: 'Poll must have at least 2 options'
           });
         }
-        
+
         // Process poll options
         if (parsedPollDetails.options && Array.isArray(parsedPollDetails.options)) {
           postData.pollDetails = {
@@ -326,10 +326,10 @@ router.post('/', authenticateToken, upload.array('media', 5), async (req, res) =
             endDate: parsedPollDetails.endDate ? new Date(parsedPollDetails.endDate) : null,
             isActive: true
           };
-          
+
           // Set title from poll question for poll posts
           postData.title = parsedPollDetails.question.trim();
-          
+
           console.log('Poll details processed successfully:', postData.pollDetails);
         }
       } catch (error) {
@@ -337,35 +337,35 @@ router.post('/', authenticateToken, upload.array('media', 5), async (req, res) =
         return res.status(400).json({ error: 'Invalid poll details format' });
       }
     }
-    
+
     if (postType === 'event' && eventDetails) {
       try {
         console.log('Raw eventDetails received:', eventDetails);
         const parsedEventDetails = typeof eventDetails === 'string' ? JSON.parse(eventDetails) : eventDetails;
         console.log('Parsed eventDetails:', parsedEventDetails);
-        
+
         // Ensure required fields are present
         if (!parsedEventDetails.title || !parsedEventDetails.title.trim()) {
           console.error('Event validation failed - missing title');
-          return res.status(400).json({ 
-            error: 'Event posts require title, date, and location' 
+          return res.status(400).json({
+            error: 'Event posts require title, date, and location'
           });
         }
-        
+
         if (!parsedEventDetails.date || !parsedEventDetails.date.trim()) {
           console.error('Event validation failed - missing date');
-          return res.status(400).json({ 
-            error: 'Event posts require title, date, and location' 
+          return res.status(400).json({
+            error: 'Event posts require title, date, and location'
           });
         }
-        
+
         if (!parsedEventDetails.location || !parsedEventDetails.location.trim()) {
           console.error('Event validation failed - missing location');
-          return res.status(400).json({ 
-            error: 'Event posts require title, date, and location' 
+          return res.status(400).json({
+            error: 'Event posts require title, date, and location'
           });
         }
-        
+
         // If time is not provided, extract it from date if it contains time
         if (!parsedEventDetails.time && parsedEventDetails.date) {
           const dateStr = parsedEventDetails.date;
@@ -375,7 +375,7 @@ router.post('/', authenticateToken, upload.array('media', 5), async (req, res) =
             parsedEventDetails.time = timePart;
           }
         }
-        
+
         postData.eventDetails = parsedEventDetails;
         console.log('Event details processed successfully:', postData.eventDetails);
       } catch (error) {
@@ -385,43 +385,43 @@ router.post('/', authenticateToken, upload.array('media', 5), async (req, res) =
     }
 
     console.log('Creating post with data:', JSON.stringify(postData, null, 2));
-    
+
     let post;
     try {
       post = new Post(postData);
       console.log('Post object created, attempting to save...');
-      
+
       // Validate the post before saving
       const validationError = post.validateSync();
       if (validationError) {
         console.error('Post validation error:', validationError);
         console.error('Validation error details:', JSON.stringify(validationError.errors, null, 2));
-        return res.status(400).json({ 
+        return res.status(400).json({
           error: 'Post validation failed',
           details: validationError.message,
           fieldErrors: validationError.errors
         });
       }
-      
+
       await post.save();
       console.log('Post saved successfully:', post._id);
     } catch (saveError) {
       console.error('Error saving post:', saveError);
       console.error('Save error details:', saveError.message);
       console.error('Save error stack:', saveError.stack);
-      
+
       // Check if it's a validation error
       if (saveError.name === 'ValidationError') {
-        return res.status(400).json({ 
+        return res.status(400).json({
           error: 'Post validation failed',
           details: saveError.message,
           fieldErrors: saveError.errors
         });
       }
-      
-      return res.status(500).json({ 
+
+      return res.status(500).json({
         error: 'Failed to save post',
-        details: saveError.message 
+        details: saveError.message
       });
     }
 
@@ -443,9 +443,9 @@ router.post('/', authenticateToken, upload.array('media', 5), async (req, res) =
     console.error('Error creating post:', error);
     console.error('Error details:', error.message);
     console.error('Error stack:', error.stack);
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Failed to create post',
-      details: error.message 
+      details: error.message
     });
   }
 });
@@ -567,7 +567,7 @@ router.post('/:id/like', authenticateToken, async (req, res) => {
         );
         liked = false;
         console.log('➖ Unlike result:', { modifiedCount: pull.modifiedCount, matchedCount: pull.matchedCount });
-        
+
         if (pull.matchedCount === 0) {
           // The post may not exist or state changed; validate existence for clarity
           const exists = await Post.exists({ _id: postId }).session(session);
@@ -674,7 +674,7 @@ router.post('/:id/comments', authenticateToken, async (req, res) => {
         content.trim()
       );
       console.log(`Comment notification created:`, createdNotification._id);
-      
+
       const io = req.app.get('io');
       if (io) {
         console.log(`Emitting comment notification to user_${post.author}`);
@@ -765,7 +765,7 @@ router.post('/:id/poll-vote', authenticateToken, async (req, res) => {
     // Check if user is clicking the same option they already voted for (remove vote)
     // IMPORTANT: Check BEFORE removing votes, as we need to know if this was the current vote
     const isCurrentVote = option.votes && option.votes.includes(userId.toString());
-    
+
     // Check if user has voted before (to determine action type)
     let hasVotedBefore = false;
     post.pollDetails.options.forEach(opt => {
@@ -773,7 +773,7 @@ router.post('/:id/poll-vote', authenticateToken, async (req, res) => {
         hasVotedBefore = true;
       }
     });
-    
+
     // Mutable voting: Remove user's vote from all options first (if they voted before)
     let previousVoteRemoved = false;
     post.pollDetails.options.forEach(opt => {
@@ -787,7 +787,7 @@ router.post('/:id/poll-vote', authenticateToken, async (req, res) => {
     if (!post.pollDetails.voteHistory) {
       post.pollDetails.voteHistory = [];
     }
-    
+
     // Ensure voteHistory is an array (defensive check)
     if (!Array.isArray(post.pollDetails.voteHistory)) {
       post.pollDetails.voteHistory = [];
@@ -901,7 +901,7 @@ router.post('/:postId/comments/:commentId/like', authenticateToken, async (req, 
     await post.save();
     await comment.populate('likes', 'name avatar');
 
-    res.json({ 
+    res.json({
       liked: likeIndex === -1,
       likeCount: comment.likes.length,
       likes: comment.likes
@@ -938,7 +938,7 @@ router.delete('/:postId/comments/:commentId', authenticateToken, async (req, res
     // Find the comment index using multiple methods
     let commentIndex = -1;
     let comment = null;
-    
+
     // Method 1: Try using .id() method (handles both _id and commentId)
     try {
       comment = post.comments.id(commentId);
@@ -974,8 +974,8 @@ router.delete('/:postId/comments/:commentId', authenticateToken, async (req, res
     if (commentIndex === -1) {
       try {
         const objectId = new mongoose.Types.ObjectId(commentId);
-        commentIndex = post.comments.findIndex(c => 
-          c._id.equals(objectId) || 
+        commentIndex = post.comments.findIndex(c =>
+          c._id.equals(objectId) ||
           (c.commentId && c.commentId.equals(objectId))
         );
         if (commentIndex !== -1) {
@@ -991,8 +991,8 @@ router.delete('/:postId/comments/:commentId', authenticateToken, async (req, res
 
     // Method 5: Try partial match
     if (commentIndex === -1) {
-      commentIndex = post.comments.findIndex(c => 
-        c._id.toString().includes(commentId) || 
+      commentIndex = post.comments.findIndex(c =>
+        c._id.toString().includes(commentId) ||
         (c.commentId && c.commentId.toString().includes(commentId))
       );
       if (commentIndex !== -1) {
@@ -1043,7 +1043,7 @@ router.post('/:id/share', authenticateToken, async (req, res) => {
     }
 
     // Check if user has already shared this post
-    const alreadyShared = post.shares.some(share => 
+    const alreadyShared = post.shares.some(share =>
       share.userId.toString() === userId.toString()
     );
 
@@ -1066,7 +1066,7 @@ router.post('/:id/share', authenticateToken, async (req, res) => {
       }
 
       // Check if user is member of the group
-      const isMember = group.members.some(member => 
+      const isMember = group.members.some(member =>
         member.userId.toString() === userId.toString()
       );
 
@@ -1114,9 +1114,9 @@ router.post('/:id/share', authenticateToken, async (req, res) => {
       });
     }
 
-    res.json({ 
-      message: 'Post shared successfully', 
-      shareCount: post.shares.length 
+    res.json({
+      message: 'Post shared successfully',
+      shareCount: post.shares.length
     });
   } catch (error) {
     console.error('Error sharing post:', error);
@@ -1164,7 +1164,7 @@ router.get('/:id/poll-data/excel', authenticateToken, async (req, res) => {
     // Get all unique user IDs from vote history (handle missing voteHistory)
     const voteHistory = post.pollDetails.voteHistory || [];
     const userIds = [...new Set(voteHistory.map(vh => vh.userId.toString()))];
-    
+
     // Fetch user details
     const users = await User.find({ _id: { $in: userIds } })
       .select('name email type department batch studentInfo facultyInfo')
@@ -1173,9 +1173,11 @@ router.get('/:id/poll-data/excel', authenticateToken, async (req, res) => {
     // Create a map of user data
     const userMap = {};
     users.forEach(user => {
+      // email is a nested object: { college, professional, personal }
+      const resolvedEmail = user.email?.college || user.email?.professional || user.email?.personal || 'N/A';
       userMap[user._id.toString()] = {
         name: user.name || 'Unknown',
-        email: user.email || 'N/A',
+        email: resolvedEmail,
         type: user.type || 'N/A',
         department: user.department || user.studentInfo?.department || user.facultyInfo?.department || 'N/A',
         batch: user.batch || user.studentInfo?.batch || 'N/A',
@@ -1183,47 +1185,87 @@ router.get('/:id/poll-data/excel', authenticateToken, async (req, res) => {
       };
     });
 
-    // Build voting data
-    const votingData = [];
+    // Build voting data - Deduplicate by user to show only the last action
+    const latestUserVotes = {};
     voteHistory.forEach(vote => {
+      const userIdStr = vote.userId.toString();
+      // Keep the most recent vote for each user
+      if (!latestUserVotes[userIdStr] || new Date(vote.timestamp) > new Date(latestUserVotes[userIdStr].timestamp)) {
+        latestUserVotes[userIdStr] = vote;
+      }
+    });
+
+    const votingData = [];
+    Object.values(latestUserVotes).forEach(vote => {
+      // Skip if the last action was removing the vote
+      if (vote.action === 'vote_removed') return;
+
       const user = userMap[vote.userId.toString()] || {
         name: 'Unknown',
         email: 'N/A',
         type: 'N/A',
-        department: 'N/A',
-        batch: 'N/A',
-        rollNumber: 'N/A'
+        department: 'N/A'
       };
 
-      const option = post.pollDetails.options.find(opt => 
-        String(opt.id || opt._id) === vote.optionId
-      );
+      const option = post.pollDetails.options.find(opt => {
+        const oId = String(opt.id || '');
+        const oMongoId = opt._id ? String(opt._id) : '';
+        return oId === vote.optionId || oMongoId === vote.optionId;
+      });
 
       votingData.push({
         'Profile Name': user.name,
         'Department': user.department,
-        'Batch Number': user.batch,
-        'College Mail ID': user.email,
         'Roll Number': user.rollNumber,
-        'Time Voted': new Date(vote.timestamp).toLocaleString(),
-        'Action': vote.action === 'voted' ? 'Voted' : vote.action === 'vote_updated' ? 'Vote Updated' : 'Vote Removed',
+        'Batch': user.batch,
+        'Email': user.email,
+        'User Type': user.type,
+        'Action': vote.action === 'voted' ? 'Voted' : (vote.action === 'vote_updated' ? 'Vote Updated' : 'N/A'),
         'Option Selected': option ? option.text : 'N/A'
       });
     });
 
     // Create workbook and worksheet
     const workbook = XLSX.utils.book_new();
-    const worksheet = XLSX.utils.json_to_sheet(votingData);
-    
+
+    // Prepare data with question as first row
+    const pollQuestion = post.pollDetails.question || 'Poll Results';
+    const worksheetData = [
+      [pollQuestion], // Row 1: The Poll Question
+      ['Profile Name', 'Department', 'Roll Number', 'Batch', 'Email', 'User Type', 'Action', 'Option Selected'] // Row 2: Headers
+    ];
+
+    // Add voting data rows starting from Row 3
+    votingData.forEach(row => {
+      worksheetData.push([
+        row['Profile Name'],
+        row['Department'],
+        row['Roll Number'],
+        row['Batch'],
+        row['Email'],
+        row['User Type'],
+        row['Action'],
+        row['Option Selected']
+      ]);
+    });
+
+    const worksheet = XLSX.utils.aoa_to_sheet(worksheetData);
+
+    // Optional: Merge the first row (question) across all columns for better presentation
+    worksheet['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 7 } }];
+
     // Add worksheet to workbook
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Poll Voting Data');
 
     // Generate Excel file buffer
     const excelBuffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
 
+    // Sanitize filename: replace invalid characters with underscores
+    const sanitizedTitle = pollQuestion.replace(/[/\\?%*:|"<>]/g, '_').substring(0, 100);
+
     // Set response headers
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.setHeader('Content-Disposition', `attachment; filename="poll-data-${postId}.xlsx"`);
+    res.setHeader('Content-Disposition', `attachment; filename="${sanitizedTitle}.xlsx"`);
 
     // Send Excel file
     res.send(excelBuffer);
@@ -1271,8 +1313,9 @@ router.get('/:id/poll-data', authenticateToken, async (req, res) => {
     }
 
     // Get all unique user IDs from vote history
-    const userIds = [...new Set(post.pollDetails.voteHistory.map(vh => vh.userId.toString()))];
-    
+    const voteHistory = post.pollDetails.voteHistory || [];
+    const userIds = [...new Set(voteHistory.map(vh => vh.userId.toString()))];
+
     // Fetch user details
     const users = await User.find({ _id: { $in: userIds } })
       .select('name email type department batch studentInfo facultyInfo')
@@ -1281,9 +1324,11 @@ router.get('/:id/poll-data', authenticateToken, async (req, res) => {
     // Create a map of user data
     const userMap = {};
     users.forEach(user => {
+      // email is a nested object: { college, professional, personal }
+      const resolvedEmail = user.email?.college || user.email?.professional || user.email?.personal || 'N/A';
       userMap[user._id.toString()] = {
         name: user.name || 'Unknown',
-        email: user.email || 'N/A',
+        email: resolvedEmail,
         type: user.type || 'N/A',
         department: user.department || user.studentInfo?.department || user.facultyInfo?.department || 'N/A',
         batch: user.batch || user.studentInfo?.batch || 'N/A',
@@ -1291,9 +1336,21 @@ router.get('/:id/poll-data', authenticateToken, async (req, res) => {
       };
     });
 
-    // Build voting data
+    // Build voting data - Deduplicate by user to show only the last action
+    const latestUserVotes = {};
+    voteHistory.forEach(vote => {
+      const userIdStr = vote.userId.toString();
+      // Keep the most recent vote for each user
+      if (!latestUserVotes[userIdStr] || new Date(vote.timestamp) > new Date(latestUserVotes[userIdStr].timestamp)) {
+        latestUserVotes[userIdStr] = vote;
+      }
+    });
+
     const votingData = [];
-    post.pollDetails.voteHistory.forEach(vote => {
+    Object.values(latestUserVotes).forEach(vote => {
+      // Skip if the last action was removing the vote
+      if (vote.action === 'vote_removed') return;
+
       const user = userMap[vote.userId.toString()] || {
         name: 'Unknown',
         email: 'N/A',
@@ -1303,9 +1360,11 @@ router.get('/:id/poll-data', authenticateToken, async (req, res) => {
         rollNumber: 'N/A'
       };
 
-      const option = post.pollDetails.options.find(opt => 
-        String(opt.id || opt._id) === vote.optionId
-      );
+      const option = post.pollDetails.options.find(opt => {
+        const oId = String(opt.id || '');
+        const oMongoId = opt._id ? String(opt._id) : '';
+        return oId === vote.optionId || oMongoId === vote.optionId;
+      });
 
       votingData.push({
         'Profile Name': user.name,
@@ -1314,7 +1373,7 @@ router.get('/:id/poll-data', authenticateToken, async (req, res) => {
         'College Mail ID': user.email,
         'Roll Number': user.rollNumber,
         'Time Voted': new Date(vote.timestamp).toLocaleString(),
-        'Action': vote.action === 'voted' ? 'Voted' : vote.action === 'vote_updated' ? 'Vote Updated' : 'Vote Removed',
+        'Action': vote.action === 'voted' ? 'Voted' : (vote.action === 'vote_updated' ? 'Vote Updated' : 'N/A'),
         'Option Selected': option ? option.text : 'N/A'
       });
     });

@@ -9,13 +9,13 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { 
-  ArrowLeft, 
-  Mail, 
-  Building, 
-  MapPin, 
-  Briefcase, 
-  GraduationCap, 
+import {
+  ArrowLeft,
+  Mail,
+  Building,
+  MapPin,
+  Briefcase,
+  GraduationCap,
   Calendar,
   Globe,
   Github,
@@ -124,7 +124,7 @@ export default function OtherUserProfile() {
   const { user: currentUser } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
-  
+
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [stats, setStats] = useState<ProfileStats>({
     posts: 0,
@@ -212,11 +212,11 @@ export default function OtherUserProfile() {
       });
     } catch (error: any) {
       console.error('Error sending follow request:', error);
-      
+
       // Handle specific error cases
       let errorMessage = "Failed to send follow request";
       let errorTitle = "Error";
-      
+
       if (error.response?.status === 409) {
         errorTitle = "Already Following";
         errorMessage = error.response.data?.error || "You are already following this user or have a pending request";
@@ -235,7 +235,7 @@ export default function OtherUserProfile() {
       } else if (error.response?.data?.error) {
         errorMessage = error.response.data.error;
       }
-      
+
       toast({
         title: errorTitle,
         description: errorMessage,
@@ -257,11 +257,11 @@ export default function OtherUserProfile() {
       });
     } catch (error: any) {
       console.error('Error unfollowing user:', error);
-      
+
       // Handle specific error cases
       let errorMessage = "Failed to unfollow user";
       let errorTitle = "Error";
-      
+
       if (error.response?.status === 400) {
         errorTitle = "Cannot Unfollow";
         errorMessage = error.response.data?.error || "You are not following this user or cannot unfollow";
@@ -275,7 +275,7 @@ export default function OtherUserProfile() {
       } else if (error.response?.data?.error) {
         errorMessage = error.response.data.error;
       }
-      
+
       toast({
         title: errorTitle,
         description: errorMessage,
@@ -287,7 +287,7 @@ export default function OtherUserProfile() {
   };
 
   const handleMessage = () => {
-    navigate(`/messages?user=${userId}`);
+    navigate(`/dashboard?section=messages&user=${userId}`);
   };
 
   useEffect(() => {
@@ -337,7 +337,7 @@ export default function OtherUserProfile() {
 
   useEffect(() => {
     if (!currentUser?._id || !userId) return;
-    
+
     // Listen for follow status updates
     const handleFollowStatusUpdate = (data: any) => {
       console.log('🔄 OtherUserProfile - Follow status update received:', data);
@@ -349,9 +349,9 @@ export default function OtherUserProfile() {
         checkFollowStatus(userId);
       }
     };
-    
+
     socketService.onFollowStatusUpdate(handleFollowStatusUpdate);
-    
+
     return () => {
       socketService.offFollowStatusUpdate();
     };
@@ -397,23 +397,23 @@ export default function OtherUserProfile() {
       <div className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
-            <Button 
-              variant="ghost" 
+            <Button
+              variant="ghost"
               onClick={() => navigate(-1)}
               className="flex items-center space-x-2"
             >
               <ArrowLeft className="h-4 w-4" />
               <span>Back</span>
             </Button>
-            
+
             <div className="flex items-center space-x-2">
               <Button variant="outline" onClick={handleMessage}>
                 <MessageSquare className="h-4 w-4 mr-2" />
                 Message
               </Button>
-              
+
               {(followStatus === 'none' || followStatus === 'not-following') && (
-                <Button 
+                <Button
                   onClick={() => handleFollow(userId)}
                   disabled={loading}
                   className="bg-blue-600 hover:bg-blue-700"
@@ -422,10 +422,10 @@ export default function OtherUserProfile() {
                   {loading ? 'Sending...' : 'Follow'}
                 </Button>
               )}
-              
+
               {followStatus === 'requested' && (
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   onClick={() => handleUnfollow(userId)}
                   disabled={loading}
                 >
@@ -433,10 +433,10 @@ export default function OtherUserProfile() {
                   {loading ? 'Cancelling...' : 'Cancel Request'}
                 </Button>
               )}
-              
+
               {followStatus === 'following' && (
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   onClick={() => handleUnfollow(userId)}
                   disabled={loading}
                 >
@@ -444,7 +444,7 @@ export default function OtherUserProfile() {
                   {loading ? 'Unfollowing...' : 'Unfollow'}
                 </Button>
               )}
-              
+
               {followStatus === 'mutual' && (
                 <Badge variant="secondary">
                   <Users className="h-3 w-3 mr-1" />
@@ -467,7 +467,7 @@ export default function OtherUserProfile() {
                 <Avatar className="h-24 w-24 mx-auto mb-4">
                   <AvatarImage src={profile.avatar} />
                   <AvatarFallback className="text-2xl">
-                    {profile.name.split(' ').map(n => n[0]).join('')}
+                    {profile.name.charAt(0).toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
                 <CardTitle className="text-xl">{profile.name}</CardTitle>
@@ -487,7 +487,7 @@ export default function OtherUserProfile() {
                   )}
                 </div>
               </CardHeader>
-              
+
               <CardContent className="space-y-4">
                 {profile.bio && (
                   <div>
@@ -495,7 +495,7 @@ export default function OtherUserProfile() {
                     <p className="text-sm text-muted-foreground">{profile.bio}</p>
                   </div>
                 )}
-                
+
                 {/* Information Visibility - Show Email Address */}
                 {profile.email?.college && (
                   <div className="flex items-center space-x-2">
@@ -509,7 +509,7 @@ export default function OtherUserProfile() {
                     <span className="text-sm">{profile.email.personal}</span>
                   </div>
                 )}
-                
+
                 {/* Information Visibility - Show Phone Number */}
                 {profile.phone && (
                   <div className="flex items-center space-x-2">
@@ -517,7 +517,7 @@ export default function OtherUserProfile() {
                     <span className="text-sm">{profile.phone}</span>
                   </div>
                 )}
-                
+
                 {/* Information Visibility - Show Location */}
                 {profile.location && (
                   <div className="flex items-center space-x-2">
@@ -525,7 +525,7 @@ export default function OtherUserProfile() {
                     <span className="text-sm">{profile.location}</span>
                   </div>
                 )}
-                
+
                 {(profile.city || profile.state || profile.country) && (
                   <div className="flex items-center space-x-2">
                     <MapPin className="h-4 w-4 text-muted-foreground" />
@@ -534,7 +534,7 @@ export default function OtherUserProfile() {
                     </span>
                   </div>
                 )}
-                
+
                 {/* Information Visibility - Show Company */}
                 {profile.company && (
                   <div className="flex items-center space-x-2">
@@ -550,7 +550,7 @@ export default function OtherUserProfile() {
                     </Badge>
                   </div>
                 )}
-                
+
                 {/* Information Visibility - Show Batch Year - Check all possible locations */}
                 {(profile.batch || (profile.type === 'alumni' && profile.alumniInfo?.graduationYear)) && (
                   <div className="flex items-center space-x-2">
@@ -558,7 +558,7 @@ export default function OtherUserProfile() {
                     <span className="text-sm">Batch {profile.batch || (profile.type === 'alumni' ? profile.alumniInfo?.graduationYear : '')}</span>
                   </div>
                 )}
-                
+
                 {/* Information Visibility - Show Department */}
                 {profile.department && (
                   <div className="flex items-center space-x-2">
@@ -566,14 +566,14 @@ export default function OtherUserProfile() {
                     <span className="text-sm">{profile.department}</span>
                   </div>
                 )}
-                
+
                 {profile.designation && (
                   <div className="flex items-center space-x-2">
                     <Briefcase className="h-4 w-4 text-muted-foreground" />
                     <span className="text-sm">{profile.designation}</span>
                   </div>
                 )}
-                
+
                 {profile.experience && (
                   <div className="flex items-center space-x-2">
                     <Calendar className="h-4 w-4 text-muted-foreground" />
@@ -602,7 +602,7 @@ export default function OtherUserProfile() {
                     <div className="text-2xl font-bold text-primary">{stats.events}</div>
                     <div className="text-sm text-muted-foreground">Events</div>
                   </div>
-                  
+
                 </div>
               </CardContent>
             </Card>
@@ -650,9 +650,9 @@ export default function OtherUserProfile() {
                   <CardTitle className="text-lg">Resume</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <a 
-                    href={profile.resume} 
-                    target="_blank" 
+                  <a
+                    href={profile.resume}
+                    target="_blank"
                     rel="noopener noreferrer"
                     className="flex items-center space-x-2 text-sm text-blue-600 hover:text-blue-800"
                   >
@@ -672,9 +672,9 @@ export default function OtherUserProfile() {
                 </CardHeader>
                 <CardContent className="space-y-2">
                   {socialLinks.linkedin && (
-                    <a 
-                      href={socialLinks.linkedin} 
-                      target="_blank" 
+                    <a
+                      href={socialLinks.linkedin}
+                      target="_blank"
                       rel="noopener noreferrer"
                       className="flex items-center space-x-2 text-sm text-blue-600 hover:text-blue-800"
                     >
@@ -684,9 +684,9 @@ export default function OtherUserProfile() {
                     </a>
                   )}
                   {socialLinks.github && (
-                    <a 
-                      href={socialLinks.github} 
-                      target="_blank" 
+                    <a
+                      href={socialLinks.github}
+                      target="_blank"
                       rel="noopener noreferrer"
                       className="flex items-center space-x-2 text-sm text-gray-600 hover:text-gray-800"
                     >
@@ -696,9 +696,9 @@ export default function OtherUserProfile() {
                     </a>
                   )}
                   {socialLinks.leetcode && (
-                    <a 
-                      href={socialLinks.leetcode} 
-                      target="_blank" 
+                    <a
+                      href={socialLinks.leetcode}
+                      target="_blank"
                       rel="noopener noreferrer"
                       className="flex items-center space-x-2 text-sm text-purple-600 hover:text-purple-800"
                     >
@@ -708,9 +708,9 @@ export default function OtherUserProfile() {
                     </a>
                   )}
                   {socialLinks.twitter && (
-                    <a 
-                      href={socialLinks.twitter} 
-                      target="_blank" 
+                    <a
+                      href={socialLinks.twitter}
+                      target="_blank"
                       rel="noopener noreferrer"
                       className="flex items-center space-x-2 text-sm text-blue-400 hover:text-blue-600"
                     >
@@ -720,9 +720,9 @@ export default function OtherUserProfile() {
                     </a>
                   )}
                   {socialLinks.website && (
-                    <a 
-                      href={socialLinks.website} 
-                      target="_blank" 
+                    <a
+                      href={socialLinks.website}
+                      target="_blank"
                       rel="noopener noreferrer"
                       className="flex items-center space-x-2 text-sm text-green-600 hover:text-green-800"
                     >
@@ -738,7 +738,7 @@ export default function OtherUserProfile() {
                         Custom Links
                       </Label>
                       {customSocialLinks.map((link, index) => (
-                        <a 
+                        <a
                           key={`${link.label}-${index}`}
                           href={link.url}
                           target="_blank"
@@ -768,7 +768,7 @@ export default function OtherUserProfile() {
                   {profile.resume && (
                     <div>
                       <Label className="text-sm font-medium text-muted-foreground">Resume</Label>
-                      <a 
+                      <a
                         href={profile.resume}
                         target="_blank"
                         rel="noopener noreferrer"
@@ -783,7 +783,7 @@ export default function OtherUserProfile() {
                   {profile.portfolio && (
                     <div>
                       <Label className="text-sm font-medium text-muted-foreground">Portfolio</Label>
-                      <a 
+                      <a
                         href={profile.portfolio}
                         target="_blank"
                         rel="noopener noreferrer"
@@ -803,7 +803,7 @@ export default function OtherUserProfile() {
           {/* Right Column - Tabs */}
           <div className="lg:col-span-2">
             <Tabs defaultValue="posts" className="space-y-6">
-                              <TabsList className="grid w-full grid-cols-2">
+              <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="posts">Posts</TabsTrigger>
                 <TabsTrigger value="connections">Connections</TabsTrigger>
               </TabsList>
@@ -828,7 +828,7 @@ export default function OtherUserProfile() {
                               <Avatar className="h-12 w-12 flex-shrink-0">
                                 <AvatarImage src={connection.avatar} />
                                 <AvatarFallback className="bg-primary text-primary-foreground">
-                                  {connection.name.split(' ').map(n => n[0]).join('')}
+                                  {connection.name.charAt(0).toUpperCase()}
                                 </AvatarFallback>
                               </Avatar>
                               <div className="flex-1 min-w-0">
@@ -861,7 +861,7 @@ export default function OtherUserProfile() {
                                 )}
                               </div>
                             </div>
-                            
+
                             {/* Action Buttons Section */}
                             <div className="flex space-x-2 mt-auto">
                               <Button

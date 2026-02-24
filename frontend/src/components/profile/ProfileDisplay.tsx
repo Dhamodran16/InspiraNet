@@ -5,19 +5,19 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { 
-  User, 
-  Mail, 
-  Phone, 
-  MapPin, 
-  Calendar, 
-  Building, 
-  GraduationCap, 
-  Briefcase, 
-  Globe, 
-  Linkedin, 
-  Github, 
-  Twitter, 
+import {
+  User,
+  Mail,
+  Phone,
+  MapPin,
+  Calendar,
+  Building,
+  GraduationCap,
+  Briefcase,
+  Globe,
+  Linkedin,
+  Github,
+  Twitter,
   ExternalLink,
   Edit,
   FileText,
@@ -39,12 +39,19 @@ interface ProfileDisplayProps {
   onEdit?: () => void;
 }
 
-const formatPlacementStatus = (status?: string) => {
-  if (!status) return 'Permanent';
-  if (status === 'placed') return 'Permanent';
-  const readable = status.replace(/_/g, ' ');
-  return readable.charAt(0).toUpperCase() + readable.slice(1);
+const PLACEMENT_STATUS_LABELS: Record<string, string> = {
+  seeking: 'Seeking Placement',
+  placed: 'Placed',
+  not_interested: 'Not Interested in Placement',
+  higher_studies: 'Higher Studies',
+  entrepreneur: 'Entrepreneur / Self-Employed'
 };
+
+const formatPlacementStatus = (status?: string) => {
+  if (!status) return 'Seeking Placement'; // default
+  return PLACEMENT_STATUS_LABELS[status] || status.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+};
+
 
 const ProfileDisplay = ({ isOwnProfile = true, onEdit }: ProfileDisplayProps) => {
   const { user } = useAuth();
@@ -138,7 +145,7 @@ const ProfileDisplay = ({ isOwnProfile = true, onEdit }: ProfileDisplayProps) =>
     socialLinks.linkedin ||
     socialLinks.github ||
     socialLinks.twitter ||
-    socialLinks.website ||
+    socialLinks.personalWebsite ||
     socialLinks.instagram ||
     socialLinks.facebook ||
     socialLinks.leetcode ||
@@ -154,10 +161,10 @@ const ProfileDisplay = ({ isOwnProfile = true, onEdit }: ProfileDisplayProps) =>
       <div className="flex justify-between items-center">
         <div className="flex items-center space-x-4">
           <Avatar className="h-16 w-16">
-              <AvatarImage src={user.avatar} />
-            <AvatarFallback className="text-xl">{user.name?.charAt(0) || 'U'}</AvatarFallback>
-            </Avatar>
-            <div>
+            <AvatarImage src={user.avatar} />
+            <AvatarFallback className="text-xl">{user.name?.charAt(0).toUpperCase() || 'U'}</AvatarFallback>
+          </Avatar>
+          <div>
             <h1 className="text-2xl font-bold">{user.name}</h1>
             <div className="flex items-center space-x-2 text-gray-600">
               <span>{user.type?.charAt(0).toUpperCase() + user.type?.slice(1)}</span>
@@ -169,10 +176,10 @@ const ProfileDisplay = ({ isOwnProfile = true, onEdit }: ProfileDisplayProps) =>
                 </>
               )}
               {/* Information Visibility: Show Batch Year - Check all possible locations */}
-              {(user.batch || user.studentInfo?.batch || (user.type === 'alumni' && user.alumniInfo?.graduationYear)) && (
+              {(user.batch || user.studentInfo?.batch) && (
                 <>
                   <span>•</span>
-                  <span>Batch {user.batch || user.studentInfo?.batch || (user.type === 'alumni' ? user.alumniInfo?.graduationYear : '')}</span>
+                  <span>Batch {user.batch || user.studentInfo?.batch}</span>
                 </>
               )}
               {/* Information Visibility: Show Company */}
@@ -201,33 +208,27 @@ const ProfileDisplay = ({ isOwnProfile = true, onEdit }: ProfileDisplayProps) =>
                 {user.alumniInfo.jobTitle} at {user.alumniInfo.currentCompany}
               </p>
             )}
-              </div>
-            </div>
+          </div>
+        </div>
         {isOwnProfile && onEdit && (
           <Button onClick={onEdit} className="flex items-center gap-2">
             <Edit className="h-4 w-4" />
-                Edit Profile
-              </Button>
-            )}
-          </div>
+            Edit Profile
+          </Button>
+        )}
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Basic Information - Only show if data exists */}
-        {(user.email?.personal || user.phone || (user as any).dateOfBirth || (user as any).location) && (
+        {/* Basic Information - Only show if data exists (email shown in Contact Info, not here) */}
+        {(user.phone || (user as any).dateOfBirth || (user as any).location || (user as any).city || (user as any).state || (user as any).country) && (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <User className="h-5 w-5" />
                 Basic Information
               </CardTitle>
-        </CardHeader>
+            </CardHeader>
             <CardContent className="space-y-4">
-              {user.email?.personal && (
-                <div>
-                  <Label className="text-sm font-medium text-gray-600">Personal Email</Label>
-                  <p className="text-sm">{user.email.personal}</p>
-                </div>
-              )}
               {user.phone && (
                 <div>
                   <Label className="text-sm font-medium text-gray-600">Phone</Label>
@@ -255,42 +256,35 @@ const ProfileDisplay = ({ isOwnProfile = true, onEdit }: ProfileDisplayProps) =>
                 </div>
               )}
             </CardContent>
-      </Card>
+          </Card>
         )}
 
-        {/* Contact Information - Information Visibility: Show Email Address */}
+        {/* Contact Information — shows College Email + Personal Email only */}
         {(user.email?.college || user.email?.personal) && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Mail className="h-5 w-5" />
-              Contact Information
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {user.email?.college && (
-              <div>
-                <Label className="text-sm font-medium text-gray-600">College Email</Label>
-                <p className="text-sm">{user.email.college}</p>
-              </div>
-            )}
-            {user.email?.personal && (
-              <div>
-                <Label className="text-sm font-medium text-gray-600">Personal Email</Label>
-                <p className="text-sm">{user.email.personal}</p>
-              </div>
-            )}
-            {/* Information Visibility: Show Phone Number */}
-            {user.phone && (
-              <div>
-                <Label className="text-sm font-medium text-gray-600">Phone</Label>
-                <p className="text-sm">{user.phone}</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Mail className="h-5 w-5" />
+                Contact Information
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {user.email?.college && (
+                <div>
+                  <Label className="text-sm font-medium text-gray-600">College Email ID</Label>
+                  <p className="text-sm font-mono">{user.email.college}</p>
+                </div>
+              )}
+              {user.email?.personal && (
+                <div>
+                  <Label className="text-sm font-medium text-gray-600">Personal Email ID</Label>
+                  <p className="text-sm font-mono">{user.email.personal}</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         )}
-        
+
         {/* Information Visibility: Show Location */}
         {((user as any).location || (user as any).city || (user as any).state || (user as any).country) && (
           <Card>
@@ -318,7 +312,7 @@ const ProfileDisplay = ({ isOwnProfile = true, onEdit }: ProfileDisplayProps) =>
             </CardContent>
           </Card>
         )}
-        
+
         {/* Information Visibility: Show Company */}
         {(user.company || user.alumniInfo?.currentCompany) && (
           <Card>
@@ -333,9 +327,9 @@ const ProfileDisplay = ({ isOwnProfile = true, onEdit }: ProfileDisplayProps) =>
             </CardContent>
           </Card>
         )}
-        
+
         {/* Information Visibility: Show Batch Year - Check all possible locations */}
-        {(user.batch || user.studentInfo?.batch || (user.type === 'alumni' && user.alumniInfo?.graduationYear)) && (
+        {(user.batch || user.studentInfo?.batch) && (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -344,11 +338,11 @@ const ProfileDisplay = ({ isOwnProfile = true, onEdit }: ProfileDisplayProps) =>
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-sm">{user.batch || user.studentInfo?.batch || (user.type === 'alumni' ? user.alumniInfo?.graduationYear : '')}</p>
+              <p className="text-sm">{user.batch || user.studentInfo?.batch}</p>
             </CardContent>
           </Card>
         )}
-        
+
         {/* Information Visibility: Show Department */}
         {(user.department || user.studentInfo?.department || user.facultyInfo?.department) && (
           <Card>
@@ -360,8 +354,8 @@ const ProfileDisplay = ({ isOwnProfile = true, onEdit }: ProfileDisplayProps) =>
             </CardHeader>
             <CardContent>
               <p className="text-sm">{user.department || user.studentInfo?.department || user.facultyInfo?.department}</p>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
         )}
 
         {/* Bio - Only show if exists */}
@@ -381,251 +375,251 @@ const ProfileDisplay = ({ isOwnProfile = true, onEdit }: ProfileDisplayProps) =>
 
         {/* Student Information - Only show if user is student and data exists */}
         {user.type === 'student' && user.studentInfo && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <GraduationCap className="h-5 w-5" />
-              Student Information
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {user.studentInfo.department && (
-              <div>
-                <Label className="text-sm font-medium text-gray-600">Department</Label>
-                <p className="text-sm">{user.studentInfo.department}</p>
-              </div>
-            )}
-            {user.studentInfo.batch && (
-              <div>
-                <Label className="text-sm font-medium text-gray-600">Batch</Label>
-                <p className="text-sm">{user.studentInfo.batch}</p>
-              </div>
-            )}
-            {user.studentInfo.currentYear && (
-              <div>
-                <Label className="text-sm font-medium text-gray-600">Current Year</Label>
-                <p className="text-sm">{user.studentInfo.currentYear}</p>
-              </div>
-            )}
-            {user.studentInfo.currentSemester && (
-              <div>
-                <Label className="text-sm font-medium text-gray-600">Current Semester</Label>
-                <p className="text-sm">{user.studentInfo.currentSemester}</p>
-              </div>
-            )}
-            {user.studentInfo.section && (
-              <div>
-                <Label className="text-sm font-medium text-gray-600">Section</Label>
-                <p className="text-sm">{user.studentInfo.section}</p>
-              </div>
-            )}
-            {user.studentInfo.specialization && (
-              <div>
-                <Label className="text-sm font-medium text-gray-600">Specialization</Label>
-                <p className="text-sm">{user.studentInfo.specialization}</p>
-              </div>
-            )}
-            {user.studentInfo.cgpa && (
-              <div>
-                <Label className="text-sm font-medium text-gray-600">CGPA</Label>
-                <p className="text-sm">{user.studentInfo.cgpa}</p>
-              </div>
-            )}
-            {/* Roll Number - Only visible to profile owner */}
-            {isOwnProfile && user.studentInfo.rollNumber && (
-              <div>
-                <Label className="text-sm font-medium text-gray-600">Roll Number</Label>
-                <p className="text-sm font-mono bg-gray-100 px-2 py-1 rounded">{user.studentInfo.rollNumber}</p>
-              </div>
-            )}
-            {/* Student ID - Only visible to profile owner */}
-            {isOwnProfile && user.studentInfo.studentId && (
-              <div>
-                <Label className="text-sm font-medium text-gray-600">Student ID</Label>
-                <p className="text-sm font-mono bg-gray-100 px-2 py-1 rounded">{user.studentInfo.studentId}</p>
-              </div>
-            )}
-            {user.studentInfo.subjects && user.studentInfo.subjects.length > 0 && (
-              <div>
-                <Label className="text-sm font-medium text-gray-600">Subjects</Label>
-                <div className="flex flex-wrap gap-2 mt-2">
-                  {user.studentInfo.subjects.map((subject: string, index: number) => (
-                    <Badge key={index} variant="outline">{subject}</Badge>
-                  ))}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <GraduationCap className="h-5 w-5" />
+                Student Information
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {user.studentInfo.department && (
+                <div>
+                  <Label className="text-sm font-medium text-gray-600">Department</Label>
+                  <p className="text-sm">{user.studentInfo.department}</p>
                 </div>
-              </div>
-            )}
-            {user.studentInfo && (
-              <div>
-                <Label className="text-sm font-medium text-gray-600">Placement Status</Label>
-                <Badge variant={!user.studentInfo.placementStatus || user.studentInfo.placementStatus === 'placed' ? 'default' : 'secondary'}>
-                  {formatPlacementStatus(user.studentInfo.placementStatus)}
-                </Badge>
-              </div>
-            )}
-            {user.studentInfo.placementCompany && (
-              <div>
-                <Label className="text-sm font-medium text-gray-600">Placement Company</Label>
-                <p className="text-sm">{user.studentInfo.placementCompany}</p>
-              </div>
-            )}
-            {user.studentInfo.placementPackage && (
-              <div>
-                <Label className="text-sm font-medium text-gray-600">Package</Label>
-                <p className="text-sm">{user.studentInfo.placementPackage}</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+              )}
+              {user.studentInfo.batch && (
+                <div>
+                  <Label className="text-sm font-medium text-gray-600">Batch</Label>
+                  <p className="text-sm">{user.studentInfo.batch}</p>
+                </div>
+              )}
+              {user.studentInfo.currentYear && (
+                <div>
+                  <Label className="text-sm font-medium text-gray-600">Current Year</Label>
+                  <p className="text-sm">{user.studentInfo.currentYear}</p>
+                </div>
+              )}
+              {user.studentInfo.currentSemester && (
+                <div>
+                  <Label className="text-sm font-medium text-gray-600">Current Semester</Label>
+                  <p className="text-sm">{user.studentInfo.currentSemester}</p>
+                </div>
+              )}
+              {user.studentInfo.section && (
+                <div>
+                  <Label className="text-sm font-medium text-gray-600">Section</Label>
+                  <p className="text-sm">{user.studentInfo.section}</p>
+                </div>
+              )}
+              {user.studentInfo.specialization && (
+                <div>
+                  <Label className="text-sm font-medium text-gray-600">Specialization</Label>
+                  <p className="text-sm">{user.studentInfo.specialization}</p>
+                </div>
+              )}
+              {user.studentInfo.cgpa && (
+                <div>
+                  <Label className="text-sm font-medium text-gray-600">CGPA</Label>
+                  <p className="text-sm">{user.studentInfo.cgpa}</p>
+                </div>
+              )}
+              {/* Roll Number */}
+              {user.studentInfo.rollNumber && (
+                <div>
+                  <Label className="text-sm font-medium text-gray-600">Roll Number</Label>
+                  <p className="text-sm font-mono bg-gray-100 px-2 py-1 rounded">{user.studentInfo.rollNumber}</p>
+                </div>
+              )}
+              {/* Student ID - Only visible to profile owner */}
+              {isOwnProfile && user.studentInfo.studentId && (
+                <div>
+                  <Label className="text-sm font-medium text-gray-600">Student ID</Label>
+                  <p className="text-sm font-mono bg-gray-100 px-2 py-1 rounded">{user.studentInfo.studentId}</p>
+                </div>
+              )}
+              {user.studentInfo.subjects && user.studentInfo.subjects.length > 0 && (
+                <div>
+                  <Label className="text-sm font-medium text-gray-600">Subjects</Label>
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {user.studentInfo.subjects.map((subject: string, index: number) => (
+                      <Badge key={index} variant="outline">{subject}</Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {user.studentInfo && (
+                <div>
+                  <Label className="text-sm font-medium text-gray-600">Placement Status</Label>
+                  <Badge variant={!user.studentInfo.placementStatus || user.studentInfo.placementStatus === 'placed' ? 'default' : 'secondary'}>
+                    {formatPlacementStatus(user.studentInfo.placementStatus)}
+                  </Badge>
+                </div>
+              )}
+              {user.studentInfo.placementCompany && (
+                <div>
+                  <Label className="text-sm font-medium text-gray-600">Placement Company</Label>
+                  <p className="text-sm">{user.studentInfo.placementCompany}</p>
+                </div>
+              )}
+              {user.studentInfo.placementPackage && (
+                <div>
+                  <Label className="text-sm font-medium text-gray-600">Package</Label>
+                  <p className="text-sm">{user.studentInfo.placementPackage}</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         )}
 
         {/* Faculty Information - Only show if user is faculty and data exists */}
         {user.type === 'faculty' && user.facultyInfo && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Building className="h-5 w-5" />
-              Faculty Information
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {user.facultyInfo.department && (
-              <div>
-                <Label className="text-sm font-medium text-gray-600">Department</Label>
-                <p className="text-sm">{user.facultyInfo.department}</p>
-              </div>
-            )}
-            {user.facultyInfo.designation && (
-              <div>
-                <Label className="text-sm font-medium text-gray-600">Designation</Label>
-                <p className="text-sm">{user.facultyInfo.designation}</p>
-              </div>
-            )}
-            {user.facultyInfo.qualification && (
-              <div>
-                <Label className="text-sm font-medium text-gray-600">Qualification</Label>
-                <p className="text-sm">{user.facultyInfo.qualification}</p>
-              </div>
-            )}
-            {user.facultyInfo.officeLocation && (
-              <div>
-                <Label className="text-sm font-medium text-gray-600">Office Location</Label>
-                <p className="text-sm">{user.facultyInfo.officeLocation}</p>
-              </div>
-            )}
-            {user.facultyInfo.officeHours && (
-              <div>
-                <Label className="text-sm font-medium text-gray-600">Office Hours</Label>
-                <p className="text-sm">{user.facultyInfo.officeHours}</p>
-              </div>
-            )}
-            {user.facultyInfo.researchAreas && user.facultyInfo.researchAreas.length > 0 && (
-              <div>
-                <Label className="text-sm font-medium text-gray-600">Research Areas</Label>
-                <div className="flex flex-wrap gap-2 mt-2">
-                  {user.facultyInfo.researchAreas.map((area: string, index: number) => (
-                    <Badge key={index} variant="outline">{area}</Badge>
-                  ))}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Building className="h-5 w-5" />
+                Faculty Information
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {user.facultyInfo.department && (
+                <div>
+                  <Label className="text-sm font-medium text-gray-600">Department</Label>
+                  <p className="text-sm">{user.facultyInfo.department}</p>
                 </div>
-              </div>
-            )}
-            {user.facultyInfo.teachingSubjects && user.facultyInfo.teachingSubjects.length > 0 && (
-              <div>
-                <Label className="text-sm font-medium text-gray-600">Teaching Subjects</Label>
-                <div className="flex flex-wrap gap-2 mt-2">
-                  {user.facultyInfo.teachingSubjects.map((subject: string, index: number) => (
-                    <Badge key={index} variant="secondary">{subject}</Badge>
-                  ))}
+              )}
+              {user.facultyInfo.designation && (
+                <div>
+                  <Label className="text-sm font-medium text-gray-600">Designation</Label>
+                  <p className="text-sm">{user.facultyInfo.designation}</p>
                 </div>
-              </div>
-            )}
-            {user.facultyInfo.consultationAvailable !== undefined && (
-              <div>
-                <Label className="text-sm font-medium text-gray-600">Consultation Available</Label>
-                <Badge variant={user.facultyInfo.consultationAvailable ? 'default' : 'secondary'}>
-                  {user.facultyInfo.consultationAvailable ? 'Yes' : 'No'}
-                </Badge>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+              )}
+              {user.facultyInfo.qualification && (
+                <div>
+                  <Label className="text-sm font-medium text-gray-600">Qualification</Label>
+                  <p className="text-sm">{user.facultyInfo.qualification}</p>
+                </div>
+              )}
+              {user.facultyInfo.officeLocation && (
+                <div>
+                  <Label className="text-sm font-medium text-gray-600">Office Location</Label>
+                  <p className="text-sm">{user.facultyInfo.officeLocation}</p>
+                </div>
+              )}
+              {user.facultyInfo.officeHours && (
+                <div>
+                  <Label className="text-sm font-medium text-gray-600">Office Hours</Label>
+                  <p className="text-sm">{user.facultyInfo.officeHours}</p>
+                </div>
+              )}
+              {user.facultyInfo.researchAreas && user.facultyInfo.researchAreas.length > 0 && (
+                <div>
+                  <Label className="text-sm font-medium text-gray-600">Research Areas</Label>
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {user.facultyInfo.researchAreas.map((area: string, index: number) => (
+                      <Badge key={index} variant="outline">{area}</Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {user.facultyInfo.teachingSubjects && user.facultyInfo.teachingSubjects.length > 0 && (
+                <div>
+                  <Label className="text-sm font-medium text-gray-600">Teaching Subjects</Label>
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {user.facultyInfo.teachingSubjects.map((subject: string, index: number) => (
+                      <Badge key={index} variant="secondary">{subject}</Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {user.facultyInfo.consultationAvailable !== undefined && (
+                <div>
+                  <Label className="text-sm font-medium text-gray-600">Consultation Available</Label>
+                  <Badge variant={user.facultyInfo.consultationAvailable ? 'default' : 'secondary'}>
+                    {user.facultyInfo.consultationAvailable ? 'Yes' : 'No'}
+                  </Badge>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         )}
 
         {/* Alumni Information - Only show if user is alumni and data exists */}
         {user.type === 'alumni' && user.alumniInfo && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Briefcase className="h-5 w-5" />
-              Alumni Information
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {user.alumniInfo.currentCompany && (
-              <div>
-                <Label className="text-sm font-medium text-gray-600">Current Company</Label>
-                <p className="text-sm">{user.alumniInfo.currentCompany}</p>
-              </div>
-            )}
-            {user.alumniInfo.jobTitle && (
-              <div>
-                <Label className="text-sm font-medium text-gray-600">Job Title</Label>
-                <p className="text-sm">{user.alumniInfo.jobTitle}</p>
-              </div>
-            )}
-            {user.alumniInfo.experience && (
-              <div>
-                <Label className="text-sm font-medium text-gray-600">Experience</Label>
-                <p className="text-sm">{user.alumniInfo.experience}</p>
-              </div>
-            )}
-            {user.alumniInfo.workLocation && (
-              <div>
-                <Label className="text-sm font-medium text-gray-600">Work Location</Label>
-                <p className="text-sm">{user.alumniInfo.workLocation}</p>
-              </div>
-            )}
-            {user.alumniInfo.industry && (
-              <div>
-                <Label className="text-sm font-medium text-gray-600">Industry</Label>
-                <p className="text-sm">{user.alumniInfo.industry}</p>
-              </div>
-            )}
-            {user.alumniInfo.salary && (
-              <div>
-                <Label className="text-sm font-medium text-gray-600">Salary</Label>
-                <p className="text-sm">{user.alumniInfo.salary}</p>
-              </div>
-            )}
-            {user.alumniInfo.mentorshipOffering !== undefined && (
-              <div>
-                <Label className="text-sm font-medium text-gray-600">Mentorship Offering</Label>
-                <Badge variant={user.alumniInfo.mentorshipOffering ? 'default' : 'secondary'}>
-                  {user.alumniInfo.mentorshipOffering ? 'Yes' : 'No'}
-                </Badge>
-              </div>
-            )}
-            {user.alumniInfo.mentorshipAreas && user.alumniInfo.mentorshipAreas.length > 0 && (
-              <div>
-                <Label className="text-sm font-medium text-gray-600">Mentorship Areas</Label>
-                <div className="flex flex-wrap gap-2 mt-2">
-                  {user.alumniInfo.mentorshipAreas.map((area: string, index: number) => (
-                    <Badge key={index} variant="outline">{area}</Badge>
-                  ))}
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-        )}
-
-        {/* Professional Information - Only show if data exists */}
-        {((user as any).skills || (user as any).interests) && (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Briefcase className="h-5 w-5" />
-                Professional Information
+                Alumni Information
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {user.alumniInfo.currentCompany && (
+                <div>
+                  <Label className="text-sm font-medium text-gray-600">Current Company</Label>
+                  <p className="text-sm">{user.alumniInfo.currentCompany}</p>
+                </div>
+              )}
+              {user.alumniInfo.jobTitle && (
+                <div>
+                  <Label className="text-sm font-medium text-gray-600">Job Title</Label>
+                  <p className="text-sm">{user.alumniInfo.jobTitle}</p>
+                </div>
+              )}
+              {user.alumniInfo.experience && (
+                <div>
+                  <Label className="text-sm font-medium text-gray-600">Experience</Label>
+                  <p className="text-sm">{user.alumniInfo.experience}</p>
+                </div>
+              )}
+              {user.alumniInfo.workLocation && (
+                <div>
+                  <Label className="text-sm font-medium text-gray-600">Work Location</Label>
+                  <p className="text-sm">{user.alumniInfo.workLocation}</p>
+                </div>
+              )}
+              {user.alumniInfo.industry && (
+                <div>
+                  <Label className="text-sm font-medium text-gray-600">Industry</Label>
+                  <p className="text-sm">{user.alumniInfo.industry}</p>
+                </div>
+              )}
+              {user.alumniInfo.salary && (
+                <div>
+                  <Label className="text-sm font-medium text-gray-600">Salary</Label>
+                  <p className="text-sm">{user.alumniInfo.salary}</p>
+                </div>
+              )}
+              {user.alumniInfo.mentorshipOffering !== undefined && (
+                <div>
+                  <Label className="text-sm font-medium text-gray-600">Mentorship Offering</Label>
+                  <Badge variant={user.alumniInfo.mentorshipOffering ? 'default' : 'secondary'}>
+                    {user.alumniInfo.mentorshipOffering ? 'Yes' : 'No'}
+                  </Badge>
+                </div>
+              )}
+              {user.alumniInfo.mentorshipAreas && user.alumniInfo.mentorshipAreas.length > 0 && (
+                <div>
+                  <Label className="text-sm font-medium text-gray-600">Mentorship Areas</Label>
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {user.alumniInfo.mentorshipAreas.map((area: string, index: number) => (
+                      <Badge key={index} variant="outline">{area}</Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Skills & Interests */}
+        {((user as any).skills?.length > 0 || (user as any).interests?.length > 0) && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Award className="h-5 w-5" />
+                Skills &amp; Interests
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -636,7 +630,7 @@ const ProfileDisplay = ({ isOwnProfile = true, onEdit }: ProfileDisplayProps) =>
                     {(user as any).skills.map((skill: string, index: number) => (
                       <Badge key={index} variant="secondary">{skill}</Badge>
                     ))}
-                </div>
+                  </div>
                 </div>
               )}
               {(user as any).interests && (user as any).interests.length > 0 && (
@@ -646,7 +640,7 @@ const ProfileDisplay = ({ isOwnProfile = true, onEdit }: ProfileDisplayProps) =>
                     {(user as any).interests.map((interest: string, index: number) => (
                       <Badge key={index} variant="outline">{interest}</Badge>
                     ))}
-                </div>
+                  </div>
                 </div>
               )}
             </CardContent>
@@ -664,10 +658,10 @@ const ProfileDisplay = ({ isOwnProfile = true, onEdit }: ProfileDisplayProps) =>
             </CardHeader>
             <CardContent className="space-y-4">
               {socialLinks.linkedin && (
-                <a 
-                  href={socialLinks.linkedin} 
-                  target="_blank" 
-                  rel="noopener noreferrer" 
+                <a
+                  href={socialLinks.linkedin}
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="flex items-center space-x-2 text-blue-600 hover:text-blue-800"
                 >
                   <Linkedin className="w-5 h-5" />
@@ -676,10 +670,10 @@ const ProfileDisplay = ({ isOwnProfile = true, onEdit }: ProfileDisplayProps) =>
                 </a>
               )}
               {socialLinks.github && (
-                <a 
-                  href={socialLinks.github} 
-                  target="_blank" 
-                  rel="noopener noreferrer" 
+                <a
+                  href={socialLinks.github}
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="flex items-center space-x-2 text-gray-600 hover:text-gray-800"
                 >
                   <Github className="w-5 h-5" />
@@ -688,10 +682,10 @@ const ProfileDisplay = ({ isOwnProfile = true, onEdit }: ProfileDisplayProps) =>
                 </a>
               )}
               {socialLinks.leetcode && (
-                <a 
-                  href={socialLinks.leetcode} 
-                  target="_blank" 
-                  rel="noopener noreferrer" 
+                <a
+                  href={socialLinks.leetcode}
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="flex items-center space-x-2 text-purple-600 hover:text-purple-800"
                 >
                   <Code2 className="w-5 h-5" />
@@ -700,10 +694,10 @@ const ProfileDisplay = ({ isOwnProfile = true, onEdit }: ProfileDisplayProps) =>
                 </a>
               )}
               {socialLinks.twitter && (
-                <a 
-                  href={socialLinks.twitter} 
-                  target="_blank" 
-                  rel="noopener noreferrer" 
+                <a
+                  href={socialLinks.twitter}
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="flex items-center space-x-2 text-blue-400 hover:text-blue-600"
                 >
                   <Twitter className="w-5 h-5" />
@@ -711,11 +705,11 @@ const ProfileDisplay = ({ isOwnProfile = true, onEdit }: ProfileDisplayProps) =>
                   <ExternalLink className="w-4 h-4" />
                 </a>
               )}
-              {socialLinks.website && (
-                <a 
-                  href={socialLinks.website} 
-                  target="_blank" 
-                  rel="noopener noreferrer" 
+              {socialLinks.personalWebsite && (
+                <a
+                  href={socialLinks.personalWebsite}
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="flex items-center space-x-2 text-green-600 hover:text-green-800"
                 >
                   <Globe className="w-5 h-5" />
@@ -730,7 +724,7 @@ const ProfileDisplay = ({ isOwnProfile = true, onEdit }: ProfileDisplayProps) =>
                     Custom Links
                   </Label>
                   {customSocialLinks.map((link, index) => (
-                    <a 
+                    <a
                       key={`${link.label}-${index}`}
                       href={link.url}
                       target="_blank"
@@ -750,46 +744,46 @@ const ProfileDisplay = ({ isOwnProfile = true, onEdit }: ProfileDisplayProps) =>
 
         {/* Resume & Portfolio - Only show if data exists */}
         {((user as any).resume || (user as any).portfolio) && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
                 <FileText className="h-5 w-5" />
                 Resume & Portfolio
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
               {(user as any).resume && (
-              <div>
+                <div>
                   <Label className="text-sm font-medium text-gray-600">Resume</Label>
-                  <a 
-                    href={(user as any).resume} 
-                    target="_blank" 
-                    rel="noopener noreferrer" 
+                  <a
+                    href={(user as any).resume}
+                    target="_blank"
+                    rel="noopener noreferrer"
                     className="flex items-center space-x-2 text-blue-600 hover:text-blue-800"
                   >
                     <FileText className="w-4 h-4" />
                     <span>View Resume</span>
                     <ExternalLink className="w-4 h-4" />
                   </a>
-              </div>
-            )}
+                </div>
+              )}
               {(user as any).portfolio && (
-              <div>
+                <div>
                   <Label className="text-sm font-medium text-gray-600">Portfolio</Label>
-                  <a 
-                    href={(user as any).portfolio} 
-                    target="_blank" 
-                    rel="noopener noreferrer" 
+                  <a
+                    href={(user as any).portfolio}
+                    target="_blank"
+                    rel="noopener noreferrer"
                     className="flex items-center space-x-2 text-blue-600 hover:text-blue-800"
                   >
                     <Globe className="w-4 h-4" />
                     <span>View Portfolio</span>
                     <ExternalLink className="w-4 h-4" />
                   </a>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         )}
 
         {/* Work Experience - Only show if data exists */}
@@ -851,12 +845,12 @@ const ProfileDisplay = ({ isOwnProfile = true, onEdit }: ProfileDisplayProps) =>
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-              <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between">
               <span className="text-sm font-medium">Verification Status</span>
-                <Badge variant={user.isVerified ? "default" : "secondary"}>
-                  {user.isVerified ? "Verified" : "Pending"}
-                </Badge>
-              </div>
+              <Badge variant={user.isVerified ? "default" : "secondary"}>
+                {user.isVerified ? "Verified" : "Pending"}
+              </Badge>
+            </div>
             <div className="flex items-center justify-between">
               <span className="text-sm font-medium">Profile Completion</span>
               <Badge variant={user.isProfileComplete ? "default" : "secondary"}>
@@ -888,7 +882,7 @@ const ProfileDisplay = ({ isOwnProfile = true, onEdit }: ProfileDisplayProps) =>
                   <div className="text-2xl font-bold text-blue-600">{connections.followers}</div>
                   <div className="text-sm text-gray-600">Followers</div>
                 </div>
-                
+
                 <div className="text-center">
                   <div className="flex items-center justify-center mb-2">
                     <UserCheck className="h-8 w-8 text-green-600" />
@@ -896,7 +890,7 @@ const ProfileDisplay = ({ isOwnProfile = true, onEdit }: ProfileDisplayProps) =>
                   <div className="text-2xl font-bold text-green-600">{connections.following}</div>
                   <div className="text-sm text-gray-600">Following</div>
                 </div>
-                
+
                 <div className="text-center">
                   <div className="flex items-center justify-center mb-2">
                     <Users className="h-8 w-8 text-purple-600" />

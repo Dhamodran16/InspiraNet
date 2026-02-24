@@ -5,8 +5,8 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { 
-  Bell, 
+import {
+  Bell,
   CheckCircle,
   AlertCircle,
   Clock,
@@ -51,7 +51,7 @@ interface EnhancedNotificationSettingsProps {
 const EnhancedNotificationSettings: React.FC<EnhancedNotificationSettingsProps> = ({ notifications, onUpdate }) => {
   const { user } = useAuth();
   const { toast } = useToast();
-  
+
   // Real-time state
   const [isOnline, setIsOnline] = useState(true);
   const [lastSync, setLastSync] = useState<Date>(new Date());
@@ -82,10 +82,10 @@ const EnhancedNotificationSettings: React.FC<EnhancedNotificationSettingsProps> 
     const updatedNotifications = { ...notifications, [field]: checked };
     addActivityLog(`${field} ${checked ? 'enabled' : 'disabled'}`, 'pending');
     setSyncStatus('syncing');
-    
+
     // Optimistically update the UI
     onUpdate(updatedNotifications);
-    
+
     // The parent component (Settings.tsx) will handle the API call and update state
     // We'll update sync status when we receive the real-time update via socket
   }, [notifications, onUpdate, addActivityLog]);
@@ -113,7 +113,7 @@ const EnhancedNotificationSettings: React.FC<EnhancedNotificationSettingsProps> 
 
     // Connect socket events
     socketService.connect();
-    
+
     // Listen for real-time settings updates
     const handleSettingsUpdate = (data: { settings: any }) => {
       if (data.settings && data.settings.notifications) {
@@ -125,15 +125,15 @@ const EnhancedNotificationSettings: React.FC<EnhancedNotificationSettingsProps> 
     };
 
     socketService.on('settings_updated', handleSettingsUpdate);
-    
+
     // Monitor connection status
     const checkConnection = () => {
-              setIsOnline(socketService.getConnectionStatus());
+      setIsOnline(socketService.getConnectionStatus());
     };
-    
+
     // Check connection periodically
     const interval = setInterval(checkConnection, 5000);
-    
+
     return () => {
       clearInterval(interval);
       socketService.off('settings_updated', handleSettingsUpdate);
@@ -157,7 +157,7 @@ const EnhancedNotificationSettings: React.FC<EnhancedNotificationSettingsProps> 
                   {isOnline ? 'Real-time Active' : 'Offline'}
                 </span>
               </div>
-              
+
               <div className="flex items-center space-x-2">
                 {syncStatus === 'synced' && <CheckCircle className="h-4 w-4 text-green-500" />}
                 {syncStatus === 'syncing' && <RefreshCw className="h-4 w-4 text-blue-500 animate-spin" />}
@@ -167,7 +167,7 @@ const EnhancedNotificationSettings: React.FC<EnhancedNotificationSettingsProps> 
                 </span>
               </div>
             </div>
-            
+
             <div className="flex items-center space-x-2">
               {pendingChanges.length > 0 && (
                 <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">
@@ -219,7 +219,7 @@ const EnhancedNotificationSettings: React.FC<EnhancedNotificationSettingsProps> 
                 <Switch
                   id="followRequests"
                   checked={notifications.followRequests}
-                  onCheckedChange={(checked) => 
+                  onCheckedChange={(checked) =>
                     handleNotificationUpdate('followRequests', checked)
                   }
                 />
@@ -229,7 +229,7 @@ const EnhancedNotificationSettings: React.FC<EnhancedNotificationSettingsProps> 
                 <Switch
                   id="followAccepted"
                   checked={notifications.followAccepted}
-                  onCheckedChange={(checked) => 
+                  onCheckedChange={(checked) =>
                     handleNotificationUpdate('followAccepted', checked)
                   }
                 />
@@ -239,7 +239,7 @@ const EnhancedNotificationSettings: React.FC<EnhancedNotificationSettingsProps> 
                 <Switch
                   id="followRejected"
                   checked={notifications.followRejected}
-                  onCheckedChange={(checked) => 
+                  onCheckedChange={(checked) =>
                     handleNotificationUpdate('followRejected', checked)
                   }
                 />
@@ -261,7 +261,7 @@ const EnhancedNotificationSettings: React.FC<EnhancedNotificationSettingsProps> 
                 <Switch
                   id="postLikes"
                   checked={notifications.postLikes}
-                  onCheckedChange={(checked) => 
+                  onCheckedChange={(checked) =>
                     handleNotificationUpdate('postLikes', checked)
                   }
                 />
@@ -271,28 +271,8 @@ const EnhancedNotificationSettings: React.FC<EnhancedNotificationSettingsProps> 
                 <Switch
                   id="postComments"
                   checked={notifications.postComments}
-                  onCheckedChange={(checked) => 
+                  onCheckedChange={(checked) =>
                     handleNotificationUpdate('postComments', checked)
-                  }
-                />
-              </div>
-              <div className="flex items-center justify-between">
-                <Label htmlFor="postShares">Post Shares</Label>
-                <Switch
-                  id="postShares"
-                  checked={notifications.postShares}
-                  onCheckedChange={(checked) => 
-                    handleNotificationUpdate('postShares', checked)
-                  }
-                />
-              </div>
-              <div className="flex items-center justify-between">
-                <Label htmlFor="postMentions">Post Mentions</Label>
-                <Switch
-                  id="postMentions"
-                  checked={notifications.postMentions}
-                  onCheckedChange={(checked) => 
-                    handleNotificationUpdate('postMentions', checked)
                   }
                 />
               </div>
@@ -313,7 +293,7 @@ const EnhancedNotificationSettings: React.FC<EnhancedNotificationSettingsProps> 
                 <Switch
                   id="newMessages"
                   checked={notifications.newMessages}
-                  onCheckedChange={(checked) => 
+                  onCheckedChange={(checked) =>
                     handleNotificationUpdate('newMessages', checked)
                   }
                 />
@@ -323,7 +303,7 @@ const EnhancedNotificationSettings: React.FC<EnhancedNotificationSettingsProps> 
                 <Switch
                   id="messageReadReceipts"
                   checked={notifications.messageReadReceipts}
-                  onCheckedChange={(checked) => 
+                  onCheckedChange={(checked) =>
                     handleNotificationUpdate('messageReadReceipts', checked)
                   }
                 />
@@ -345,7 +325,7 @@ const EnhancedNotificationSettings: React.FC<EnhancedNotificationSettingsProps> 
                 <Switch
                   id="eventReminders"
                   checked={notifications.eventReminders}
-                  onCheckedChange={(checked) => 
+                  onCheckedChange={(checked) =>
                     handleNotificationUpdate('eventReminders', checked)
                   }
                 />
@@ -355,7 +335,7 @@ const EnhancedNotificationSettings: React.FC<EnhancedNotificationSettingsProps> 
                 <Switch
                   id="eventInvitations"
                   checked={notifications.eventInvitations}
-                  onCheckedChange={(checked) => 
+                  onCheckedChange={(checked) =>
                     handleNotificationUpdate('eventInvitations', checked)
                   }
                 />
@@ -377,7 +357,7 @@ const EnhancedNotificationSettings: React.FC<EnhancedNotificationSettingsProps> 
                 <Switch
                   id="jobApplications"
                   checked={notifications.jobApplications}
-                  onCheckedChange={(checked) => 
+                  onCheckedChange={(checked) =>
                     handleNotificationUpdate('jobApplications', checked)
                   }
                 />
@@ -387,7 +367,7 @@ const EnhancedNotificationSettings: React.FC<EnhancedNotificationSettingsProps> 
                 <Switch
                   id="jobUpdates"
                   checked={notifications.jobUpdates}
-                  onCheckedChange={(checked) => 
+                  onCheckedChange={(checked) =>
                     handleNotificationUpdate('jobUpdates', checked)
                   }
                 />
@@ -409,7 +389,7 @@ const EnhancedNotificationSettings: React.FC<EnhancedNotificationSettingsProps> 
                 <Switch
                   id="systemAnnouncements"
                   checked={notifications.systemAnnouncements}
-                  onCheckedChange={(checked) => 
+                  onCheckedChange={(checked) =>
                     handleNotificationUpdate('systemAnnouncements', checked)
                   }
                 />
@@ -419,7 +399,7 @@ const EnhancedNotificationSettings: React.FC<EnhancedNotificationSettingsProps> 
                 <Switch
                   id="securityAlerts"
                   checked={notifications.securityAlerts}
-                  onCheckedChange={(checked) => 
+                  onCheckedChange={(checked) =>
                     handleNotificationUpdate('securityAlerts', checked)
                   }
                 />

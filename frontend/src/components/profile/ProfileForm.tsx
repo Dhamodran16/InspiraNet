@@ -24,7 +24,7 @@ const ProfileForm: React.FC<ProfileFormProps> = ({ onSave, onCancel }) => {
   const [departments, setDepartments] = useState<string[]>([]);
   const [designations, setDesignations] = useState<string[]>([]);
   const [placementStatuses, setPlacementStatuses] = useState<string[]>([]);
-  
+
   const [formData, setFormData] = useState({
     name: user?.name || '',
     email: {
@@ -32,7 +32,7 @@ const ProfileForm: React.FC<ProfileFormProps> = ({ onSave, onCancel }) => {
       personal: user?.email?.personal || ''
     },
     phone: user?.phone || '',
-    dateOfBirth: user?.dateOfBirth || '',
+    dateOfBirth: user?.dateOfBirth ? (typeof user.dateOfBirth === 'string' ? user.dateOfBirth.split('T')[0] : new Date(user.dateOfBirth).toISOString().split('T')[0]) : '',
     bio: user?.bio || '',
     areaOfInterest: user?.areaOfInterest || '',
     skills: user?.skills || [],
@@ -55,7 +55,7 @@ const ProfileForm: React.FC<ProfileFormProps> = ({ onSave, onCancel }) => {
           ConfigService.getDesignations(),
           ConfigService.getPlacementStatuses()
         ]);
-        
+
         setDepartments(deptData);
         setDesignations(desigData);
         setPlacementStatuses(statusData);
@@ -104,7 +104,7 @@ const ProfileForm: React.FC<ProfileFormProps> = ({ onSave, onCancel }) => {
       setFormData(prev => ({
         ...prev,
         [section]: {
-          ...prev[section as keyof typeof prev],
+          ...(prev[section as keyof typeof prev] as any),
           [field]: value
         }
       }));
@@ -113,7 +113,7 @@ const ProfileForm: React.FC<ProfileFormProps> = ({ onSave, onCancel }) => {
       setFormData(prev => ({
         ...prev,
         [parent]: {
-          ...prev[parent as keyof typeof prev],
+          ...(prev[parent as keyof typeof prev] as any),
           [child]: value
         }
       }));
@@ -130,12 +130,12 @@ const ProfileForm: React.FC<ProfileFormProps> = ({ onSave, onCancel }) => {
       .split(',')
       .map(item => item.trim())
       .filter(item => item.length > 0);
-    
+
     if (section) {
       setFormData(prev => ({
         ...prev,
         [section]: {
-          ...prev[section as keyof typeof prev],
+          ...(prev[section as keyof typeof prev] as any),
           [field]: arrayValue
         }
       }));
@@ -153,7 +153,7 @@ const ProfileForm: React.FC<ProfileFormProps> = ({ onSave, onCancel }) => {
 
     try {
       const response = await api.put('/api/users/profile', formData);
-      
+
       if (response.data.success || response.data.message) {
         updateUser(response.data.user);
         toast({
@@ -181,7 +181,7 @@ const ProfileForm: React.FC<ProfileFormProps> = ({ onSave, onCancel }) => {
           <CardTitle className="flex items-center gap-2">
             <Avatar className="h-8 w-8">
               <AvatarImage src={user?.avatar} />
-              <AvatarFallback>{user?.name?.charAt(0) || 'U'}</AvatarFallback>
+              <AvatarFallback>{user?.name?.charAt(0).toUpperCase() || 'U'}</AvatarFallback>
             </Avatar>
             Edit Profile
           </CardTitle>
@@ -194,7 +194,7 @@ const ProfileForm: React.FC<ProfileFormProps> = ({ onSave, onCancel }) => {
                 <User className="h-5 w-5" />
                 Basic Information
               </h3>
-              
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="name">Full Name *</Label>
@@ -233,7 +233,7 @@ const ProfileForm: React.FC<ProfileFormProps> = ({ onSave, onCancel }) => {
                   <Input
                     id="dateOfBirth"
                     type="date"
-                    value={formData.dateOfBirth}
+                    value={formData.dateOfBirth as string}
                     onChange={(e) => handleInputChange('dateOfBirth', e.target.value)}
                   />
                 </div>
@@ -268,12 +268,12 @@ const ProfileForm: React.FC<ProfileFormProps> = ({ onSave, onCancel }) => {
                   <GraduationCap className="h-5 w-5" />
                   Academic Information
                 </h3>
-                
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="department">Department</Label>
-                    <Select 
-                      value={formData.studentInfo?.department || ''} 
+                    <Select
+                      value={formData.studentInfo?.department || ''}
                       onValueChange={(value) => handleInputChange('department', value, 'studentInfo')}
                     >
                       <SelectTrigger>
@@ -332,8 +332,8 @@ const ProfileForm: React.FC<ProfileFormProps> = ({ onSave, onCancel }) => {
                   </div>
                   <div>
                     <Label htmlFor="placementStatus">Placement Status</Label>
-                    <Select 
-                      value={formData.studentInfo?.placementStatus || ''} 
+                    <Select
+                      value={formData.studentInfo?.placementStatus || ''}
                       onValueChange={(value) => handleInputChange('placementStatus', value, 'studentInfo')}
                     >
                       <SelectTrigger>
@@ -359,12 +359,12 @@ const ProfileForm: React.FC<ProfileFormProps> = ({ onSave, onCancel }) => {
                   <Briefcase className="h-5 w-5" />
                   Faculty Information
                 </h3>
-                
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="facultyDepartment">Department</Label>
-                    <Select 
-                      value={formData.facultyInfo?.department || ''} 
+                    <Select
+                      value={formData.facultyInfo?.department || ''}
                       onValueChange={(value) => handleInputChange('department', value, 'facultyInfo')}
                     >
                       <SelectTrigger>
@@ -381,8 +381,8 @@ const ProfileForm: React.FC<ProfileFormProps> = ({ onSave, onCancel }) => {
                   </div>
                   <div>
                     <Label htmlFor="designation">Designation</Label>
-                    <Select 
-                      value={formData.facultyInfo?.designation || ''} 
+                    <Select
+                      value={formData.facultyInfo?.designation || ''}
                       onValueChange={(value) => handleInputChange('designation', value, 'facultyInfo')}
                     >
                       <SelectTrigger>
@@ -407,7 +407,7 @@ const ProfileForm: React.FC<ProfileFormProps> = ({ onSave, onCancel }) => {
                 <Briefcase className="h-5 w-5" />
                 Professional Development
               </h3>
-              
+
               <div>
                 <Label htmlFor="skills">Skills</Label>
                 <TagInput
@@ -445,7 +445,7 @@ const ProfileForm: React.FC<ProfileFormProps> = ({ onSave, onCancel }) => {
                 <Globe className="h-5 w-5" />
                 Social & Professional Links
               </h3>
-              
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="linkedin">LinkedIn Profile</Label>
@@ -476,7 +476,7 @@ const ProfileForm: React.FC<ProfileFormProps> = ({ onSave, onCancel }) => {
                 <User className="h-5 w-5" />
                 Resume & Portfolio
               </h3>
-              
+
               <div>
                 <Label htmlFor="resume">Resume URL</Label>
                 <Input

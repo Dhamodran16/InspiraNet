@@ -31,12 +31,12 @@ api.interceptors.request.use(
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`;
     }
-    
+
     // If FormData is being sent, remove Content-Type header to let axios set it with boundary
     if (config.data instanceof FormData) {
       delete config.headers['Content-Type'];
     }
-    
+
     return config;
   },
   (error: AxiosError) => {
@@ -63,7 +63,7 @@ api.interceptors.response.use(
           description: "Please log in again.",
           variant: "destructive",
         });
-        
+
         // Redirect to login page
         window.location.href = '/signin';
         return Promise.reject(error);
@@ -73,7 +73,7 @@ api.interceptors.response.use(
       try {
         originalRequest._retry = true;
         const token = getAuthToken();
-        
+
         if (token) {
           const refreshResponse = await axios.post(
             `${API_BASE_URL}/api/auth/refresh`,
@@ -88,7 +88,7 @@ api.interceptors.response.use(
           if (refreshResponse.data.token) {
             // Store new token
             localStorage.setItem('authToken', refreshResponse.data.token);
-            
+
             // Retry original request with new token
             originalRequest.headers.Authorization = `Bearer ${refreshResponse.data.token}`;
             return api(originalRequest);
@@ -105,8 +105,8 @@ api.interceptors.response.use(
         description: "Please log in again.",
         variant: "destructive",
       });
-      
-              window.location.href = '/signin';
+
+      window.location.href = '/signin';
     }
 
     // Handle other errors
@@ -172,7 +172,7 @@ export const makeAuthenticatedRequest = async <T>(
       }
       throw new Error(error.response?.data?.error || error.message);
     }
-      throw error;
+    throw error;
   }
 };
 
@@ -187,7 +187,7 @@ export const uploadFile = async (
 
   try {
     const response = await api.post(url, formData, {
-        headers: {
+      headers: {
         'Content-Type': 'multipart/form-data',
       },
       onUploadProgress: (progressEvent) => {
@@ -200,11 +200,11 @@ export const uploadFile = async (
       },
     });
     return response.data;
-    } catch (error) {
+  } catch (error) {
     if (axios.isAxiosError(error)) {
       throw new Error(error.response?.data?.error || 'Upload failed');
     }
-      throw error;
+    throw error;
   }
 };
 
@@ -224,7 +224,7 @@ export const checkServerHealth = async (): Promise<boolean> => {
   try {
     const response = await api.get('/api/health');
     return response.status === 200;
-    } catch (error) {
+  } catch (error) {
     return false;
   }
 };
@@ -282,11 +282,11 @@ export const unfollowUser = async (userId: string): Promise<any> => {
   }
 };
 
-// Accept follow request
-export const acceptFollowRequest = async (requesterUserId: string): Promise<any> => {
+// Accept follow request - requestId is the _id of the FollowRequest document
+export const acceptFollowRequest = async (requestId: string): Promise<any> => {
   try {
-    // Backend route: POST /api/follows/accept/:userId
-    const response = await api.post(`/api/follows/accept/${requesterUserId}`);
+    // Backend route: POST /api/follows/accept/:requestId
+    const response = await api.post(`/api/follows/accept/${requestId}`);
     return response.data;
   } catch (error) {
     console.error('Error accepting follow request:', error);
@@ -295,10 +295,10 @@ export const acceptFollowRequest = async (requesterUserId: string): Promise<any>
 };
 
 // Reject follow request
-export const rejectFollowRequest = async (requesterUserId: string): Promise<any> => {
+export const rejectFollowRequest = async (requestId: string): Promise<any> => {
   try {
-    // Backend route: POST /api/follows/reject/:userId
-    const response = await api.post(`/api/follows/reject/${requesterUserId}`);
+    // Backend route: POST /api/follows/reject/:requestId
+    const response = await api.post(`/api/follows/reject/${requestId}`);
     return response.data;
   } catch (error) {
     console.error('Error rejecting follow request:', error);

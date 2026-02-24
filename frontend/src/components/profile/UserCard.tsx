@@ -45,7 +45,7 @@ export default function UserCard({ user, currentUserId }: UserCardProps) {
     <div className="flex items-center space-x-4 p-4 border rounded-lg bg-background">
       <Avatar className="h-12 w-12">
         <AvatarImage src={user.avatar} />
-        <AvatarFallback>{user.name.split(' ').map(n => n[0]).join('')}</AvatarFallback>
+        <AvatarFallback>{user.name.charAt(0).toUpperCase()}</AvatarFallback>
       </Avatar>
       <div className="flex-1 min-w-0">
         <div className="font-semibold">{user.name}</div>
