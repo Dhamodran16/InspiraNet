@@ -1617,16 +1617,11 @@ body {
 }
 
 .messages-theme .message-bubble-own {
-  background-color: hsl(var(--primary) / 0.15);
-  color: hsl(var(--primary));
-  border-color: hsl(var(--primary) / 0.2);
-}
-
-.dark .messages-theme .message-bubble-own {
   background-color: hsl(var(--primary));
   color: hsl(var(--primary-foreground));
   border-color: hsl(var(--primary) / 0.8);
 }
+
 
 .messages-theme .message-bubble-other {
   background-color: hsl(var(--muted));
@@ -1634,8 +1629,28 @@ body {
   border-color: hsl(var(--border));
 }
 
+/* Dark mode: received bubble needs a clearly distinct bg from the near-black canvas */
+.dark .messages-theme .message-bubble-other {
+  background-color: hsl(215 20% 22%);
+  color: hsl(210 40% 95%);
+  border-color: hsl(215 20% 30%);
+}
+
+/* Dark mode: sent bubble — slightly lighter card to stand out from canvas */
+.dark .messages-theme .message-bubble-own {
+  background-color: hsl(215 25% 18%);
+  color: hsl(210 40% 95%);
+  border-color: hsl(215 25% 26%);
+}
+
 .messages-theme .message-sender-subtle {
+  color: hsl(var(--primary-foreground) / 0.85);
+  font-weight: 600;
+}
+
+.dark .messages-theme .message-sender-subtle {
   color: hsl(var(--muted-foreground));
+  font-weight: 600;
 }
 
 .messages-theme .bg-white,

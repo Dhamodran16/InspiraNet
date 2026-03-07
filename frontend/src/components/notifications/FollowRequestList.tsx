@@ -334,7 +334,7 @@ export default function FollowRequestList({ onRequestProcessed }: { onRequestPro
       {/* Header handled by parent component */}
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <div className="w-full overflow-x-auto scrollbar-none mb-6">
+        <div className="w-full overflow-x-auto scrollbar-none mb-6 max-w-full min-w-0">
           <TabsList className="flex space-x-2 min-w-max pb-1 bg-transparent border-0 p-0 h-auto justify-start">
             <TabsTrigger
               value="received"

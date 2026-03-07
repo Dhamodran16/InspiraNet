@@ -248,6 +248,11 @@ export const getUsersDirectory = async (params: {
   }
 };
 
+// Search users by name or email
+export const searchUsers = async (query: string): Promise<any> => {
+  return getUsersDirectory({ search: query });
+};
+
 // Send follow request
 export const sendFollowRequest = async (userId: string): Promise<any> => {
   try {

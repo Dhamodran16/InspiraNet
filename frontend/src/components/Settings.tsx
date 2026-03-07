@@ -1044,8 +1044,8 @@ export default function Settings() {
       {/* Real-time Status Indicator */}
       <Card className="border-l-4 border-l-blue-500">
         <CardContent className="pt-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:space-x-4">
               <div className="flex items-center space-x-2">
                 {isOnline ? (
                   <Wifi className="h-4 w-4 text-green-500" />
@@ -1074,7 +1074,7 @@ export default function Settings() {
               </div>
             </div>
 
-            <div className="flex items-center space-x-2">
+            <div className="flex w-full sm:w-auto items-center justify-between sm:justify-end gap-3 mt-4 sm:mt-0">
               {pendingChanges.length > 0 && (
                 <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">
                   {pendingChanges.length} pending
@@ -1095,33 +1095,35 @@ export default function Settings() {
         </CardContent>
       </Card>
 
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold">Settings</h1>
-          <p className="text-muted-foreground">Manage your account preferences and privacy</p>
+          <h1 className="text-2xl sm:text-3xl font-bold">Settings</h1>
+          <p className="text-sm sm:text-base text-muted-foreground mt-1">Manage your account preferences and privacy</p>
         </div>
-        <Button onClick={resetSettings} variant="outline">
+        <Button onClick={resetSettings} variant="outline" className="w-full sm:w-auto shrink-0">
           <RefreshCw className="h-4 w-4 mr-2" />
           Reset to Defaults
         </Button>
       </div>
 
       <Tabs defaultValue="profile" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-7">
-          <TabsTrigger value="profile">Profile</TabsTrigger>
-          <TabsTrigger value="notifications">Notifications</TabsTrigger>
-          <TabsTrigger value="privacy">Privacy</TabsTrigger>
-          <TabsTrigger value="communication">Communication</TabsTrigger>
-          <TabsTrigger value="security">Security</TabsTrigger>
-          <TabsTrigger value="appearance">Appearance</TabsTrigger>
-          <TabsTrigger value="activity">Activity</TabsTrigger>
-        </TabsList>
+        <div className="w-full min-w-0">
+          <TabsList className="flex flex-wrap w-full justify-start gap-2 bg-transparent p-0 h-auto">
+            <TabsTrigger className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-4 py-2" value="profile">Profile</TabsTrigger>
+            <TabsTrigger className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-4 py-2" value="notifications">Notifications</TabsTrigger>
+            <TabsTrigger className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-4 py-2" value="privacy">Privacy</TabsTrigger>
+            <TabsTrigger className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-4 py-2" value="communication">Communication</TabsTrigger>
+            <TabsTrigger className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-4 py-2" value="security">Security</TabsTrigger>
+            <TabsTrigger className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-4 py-2" value="appearance">Appearance</TabsTrigger>
+            <TabsTrigger className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-4 py-2" value="activity">Activity</TabsTrigger>
+          </TabsList>
+        </div>
 
         {/* Profile Settings */}
         <TabsContent value="profile" className="space-y-6">
           <Card>
             <CardHeader>
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <div>
                   <CardTitle className="flex items-center space-x-2">
                     <User className="h-5 w-5" />
@@ -1132,12 +1134,12 @@ export default function Settings() {
                   </CardDescription>
                 </div>
                 {!isEditingProfile ? (
-                  <Button onClick={() => setIsEditingProfile(true)} variant="outline">
+                  <Button onClick={() => setIsEditingProfile(true)} variant="outline" className="w-full sm:w-auto">
                     <User className="h-4 w-4 mr-2" />
                     Edit Profile
                   </Button>
                 ) : (
-                  <div className="flex space-x-2">
+                  <div className="flex w-full sm:w-auto gap-2">
                     <Button
                       onClick={async () => {
                         try {
@@ -1315,26 +1317,36 @@ export default function Settings() {
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="flex flex-col gap-4">
                 <div>
                   <Label htmlFor="name">Full Name</Label>
-                  <Input
-                    id="name"
-                    value={isEditingProfile ? profileForm.name : (user?.name || '')}
-                    disabled={!isEditingProfile}
-                    onChange={(e) => setProfileForm({ ...profileForm, name: e.target.value })}
-                  />
+                  {isEditingProfile ? (
+                    <Input
+                      id="name"
+                      value={profileForm.name}
+                      onChange={(e) => setProfileForm({ ...profileForm, name: e.target.value })}
+                    />
+                  ) : (
+                    <div className="flex w-full min-h-[40px] items-center rounded-md border border-input bg-muted/50 px-3 py-2 text-sm opacity-70 break-words">
+                      {user?.name || ''}
+                    </div>
+                  )}
                 </div>
                 <div>
                   <Label htmlFor="collegeEmail">College Email ID</Label>
-                  <Input
-                    id="collegeEmail"
-                    value={isEditingProfile ? profileForm.collegeEmail : (user?.email?.college || '')}
-                    disabled={!isEditingProfile || !!user?.email?.college}
-                    onChange={(e) => setProfileForm({ ...profileForm, collegeEmail: e.target.value })}
-                    className={`font-mono ${(!isEditingProfile || !!user?.email?.college) ? 'bg-gray-50/50' : ''}`}
-                    placeholder="name.yydept@kongu.edu"
-                  />
+                  {!isEditingProfile || !!user?.email?.college ? (
+                    <div className="flex w-full min-h-[40px] items-center rounded-md border border-input bg-muted/50 px-3 py-2 text-sm font-mono opacity-70 break-all">
+                      {user?.email?.college || 'Not set'}
+                    </div>
+                  ) : (
+                    <Input
+                      id="collegeEmail"
+                      value={profileForm.collegeEmail}
+                      onChange={(e) => setProfileForm({ ...profileForm, collegeEmail: e.target.value })}
+                      className="font-mono"
+                      placeholder="name.yydept@kongu.edu"
+                    />
+                  )}
                   {isEditingProfile && !user?.email?.college && (
                     <p className="text-xs text-amber-600 mt-1">
                       Your college email is missing. Please enter it to restore full account access.
@@ -1343,14 +1355,19 @@ export default function Settings() {
                 </div>
                 <div>
                   <Label htmlFor="personalEmail">Personal Email ID</Label>
-                  <Input
-                    id="personalEmail"
-                    value={isEditingProfile ? profileForm.personalEmail : (user?.email?.personal || '')}
-                    disabled={!isEditingProfile}
-                    onChange={(e) => setProfileForm({ ...profileForm, personalEmail: e.target.value })}
-                    className={`font-mono ${!isEditingProfile ? 'bg-gray-50/50' : ''}`}
-                    placeholder="Enter your personal email"
-                  />
+                  {!isEditingProfile ? (
+                    <div className="flex w-full min-h-[40px] items-center rounded-md border border-input bg-muted/50 px-3 py-2 text-sm font-mono opacity-70 break-all">
+                      {user?.email?.personal || 'Not set'}
+                    </div>
+                  ) : (
+                    <Input
+                      id="personalEmail"
+                      value={profileForm.personalEmail}
+                      onChange={(e) => setProfileForm({ ...profileForm, personalEmail: e.target.value })}
+                      className="font-mono"
+                      placeholder="Enter your personal email"
+                    />
+                  )}
                   {isEditingProfile && (
                     <p className="text-xs text-muted-foreground mt-1">
                       Secondary email for account recovery and migration.
@@ -1461,7 +1478,7 @@ export default function Settings() {
                     )}
                   </>
                 )}
-                <div className="col-span-2">
+                <div className="w-full">
                   <Label htmlFor="bio">Bio</Label>
                   <textarea
                     id="bio"
@@ -1581,28 +1598,39 @@ export default function Settings() {
                   <Mail className="h-4 w-4" />
                   <span>Contact Information</span>
                 </h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="flex flex-col gap-4">
                   <div>
-                    <Label htmlFor="collegeEmail">College Email</Label>
-                    <Input
-                      id="collegeEmail"
-                      type="email"
-                      value={isEditingProfile ? profileForm.collegeEmail : (user?.email?.college || '')}
-                      disabled={!isEditingProfile}
-                      onChange={(e) => setProfileForm({ ...profileForm, collegeEmail: e.target.value })}
-                      placeholder="college-email@kongu.edu"
-                    />
+                    <Label htmlFor="contactCollegeEmail">College Email</Label>
+                    {!isEditingProfile ? (
+                      <div className="flex w-full min-h-[40px] items-center rounded-md border border-input bg-muted/50 px-3 py-2 text-sm font-mono opacity-70 break-all">
+                        {user?.email?.college || 'Not set'}
+                      </div>
+                    ) : (
+                      <Input
+                        id="contactCollegeEmail"
+                        type="email"
+                        value={profileForm.collegeEmail}
+                        disabled={true} // College email should be locked if they are editing it up top and it exists
+                        onChange={(e) => setProfileForm({ ...profileForm, collegeEmail: e.target.value })}
+                        placeholder="college-email@kongu.edu"
+                      />
+                    )}
                   </div>
                   <div>
-                    <Label htmlFor="personalEmail">Personal Email</Label>
-                    <Input
-                      id="personalEmail"
-                      type="email"
-                      value={isEditingProfile ? profileForm.personalEmail : (user?.email?.personal || '')}
-                      disabled={!isEditingProfile}
-                      onChange={(e) => setProfileForm({ ...profileForm, personalEmail: e.target.value })}
-                      placeholder="your.personal@email.com"
-                    />
+                    <Label htmlFor="contactPersonalEmail">Personal Email</Label>
+                    {!isEditingProfile ? (
+                      <div className="flex w-full min-h-[40px] items-center rounded-md border border-input bg-muted/50 px-3 py-2 text-sm font-mono opacity-70 break-all">
+                        {user?.email?.personal || 'Not set'}
+                      </div>
+                    ) : (
+                      <Input
+                        id="contactPersonalEmail"
+                        type="email"
+                        value={profileForm.personalEmail}
+                        onChange={(e) => setProfileForm({ ...profileForm, personalEmail: e.target.value })}
+                        placeholder="your.personal@email.com"
+                      />
+                    )}
                   </div>
                 </div>
               </div>
@@ -1763,13 +1791,22 @@ export default function Settings() {
                   Resume
                   <span className="text-xs text-muted-foreground">(optional)</span>
                 </h4>
-                <Input
-                  id="resume"
-                  value={isEditingProfile ? profileForm.resume : (user?.resume || '')}
-                  disabled={!isEditingProfile}
-                  onChange={(e) => setProfileForm({ ...profileForm, resume: e.target.value })}
-                  placeholder="Resume URL or file path"
-                />
+                {!isEditingProfile ? (
+                  <div className="flex w-full min-h-[40px] items-center rounded-md border border-input bg-muted/50 px-3 py-2 text-sm text-foreground break-all">
+                    {user?.resume ? (
+                      <a href={user.resume} target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline">
+                        {user.resume}
+                      </a>
+                    ) : 'Not set'}
+                  </div>
+                ) : (
+                  <Input
+                    id="resume"
+                    value={profileForm.resume}
+                    onChange={(e) => setProfileForm({ ...profileForm, resume: e.target.value })}
+                    placeholder="Resume URL or file path"
+                  />
+                )}
                 <p className="text-xs text-muted-foreground mt-1">Enter URL or file path to your Resume</p>
               </div>
 
@@ -1778,13 +1815,22 @@ export default function Settings() {
                   Portfolio URL
                   <span className="text-xs text-muted-foreground">(optional)</span>
                 </h4>
-                <Input
-                  id="portfolio"
-                  value={isEditingProfile ? profileForm.portfolio : (user?.portfolio || '')}
-                  disabled={!isEditingProfile}
-                  onChange={(e) => setProfileForm({ ...profileForm, portfolio: e.target.value })}
-                  placeholder="https://yourportfolio.com"
-                />
+                {!isEditingProfile ? (
+                  <div className="flex w-full min-h-[40px] items-center rounded-md border border-input bg-muted/50 px-3 py-2 text-sm text-foreground break-all">
+                    {user?.portfolio ? (
+                      <a href={user.portfolio} target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline">
+                        {user.portfolio}
+                      </a>
+                    ) : 'Not set'}
+                  </div>
+                ) : (
+                  <Input
+                    id="portfolio"
+                    value={profileForm.portfolio}
+                    onChange={(e) => setProfileForm({ ...profileForm, portfolio: e.target.value })}
+                    placeholder="https://yourportfolio.com"
+                  />
+                )}
                 <p className="text-xs text-muted-foreground mt-1">Share a public portfolio or project site link</p>
               </div>
 
@@ -1796,36 +1842,63 @@ export default function Settings() {
                   <LinkIcon className="h-4 w-4" />
                   <span>Social Links</span>
                 </h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="flex flex-col gap-4">
                   <div>
                     <Label htmlFor="linkedin">LinkedIn</Label>
-                    <Input
-                      id="linkedin"
-                      value={isEditingProfile ? profileForm.linkedin : (user?.socialLinks?.linkedin || '')}
-                      disabled={!isEditingProfile}
-                      onChange={(e) => setProfileForm({ ...profileForm, linkedin: e.target.value })}
-                      placeholder="https://linkedin.com/in/yourprofile"
-                    />
+                    {!isEditingProfile ? (
+                      <div className="flex w-full min-h-[40px] items-center rounded-md border border-input bg-muted/50 px-3 py-2 text-sm text-foreground break-all">
+                        {user?.socialLinks?.linkedin ? (
+                          <a href={user.socialLinks.linkedin} target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline">
+                            {user.socialLinks.linkedin}
+                          </a>
+                        ) : 'Not set'}
+                      </div>
+                    ) : (
+                      <Input
+                        id="linkedin"
+                        value={profileForm.linkedin}
+                        onChange={(e) => setProfileForm({ ...profileForm, linkedin: e.target.value })}
+                        placeholder="https://linkedin.com/in/yourprofile"
+                      />
+                    )}
                   </div>
                   <div>
                     <Label htmlFor="github">GitHub</Label>
-                    <Input
-                      id="github"
-                      value={isEditingProfile ? profileForm.github : (user?.socialLinks?.github || '')}
-                      disabled={!isEditingProfile}
-                      onChange={(e) => setProfileForm({ ...profileForm, github: e.target.value })}
-                      placeholder="https://github.com/yourusername"
-                    />
+                    {!isEditingProfile ? (
+                      <div className="flex w-full min-h-[40px] items-center rounded-md border border-input bg-muted/50 px-3 py-2 text-sm text-foreground break-all">
+                        {user?.socialLinks?.github ? (
+                          <a href={user.socialLinks.github} target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline">
+                            {user.socialLinks.github}
+                          </a>
+                        ) : 'Not set'}
+                      </div>
+                    ) : (
+                      <Input
+                        id="github"
+                        value={profileForm.github}
+                        onChange={(e) => setProfileForm({ ...profileForm, github: e.target.value })}
+                        placeholder="https://github.com/yourusername"
+                      />
+                    )}
                   </div>
                   <div>
                     <Label htmlFor="leetcode">LeetCode</Label>
-                    <Input
-                      id="leetcode"
-                      value={isEditingProfile ? profileForm.leetcode : (user?.socialLinks?.leetcode || '')}
-                      disabled={!isEditingProfile}
-                      onChange={(e) => setProfileForm({ ...profileForm, leetcode: e.target.value })}
-                      placeholder="https://leetcode.com/yourusername"
-                    />
+                    {!isEditingProfile ? (
+                      <div className="flex w-full min-h-[40px] items-center rounded-md border border-input bg-muted/50 px-3 py-2 text-sm text-foreground break-all">
+                        {user?.socialLinks?.leetcode ? (
+                          <a href={user.socialLinks.leetcode} target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline">
+                            {user.socialLinks.leetcode}
+                          </a>
+                        ) : 'Not set'}
+                      </div>
+                    ) : (
+                      <Input
+                        id="leetcode"
+                        value={profileForm.leetcode}
+                        onChange={(e) => setProfileForm({ ...profileForm, leetcode: e.target.value })}
+                        placeholder="https://leetcode.com/yourusername"
+                      />
+                    )}
                   </div>
                 </div>
 
@@ -1900,7 +1973,7 @@ export default function Settings() {
         <TabsContent value="privacy" className="space-y-6">
           <Card>
             <CardHeader>
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <div>
                   <CardTitle className="flex items-center space-x-2">
                     <Eye className="h-5 w-5" />
@@ -2021,7 +2094,7 @@ export default function Settings() {
         <TabsContent value="communication" className="space-y-6">
           <Card>
             <CardHeader>
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <div>
                   <CardTitle className="flex items-center space-x-2">
                     <Globe className="h-5 w-5" />
@@ -2377,8 +2450,8 @@ export default function Settings() {
             <CardContent>
               <div className="space-y-4">
                 {/* Real-time Controls */}
-                <div className="flex items-center justify-between p-4 bg-muted rounded-lg border border-border">
-                  <div className="flex items-center space-x-4">
+                <div className="flex flex-col sm:flex-row items-start justify-between p-4 bg-muted rounded-lg border border-border gap-4">
+                  <div className="flex flex-wrap items-center gap-4">
                     <div className="flex items-center space-x-2">
                       <Switch
                         checked={realTimeUpdates}

@@ -70,8 +70,8 @@ export function NotificationList({ onNotificationClick, onMarkAllRead }: Notific
   const [filter, setFilter] = useState<'all' | 'unread' | 'connection' | 'communication' | 'follow_requests' | 'read'>('all');
 
   useEffect(() => {
-    loadNotifications();
-  }, [currentPage, filter]);
+    loadNotifications(1, false);
+  }, [filter]);
 
   // Auto-refresh on socket new_notification and notification_read
   useEffect(() => {
@@ -84,7 +84,7 @@ export function NotificationList({ onNotificationClick, onMarkAllRead }: Notific
       socketService.offNewNotification();
       socketService.offNotificationRead();
     };
-  }, [currentPage]);
+  }, [filter]);
 
   const loadNotifications = async (page = 1, append = false) => {
     try {
@@ -200,21 +200,21 @@ export function NotificationList({ onNotificationClick, onMarkAllRead }: Notific
   const getNotificationColor = (type: string) => {
     switch (type) {
       case 'follow_request':
-        return 'border-l-blue-500 bg-blue-50/50 dark:bg-blue-900/20';
+        return 'border-l-blue-500';
       case 'follow_accepted':
-        return 'border-l-green-500 bg-green-50/50 dark:bg-green-900/20';
+        return 'border-l-green-500';
       case 'follow_rejected':
-        return 'border-l-red-500 bg-red-50/50 dark:bg-red-900/20';
+        return 'border-l-red-500';
       case 'post_like':
-        return 'border-l-red-500 bg-red-50/50 dark:bg-red-900/20';
+        return 'border-l-red-500';
       case 'post_comment':
-        return 'border-l-blue-500 bg-blue-50/50 dark:bg-blue-900/20';
+        return 'border-l-blue-500';
       case 'post_share':
-        return 'border-l-purple-500 bg-purple-50/50 dark:bg-purple-900/20';
+        return 'border-l-purple-500';
       case 'message':
-        return 'border-l-green-500 bg-green-50/50 dark:bg-green-900/20';
+        return 'border-l-green-500';
       default:
-        return 'border-l-gray-500 bg-gray-50/50 dark:bg-slate-800/20';
+        return 'border-l-gray-500';
     }
   };
 
@@ -250,65 +250,82 @@ export function NotificationList({ onNotificationClick, onMarkAllRead }: Notific
     <div className="space-y-4">
       {/* Header with filters and actions - Made responsive with horizontal scroll */}
       {/* Header with filters and actions - Made responsive with horizontal scroll */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-6">
-        <div className="w-full sm:w-auto overflow-x-auto scrollbar-none">
-          <div className="flex space-x-2 min-w-max pb-1">
-            <button
-              onClick={() => setFilter('all')}
-              className={`px-4 py-2 rounded-full text-xs sm:text-sm font-medium transition-all flex items-center gap-2 border ${filter === 'all' ? 'bg-blue-600 text-white border-blue-600 shadow-sm' : 'bg-transparent text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
-            >
-              <Bell className="h-4 w-4" />
-              All
-            </button>
-            <button
-              onClick={() => setFilter('unread')}
-              className={`px-4 py-2 rounded-full text-xs sm:text-sm font-medium transition-all flex items-center gap-2 border ${filter === 'unread' ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm' : 'bg-transparent text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
-            >
-              <BellRing className="h-4 w-4" />
-              Unread
-            </button>
-            <button
-              onClick={() => setFilter('connection')}
-              className={`px-4 py-2 rounded-full text-xs sm:text-sm font-medium transition-all flex items-center gap-2 border ${filter === 'connection' ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm' : 'bg-transparent text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
-            >
-              <Users className="h-4 w-4" />
-              Network
-            </button>
-            <button
-              onClick={() => setFilter('communication')}
-              className={`px-4 py-2 rounded-full text-xs sm:text-sm font-medium transition-all flex items-center gap-2 border ${filter === 'communication' ? 'bg-pink-600 text-white border-pink-600 shadow-sm' : 'bg-transparent text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
-            >
-              <Radio className="h-4 w-4" />
-              Alerts
-            </button>
-            <button
-              onClick={() => setFilter('follow_requests')}
-              className={`px-4 py-2 rounded-full text-xs sm:text-sm font-medium transition-all flex items-center gap-2 border ${filter === 'follow_requests' ? 'bg-amber-600 text-white border-amber-600 shadow-sm' : 'bg-transparent text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
-            >
-              <UserPlus className="h-4 w-4" />
-              Follow
-            </button>
-          </div>
+      <div className="flex flex-col gap-3 mb-5 w-full min-w-0">
+        {/* Mobile quick actions header */}
+        <div className="flex w-full justify-between items-center sm:hidden px-1">
+          <span className="text-sm font-medium text-muted-foreground font-semibold">Filter Notifications</span>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleMarkAllRead}
+            className="h-8 px-3 rounded-full text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 font-semibold flex-shrink-0 transition-all text-xs whitespace-nowrap"
+          >
+            <CheckCircle className="h-3.5 w-3.5 flex-shrink-0 mr-1.5" />
+            Mark all read
+          </Button>
         </div>
 
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={handleMarkAllRead}
-          className="h-9 px-3 rounded-full text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 font-semibold flex-shrink-0 transition-all w-full sm:w-auto whitespace-nowrap"
-        >
-          <CheckCircle className="h-4 w-4 mr-1.5" />
-          Mark all read
-        </Button>
+        {/* Filters bar and desktop actions */}
+        <div className="flex flex-row items-start sm:items-center justify-between w-full min-w-0">
+          <div className="w-full min-w-0">
+            <div className="flex flex-wrap gap-2 pb-1">
+              <button
+                onClick={() => setFilter('all')}
+                className={`px-4 py-2 rounded-full text-xs sm:text-sm font-medium transition-all flex items-center gap-2 border ${filter === 'all' ? 'bg-blue-600 text-white border-blue-600 shadow-sm' : 'bg-transparent text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
+              >
+                <Bell className="h-4 w-4" />
+                All
+              </button>
+              <button
+                onClick={() => setFilter('unread')}
+                className={`px-4 py-2 rounded-full text-xs sm:text-sm font-medium transition-all flex items-center gap-2 border ${filter === 'unread' ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm' : 'bg-transparent text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
+              >
+                <BellRing className="h-4 w-4" />
+                Unread
+              </button>
+              <button
+                onClick={() => setFilter('connection')}
+                className={`px-4 py-2 rounded-full text-xs sm:text-sm font-medium transition-all flex items-center gap-2 border ${filter === 'connection' ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm' : 'bg-transparent text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
+              >
+                <Users className="h-4 w-4" />
+                Network
+              </button>
+              <button
+                onClick={() => setFilter('communication')}
+                className={`px-4 py-2 rounded-full text-xs sm:text-sm font-medium transition-all flex items-center gap-2 border ${filter === 'communication' ? 'bg-pink-600 text-white border-pink-600 shadow-sm' : 'bg-transparent text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
+              >
+                <Radio className="h-4 w-4" />
+                Alerts
+              </button>
+              <button
+                onClick={() => setFilter('follow_requests')}
+                className={`px-4 py-2 rounded-full text-xs sm:text-sm font-medium transition-all flex items-center gap-2 border ${filter === 'follow_requests' ? 'bg-amber-600 text-white border-amber-600 shadow-sm' : 'bg-transparent text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
+              >
+                <UserPlus className="h-4 w-4" />
+                Follow
+              </button>
+            </div>
+          </div>
+
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleMarkAllRead}
+            className="hidden sm:inline-flex h-9 px-3 rounded-full text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 font-semibold flex-shrink-0 transition-all w-auto whitespace-nowrap ml-4"
+          >
+            <CheckCircle className="h-4 w-4 flex-shrink-0 mr-1.5" />
+            Mark all read
+          </Button>
+        </div>
       </div>
 
       {/* Notifications list */}
-      <div className="flex flex-col gap-2.5 sm:gap-3 px-3 sm:px-0 mt-2 sm:mt-3">
+      <div className="flex flex-col gap-3 mt-4 w-full">
         {notifications.map((notification) => (
           <div
             key={notification._id}
-            className={`transition-all duration-300 transform hover:scale-[1.005] sm:rounded-lg sm:border-l-4 sm:border shadow-sm hover:shadow-md ${getNotificationColor(notification.type)} ${!notification.isRead ? 'bg-blue-50/40 ring-1 ring-blue-100/50' : 'bg-white sm:bg-card'
-              } p-3 sm:p-3 relative overflow-hidden group`}
+            className={`transition-all w-full duration-300 transform hover:scale-[1.005] rounded-xl border shadow-sm hover:shadow-md ${getNotificationColor(notification.type)} ${!notification.isRead ? 'bg-primary/5 dark:bg-primary/10 ring-1 ring-primary/20' : 'bg-card'
+              } p-4 relative overflow-hidden group`}
           >
             <div className="p-0">
               <div className="flex items-start gap-2.5">
@@ -336,29 +353,29 @@ export function NotificationList({ onNotificationClick, onMarkAllRead }: Notific
                   </div>
 
                   {notification.message && (
-                    <p className="text-[12px] sm:text-[13px] text-muted-foreground mb-2 line-clamp-2 md:line-clamp-none leading-snug">
+                    <p className="text-[12px] sm:text-[13px] text-muted-foreground mb-2 leading-relaxed">
                       {notification.message}
                     </p>
                   )}
 
-                  <div className="flex flex-wrap items-center justify-between gap-2 mt-1 pt-1 border-t border-black/5 dark:border-white/5">
-                    <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[9px] sm:text-[10px] text-muted-foreground/80">
+                  <div className="flex flex-wrap items-center justify-between gap-2 mt-1 pt-2 border-t border-black/5 dark:border-white/5">
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] sm:text-[11px] text-muted-foreground/80">
                       {notification.senderId && (
-                        <div className="flex items-center gap-1">
-                          <Avatar className="h-3.5 w-3.5">
+                        <div className="flex items-center gap-1.5">
+                          <Avatar className="h-4 w-4">
                             <AvatarImage src={notification.senderId.avatar} />
-                            <AvatarFallback className="text-[7px]">
+                            <AvatarFallback className="text-[8px]">
                               {notification.senderId.name.charAt(0).toUpperCase()}
                             </AvatarFallback>
                           </Avatar>
-                          <span className="max-w-[80px] truncate font-medium">{notification.senderId.name}</span>
+                          <span className="max-w-[140px] sm:max-w-[200px] truncate font-medium">{notification.senderId.name}</span>
                         </div>
                       )}
                       <span className="opacity-40">•</span>
                       <span>{formatDistanceToNow(new Date(notification.createdAt), { addSuffix: true })}</span>
                     </div>
 
-                    <div className="flex items-center gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
+                    <div className="flex items-center gap-1 opacity-100 sm:opacity-60 sm:group-hover:opacity-100 transition-opacity">
                       {!notification.isRead && (
                         <Button
                           size="sm"

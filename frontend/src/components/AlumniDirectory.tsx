@@ -609,7 +609,7 @@ export default function AlumniDirectory() {
                     </Button>
 
                     {/* Secondary Action Buttons */}
-                    <div className="flex space-x-2">
+                    <div className="flex flex-wrap gap-2 sm:flex-nowrap">
                       {/* Message Button */}
                       {(user.isFollowing || user.isFollowedBy || user.followRequestStatus === 'accepted') && (
                         <Button
@@ -619,10 +619,10 @@ export default function AlumniDirectory() {
                             e.stopPropagation();
                             handleMessage(user._id);
                           }}
-                          className="flex-1 transition-all duration-300 hover:scale-105"
+                          className="flex-1 min-w-[100px] transition-all duration-300 hover:scale-105"
                         >
-                          <MessageSquare className="h-4 w-4 mr-2" />
-                          Message
+                          <MessageSquare className="h-4 w-4 mr-1 sm:mr-2 flex-shrink-0" />
+                          <span className="truncate">Message</span>
                         </Button>
                       )}
 
@@ -634,10 +634,10 @@ export default function AlumniDirectory() {
                           e.stopPropagation();
                           handleViewProfile(user._id);
                         }}
-                        className="flex-1 transition-all duration-300 hover:scale-105"
+                        className="flex-1 min-w-[100px] transition-all duration-300 hover:scale-105"
                       >
-                        <Eye className="h-4 w-4 mr-2" />
-                        Profile
+                        <Eye className="h-4 w-4 mr-1 sm:mr-2 flex-shrink-0" />
+                        <span className="truncate">Profile</span>
                       </Button>
 
                       {/* Share Profile Button */}

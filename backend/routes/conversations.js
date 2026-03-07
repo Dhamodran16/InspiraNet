@@ -292,17 +292,46 @@ router.post('/:id/members', authenticateToken, async (req, res) => {
     await conversation.save();
     await conversation.populate('participants', 'name avatar email type department');
 
-    // Emit socket events
-    const io = req.app.get('io');
-    if (io) {
+    // Fetch admin user name for the system message
+    const adminUser = await User.findById(userId).select('name');
+    const adminName = adminUser?.name || 'Admin';
+
+    // Create a system message for each newly added member (WhatsApp-style)
+    const addedMemberUsers = newMembers.filter(m => newMemberIds.map(id => id.toString()).includes(m._id.toString()));
+    for (const addedMember of addedMemberUsers) {
+      const sysMsg = await Message.create({
+        conversationId,
+        senderId: userId,
+        senderName: 'System',
+        content: `${adminName} added ${addedMember.name} to the group`,
+        messageType: 'system',
+        status: 'delivered',
+        isSystemMessage: true,
+      });
+
+      // Emit socket events
+      const io = req.app.get('io');
+      if (io) {
+        conversation.participants.forEach(participantId => {
+          io.to(`user_${participantId}`).emit('new_message', {
+            ...sysMsg.toObject(),
+            conversationId
+          });
+        });
+      }
+    }
+
+    // Emit socket events for group update
+    const groupIo = req.app.get('io');
+    if (groupIo) {
       newMemberIds.forEach(memberId => {
-        io.to(`user_${memberId}`).emit('added_to_group', {
+        groupIo.to(`user_${memberId}`).emit('added_to_group', {
           conversationId,
           addedBy: userId
         });
       });
       conversation.participants.forEach(participantId => {
-        io.to(`user_${participantId}`).emit('group_updated', {
+        groupIo.to(`user_${participantId}`).emit('group_updated', {
           conversationId,
           updatedBy: userId
         });

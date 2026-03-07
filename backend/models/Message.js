@@ -90,6 +90,11 @@ const messageSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
+  // System message flag (e.g. "Admin added John to the group")
+  isSystemMessage: {
+    type: Boolean,
+    default: false
+  },
   deletedBy: [{
     userId: {
       type: mongoose.Schema.Types.ObjectId,

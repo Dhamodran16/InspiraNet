@@ -456,8 +456,8 @@ const MessagesPage: React.FC = () => {
                       key={user._id}
                       onClick={() => setSelectedUser(user)}
                       className={`flex items-center space-x-3 p-4 cursor-pointer transition-colors border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 ${selectedUser?._id === user._id
-                          ? 'bg-blue-50 dark:bg-blue-900/20 border-l-4 border-l-blue-500'
-                          : ''
+                        ? 'bg-blue-50 dark:bg-blue-900/20 border-l-4 border-l-blue-500'
+                        : ''
                         }`}
                     >
                       <Avatar className="h-12 w-12">
@@ -521,15 +521,15 @@ const MessagesPage: React.FC = () => {
                           >
                             <div
                               className={`max-w-xs lg:max-w-md px-4 py-2 rounded-2xl ${isSelf
-                                  ? 'bg-blue-500 text-white rounded-br-md'
-                                  : 'bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded-bl-md border border-gray-200 dark:border-gray-600'
+                                ? 'bg-blue-500 text-white rounded-br-md'
+                                : 'bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded-bl-md border border-gray-200 dark:border-gray-600'
                                 }`}
                             >
                               <p className={`text-xs mb-1 ${isSelf ? 'text-blue-100' : 'text-gray-600 dark:text-gray-400'}`}>
                                 {message.senderName || (isSelf ? user?.name : selectedUser?.name)}
                               </p>
                               <p className="text-sm whitespace-pre-wrap break-words">
-                                <Linkify text={message.content} />
+                                <Linkify text={message.content} linkClassName={isSelf ? 'text-primary-foreground hover:text-primary-foreground/90 underline decoration-primary-foreground/50 font-medium' : ''} />
                               </p>
                               <p className={`text-xs mt-1 ${isSelf ? 'text-blue-100' : 'text-gray-500 dark:text-gray-400'}`}>
                                 {new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}

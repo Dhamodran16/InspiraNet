@@ -8,13 +8,13 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { MessageCircle, Send, Search, MoreVertical, Phone, Video } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { api } from '@/services/api';
+import * as api from '@/services/api';
 import { toast } from '@/hooks/use-toast';
 import Linkify from '@/components/ui/Linkify';
 
 interface Message {
   _id: string;
-  senderId: string;
+  senderId: any;
   senderName: string;
   content: string;
   messageType: 'text' | 'image' | 'file';
@@ -345,10 +345,15 @@ export default function ChatSystem() {
                   let messageSenderId;
 
                   // Handle senderId as object or string
-                  if (typeof message.senderId === 'object' && message.senderId !== null) {
-                    messageSenderId = message.senderId._id?.toString() || message.senderId.toString();
+                  if (message.senderId) {
+                    if (typeof message.senderId === 'object') {
+                      const senderObj = message.senderId as any;
+                      messageSenderId = senderObj._id?.toString() || senderObj.toString() || '';
+                    } else {
+                      messageSenderId = message.senderId.toString();
+                    }
                   } else {
-                    messageSenderId = message.senderId?.toString();
+                    messageSenderId = '';
                   }
 
                   const isOwn = message.isOwn !== undefined ? message.isOwn : (messageSenderId === user?._id?.toString());
@@ -386,12 +391,12 @@ export default function ChatSystem() {
                           {/* Message bubble */}
                           <div
                             className={`px-4 py-2 rounded-lg ${isOwn
-                                ? 'bg-primary text-primary-foreground'
-                                : 'bg-muted text-muted-foreground'
+                              ? 'bg-primary text-primary-foreground'
+                              : 'bg-muted text-muted-foreground'
                               }`}
                           >
                             <p className="text-sm whitespace-pre-wrap break-words">
-                              <Linkify text={message.content} />
+                              <Linkify text={message.content} linkClassName={isOwn ? 'text-primary-foreground hover:text-primary-foreground/90 underline decoration-primary-foreground/50 font-medium' : ''} />
                             </p>
                             <div className={`flex items-center justify-between mt-1 text-xs ${isOwn ? 'text-primary-foreground/70' : 'text-muted-foreground'
                               }`}>

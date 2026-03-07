@@ -164,6 +164,16 @@
   border-bottom-right-radius: 0.25rem;
 }
 
+.message-bubble-own a {
+  color: white !important;
+  text-decoration: underline;
+  opacity: 0.95;
+}
+
+.message-bubble-own a:hover {
+  opacity: 1;
+}
+
 .message-bubble.other,
 .message-bubble-other {
   background-color: #f3f4f6;

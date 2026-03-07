@@ -5,6 +5,8 @@ interface LinkifyProps {
     text: string;
     /** When true, show only the hostname as link text instead of the full URL */
     shortenUrls?: boolean;
+    /** Custom class for the anchor tags */
+    linkClassName?: string;
 }
 
 // Matches http(s):// URLs and bare www. URLs
@@ -30,7 +32,7 @@ function shortDisplay(url: string): string {
     }
 }
 
-const Linkify: React.FC<LinkifyProps> = ({ text, shortenUrls = false }) => {
+const Linkify: React.FC<LinkifyProps> = ({ text, shortenUrls = false, linkClassName }) => {
     if (!text) return null;
 
     const parts: React.ReactNode[] = [];
@@ -53,7 +55,7 @@ const Linkify: React.FC<LinkifyProps> = ({ text, shortenUrls = false }) => {
                 href={href}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-0.5 text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:underline break-all font-medium transition-colors"
+                className={`inline-flex items-center gap-0.5 hover:underline break-all font-medium transition-colors ${linkClassName || 'text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300'}`}
                 onClick={(e) => e.stopPropagation()}
                 title={href}
             >

@@ -77,7 +77,7 @@ interface Message {
   senderId: string;
   senderName: string;
   content: string;
-  messageType: 'text' | 'image' | 'video' | 'pdf' | 'file';
+  messageType: 'text' | 'image' | 'video' | 'pdf' | 'file' | 'system';
   mediaUrl?: string;
   fileName?: string;
   fileSize?: number;
@@ -88,6 +88,7 @@ interface Message {
   status?: 'sending' | 'sent' | 'delivered' | 'read' | 'failed';
   isOwn?: boolean;
   tempId?: string;
+  isSystemMessage?: boolean;
   replyTo?: {
     messageId: string;
     content: string;
@@ -2077,6 +2078,16 @@ const EnhancedMessagesPage: React.FC = () => {
   };
 
   const renderMessage = (message: Message) => {
+    // Render system messages (e.g. "Admin added John to the group") like WhatsApp
+    if (message.isSystemMessage || message.messageType === 'system') {
+      return (
+        <div key={message._id} className="flex justify-center my-2">
+          <div className="bg-muted text-muted-foreground text-xs px-3 py-1 rounded-full border border-border/50 shadow-sm select-none">
+            {message.content}
+          </div>
+        </div>
+      );
+    }
     // Fix: Handle senderId as object or string
     const currentUserId = user?._id?.toString();
     let messageSenderId;
@@ -2152,8 +2163,8 @@ const EnhancedMessagesPage: React.FC = () => {
         <div className={`flex items-end max-w-[85%] lg:max-w-md ${isOwn ? 'flex-row-reverse' : 'flex-row'} relative min-w-0`}>
           {/* Avatar - only show for received messages */}
           {!isOwn && (
-            <div className="w-8 h-8 flex-shrink-0 mr-2 bg-gray-300 rounded-full flex items-center justify-center mb-1">
-              <span className="text-xs font-medium uppercase">
+            <div className="w-8 h-8 flex-shrink-0 mr-2 rounded-full flex items-center justify-center mb-1 bg-gradient-to-br from-blue-500 to-indigo-600 shadow-sm">
+              <span className="text-xs font-bold text-white uppercase">
                 {message.senderName?.charAt(0) || 'U'}
               </span>
             </div>
@@ -2268,7 +2279,7 @@ const EnhancedMessagesPage: React.FC = () => {
                       </div>
                       {message.content && message.content !== '[image]' && (
                         <p className="text-sm whitespace-pre-wrap break-words">
-                          <Linkify text={message.content} />
+                          <Linkify text={message.content} linkClassName={isOwn ? 'text-white hover:text-blue-100 underline decoration-white/50' : ''} />
                         </p>
                       )}
                     </div>
@@ -2297,7 +2308,7 @@ const EnhancedMessagesPage: React.FC = () => {
                       </div>
                       {message.content && message.content !== '[video]' && message.content !== '[file]' && (
                         <p className="text-sm whitespace-pre-wrap break-words">
-                          <Linkify text={message.content} />
+                          <Linkify text={message.content} linkClassName={isOwn ? 'text-white hover:text-blue-100 underline decoration-white/50' : ''} />
                         </p>
                       )}
                     </div>
@@ -2326,7 +2337,7 @@ const EnhancedMessagesPage: React.FC = () => {
                       </div>
                       {message.content && message.content !== '[file]' && (
                         <p className="text-sm whitespace-pre-wrap break-words">
-                          <Linkify text={message.content} />
+                          <Linkify text={message.content} linkClassName={isOwn ? 'text-white hover:text-blue-100 underline decoration-white/50' : ''} />
                         </p>
                       )}
                     </div>
@@ -2353,14 +2364,14 @@ const EnhancedMessagesPage: React.FC = () => {
 
               {/* Text content */}
               {message.content && message.messageType === 'text' && (
-                <p className="text-sm whitespace-pre-wrap break-words">
-                  <Linkify text={message.content} />
+                <p className="text-sm whitespace-pre-wrap break-words leading-relaxed" style={{ color: 'inherit' }}>
+                  <Linkify text={message.content} linkClassName={isOwn ? 'text-white hover:text-blue-100 underline decoration-white/50' : ''} />
                 </p>
               )}
 
               {/* Message metadata */}
               <div className="flex items-center justify-end mt-1 space-x-1">
-                <span className="text-[10px] opacity-60">{messageTime}</span>
+                <span className="text-[10px] opacity-50">{messageTime}</span>
                 {isOwn && (
                   <div className="flex items-center ml-1">
                     {message.status === 'sending' && (
@@ -3040,11 +3051,11 @@ const EnhancedMessagesPage: React.FC = () => {
                 </div>
               </>
             ) : (
-              <div className="flex items-center justify-center h-full bg-white overflow-hidden">
+              <div className="flex items-center justify-center h-full bg-background overflow-hidden">
                 <div className="text-center space-y-3 px-6">
-                  <MessageSquare className="h-16 w-16 text-slate-200 mx-auto" />
-                  <h3 className="text-lg font-semibold text-slate-900">Select a conversation</h3>
-                  <p className="text-slate-500">Choose someone from the list to start chatting.</p>
+                  <MessageSquare className="h-16 w-16 text-muted-foreground/40 mx-auto" />
+                  <h3 className="text-lg font-semibold text-foreground">Select a conversation</h3>
+                  <p className="text-muted-foreground">Choose someone from the list to start chatting.</p>
                 </div>
               </div>
             )}
@@ -3055,7 +3066,7 @@ const EnhancedMessagesPage: React.FC = () => {
         <Dialog open={showGroupModal} onOpenChange={setShowGroupModal}>
           <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden">
             <DialogHeader>
-              <DialogTitle className="text-xl font-semibold text-slate-900">
+              <DialogTitle className="text-xl font-semibold">
                 {selectedConversation?.isGroupChat ? 'Add Members to Group' : 'Create New Group'}
               </DialogTitle>
             </DialogHeader>
@@ -3064,7 +3075,7 @@ const EnhancedMessagesPage: React.FC = () => {
               {/* Group Details */}
               <div className="space-y-4">
                 <div>
-                  <Label htmlFor="groupName" className="text-sm font-medium text-slate-700">
+                  <Label htmlFor="groupName" className="text-sm font-medium text-foreground">
                     Group Name *
                   </Label>
                   <Input
@@ -3078,7 +3089,7 @@ const EnhancedMessagesPage: React.FC = () => {
                 </div>
 
                 <div>
-                  <Label htmlFor="groupDescription" className="text-sm font-medium text-slate-700">
+                  <Label htmlFor="groupDescription" className="text-sm font-medium text-foreground">
                     Description (Optional)
                   </Label>
                   <Textarea
@@ -3096,14 +3107,14 @@ const EnhancedMessagesPage: React.FC = () => {
               {/* Selected Members */}
               {selectedMembers.length > 0 && (
                 <div>
-                  <Label className="text-sm font-medium text-slate-700">
+                  <Label className="text-sm font-medium text-foreground">
                     Selected Members ({selectedMembers.length})
                   </Label>
                   <div className="mt-2 flex flex-wrap gap-2">
                     {selectedMembers.map((member) => (
                       <div
                         key={member._id}
-                        className="flex items-center space-x-2 bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm"
+                        className="flex items-center space-x-2 bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-200 px-3 py-1 rounded-full text-sm"
                       >
                         <Avatar className="h-6 w-6">
                           <AvatarImage src={member.avatar} />
@@ -3128,7 +3139,7 @@ const EnhancedMessagesPage: React.FC = () => {
 
               {/* Member Search with Filters */}
               <div>
-                <Label className="text-sm font-medium text-slate-700 flex items-center gap-2">
+                <Label className="text-sm font-medium text-foreground flex items-center gap-2">
                   <Filter className="h-4 w-4" />
                   Add Members *
                 </Label>
@@ -3196,7 +3207,7 @@ const EnhancedMessagesPage: React.FC = () => {
                   </div>
 
                   {/* User List */}
-                  <div className="max-h-48 overflow-y-auto border border-slate-200 rounded-lg">
+                  <div className="max-h-96 overflow-y-auto border border-border rounded-lg">
                     {loadingUsers ? (
                       <div className="flex items-center justify-center py-4">
                         <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
@@ -3210,8 +3221,8 @@ const EnhancedMessagesPage: React.FC = () => {
                               key={user._id}
                               onClick={() => toggleMemberSelection(user)}
                               className={`flex items-center space-x-3 p-2 rounded-lg cursor-pointer transition-colors ${isSelected
-                                ? 'bg-blue-100 border border-blue-200'
-                                : 'hover:bg-slate-50'
+                                ? 'bg-blue-100 dark:bg-blue-900/40 border border-blue-200 dark:border-blue-800'
+                                : 'hover:bg-muted'
                                 }`}
                             >
                               <input
@@ -3226,22 +3237,25 @@ const EnhancedMessagesPage: React.FC = () => {
                                   {user.name?.charAt(0) || 'U'}
                                 </AvatarFallback>
                               </Avatar>
-                              <div className="flex-1 min-w-0">
-                                <p className="text-sm font-medium text-slate-900 truncate">
+                              <div className="flex-1 min-w-0 flex items-center space-x-2">
+                                <p className="text-sm font-medium text-foreground truncate shrink-0 max-w-[45%]">
                                   {typeof user.name === 'string' ? user.name : 'Unknown User'}
                                 </p>
-                                <p className="text-xs text-slate-500 truncate">
-                                  {typeof user.email === 'string' ? user.email : 'No email'}
+                                <p className="text-xs text-muted-foreground truncate">
+                                  {(() => {
+                                    const e = user.email as any;
+                                    return typeof e === 'string' ? e : (e?.college || e?.personal || 'No email');
+                                  })()}
                                 </p>
                               </div>
-                              <div className="text-xs text-slate-400">
+                              <div className="text-xs text-muted-foreground">
                                 {typeof user.type === 'string' ? user.type : 'Unknown'}
                               </div>
                             </div>
                           );
                         })}
                         {availableUsers.length === 0 && !loadingUsers && (
-                          <div className="text-center py-4 text-slate-500 text-sm">
+                          <div className="text-center py-4 text-muted-foreground text-sm">
                             No users found
                           </div>
                         )}
@@ -3253,7 +3267,7 @@ const EnhancedMessagesPage: React.FC = () => {
             </div>
 
             {/* Modal Actions */}
-            <div className="flex justify-end space-x-3 pt-4 border-t border-slate-200">
+            <div className="flex justify-end space-x-3 pt-4 border-t border-border">
               <Button
                 variant="outline"
                 onClick={() => setShowGroupModal(false)}
@@ -3275,7 +3289,7 @@ const EnhancedMessagesPage: React.FC = () => {
         <Dialog open={showGroupMembers} onOpenChange={setShowGroupMembers}>
           <DialogContent className="max-w-md max-h-[80vh] overflow-hidden">
             <DialogHeader>
-              <DialogTitle className="text-xl font-semibold text-slate-900">
+              <DialogTitle className="text-xl font-semibold">
                 {selectedConversation?.groupName} Members
               </DialogTitle>
             </DialogHeader>
@@ -3291,11 +3305,11 @@ const EnhancedMessagesPage: React.FC = () => {
                 if (!admin) return null;
 
                 return (
-                  <div className="mb-4 pb-4 border-b border-slate-200">
-                    <Label className="text-xs font-semibold text-slate-600 mb-2 block uppercase tracking-wide">
+                  <div className="mb-4 pb-4 border-b border-border">
+                    <Label className="text-xs font-semibold text-muted-foreground mb-2 block uppercase tracking-wide">
                       Group Admin
                     </Label>
-                    <div className="flex items-center space-x-3 p-3 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
+                    <div className="flex items-center space-x-3 p-3 bg-blue-50 dark:bg-blue-950/40 rounded-lg border border-blue-200 dark:border-blue-800">
                       <Avatar className="h-12 w-12 ring-2 ring-blue-400">
                         <AvatarImage src={admin.avatar} />
                         <AvatarFallback className="bg-blue-500 text-white font-semibold">
@@ -3304,7 +3318,7 @@ const EnhancedMessagesPage: React.FC = () => {
                       </Avatar>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center space-x-2">
-                          <p className="text-sm font-semibold text-slate-900 truncate">
+                          <p className="text-sm font-semibold text-foreground break-words">
                             {typeof admin.name === 'string' ? admin.name : 'Unknown Admin'}
                           </p>
                           <Badge className="bg-blue-600 text-white text-xs px-2 py-0.5">
@@ -3314,15 +3328,18 @@ const EnhancedMessagesPage: React.FC = () => {
                             <div className="w-2 h-2 bg-green-400 rounded-full" />
                           )}
                         </div>
-                        <p className="text-xs text-slate-600 truncate mt-1">
-                          {typeof admin.email === 'string' ? admin.email : 'No email'}
+                        <p className="text-xs text-muted-foreground break-all mt-1">
+                          {(() => {
+                            const e = admin.email as any;
+                            return typeof e === 'string' ? e : (e?.college || e?.personal || 'No email');
+                          })()}
                         </p>
                         <div className="flex flex-wrap items-center gap-2 mt-1.5">
                           <Badge variant="secondary" className="text-[10px] md:text-xs">
                             {typeof admin.type === 'string' ? admin.type : 'Unknown'}
                           </Badge>
                           {admin.department && (
-                            <Badge variant="outline" className="text-[10px] md:text-xs max-w-[150px] truncate block">
+                            <Badge variant="outline" className="text-[10px] md:text-xs max-w-full">
                               {typeof admin.department === 'string' ? admin.department : 'Unknown Dept'}
                             </Badge>
                           )}
@@ -3347,7 +3364,7 @@ const EnhancedMessagesPage: React.FC = () => {
               {/* Regular Members Section */}
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <Label className="text-xs font-semibold text-slate-600 block uppercase tracking-wide">
+                  <Label className="text-xs font-semibold text-muted-foreground block uppercase tracking-wide">
                     Members ({selectedConversation?.participants.filter(p => {
                       const adminId = typeof selectedConversation.groupAdmin === 'object' && selectedConversation.groupAdmin !== null
                         ? (selectedConversation.groupAdmin as any)._id
@@ -3396,24 +3413,27 @@ const EnhancedMessagesPage: React.FC = () => {
                       return member._id !== adminId && member._id?.toString() !== adminId?.toString();
                     })
                     .map((member) => (
-                      <div key={member._id} className="flex items-center space-x-3 p-3 hover:bg-slate-50 rounded-lg transition-colors">
+                      <div key={member._id} className="flex items-center space-x-3 p-3 hover:bg-muted rounded-lg transition-colors">
                         <Avatar className="h-10 w-10">
                           <AvatarImage src={member.avatar} />
-                          <AvatarFallback className="bg-blue-100 text-blue-600 font-semibold">
+                          <AvatarFallback className="bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-300 font-semibold">
                             {typeof member.name === 'string' ? member.name.charAt(0) : 'U'}
                           </AvatarFallback>
                         </Avatar>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center space-x-2">
-                            <p className="text-sm font-medium text-slate-900 truncate">
+                            <p className="text-sm font-medium text-foreground break-words">
                               {typeof member.name === 'string' ? member.name : 'Unknown User'}
                             </p>
                             {member.isOnline && (
                               <div className="w-2 h-2 bg-green-400 rounded-full" />
                             )}
                           </div>
-                          <p className="text-xs text-slate-500 truncate">
-                            {typeof member.email === 'string' ? member.email : 'No email'}
+                          <p className="text-xs text-muted-foreground break-all">
+                            {(() => {
+                              const e = member.email as any;
+                              return typeof e === 'string' ? e : (e?.college || e?.personal || 'No email');
+                            })()}
                           </p>
                           <div className="flex flex-wrap items-center gap-2 mt-1.5">
                             <Badge variant="secondary" className="text-[10px] md:text-xs">
@@ -3518,7 +3538,7 @@ const EnhancedMessagesPage: React.FC = () => {
               </div>
             </div>
 
-            <div className="flex justify-between items-center pt-4 border-t border-slate-200">
+            <div className="flex justify-between items-center pt-4 border-t border-border">
               {/* Delete Group Button - Only visible to admin */}
               {selectedConversation?.groupAdmin && (() => {
                 const adminId = typeof selectedConversation.groupAdmin === 'object' && selectedConversation.groupAdmin !== null
@@ -3675,7 +3695,7 @@ const EnhancedMessagesPage: React.FC = () => {
                 <Label className="text-sm font-semibold text-slate-700 mb-2 block">
                   Available Members
                 </Label>
-                <div className="border border-slate-200 rounded-lg max-h-64 overflow-y-auto">
+                <div className="border border-slate-200 rounded-lg max-h-96 overflow-y-auto">
                   {addMemberLoadingUsers ? (
                     <div className="flex items-center justify-center py-8">
                       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
@@ -3703,8 +3723,8 @@ const EnhancedMessagesPage: React.FC = () => {
                                 }
                               }}
                               className={`flex items-center space-x-3 p-3 cursor-pointer transition-colors ${isSelected
-                                ? 'bg-blue-50 border-l-4 border-l-blue-500'
-                                : 'hover:bg-slate-50'
+                                ? 'bg-blue-50 dark:bg-blue-900/30 border-l-4 border-l-blue-500'
+                                : 'hover:bg-muted'
                                 }`}
                             >
                               <input
@@ -3716,17 +3736,22 @@ const EnhancedMessagesPage: React.FC = () => {
                               />
                               <Avatar className="h-10 w-10">
                                 <AvatarImage src={user.avatar} />
-                                <AvatarFallback className="bg-blue-100 text-blue-600 font-semibold">
+                                <AvatarFallback className="bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-300 font-semibold">
                                   {user.name?.charAt(0) || 'U'}
                                 </AvatarFallback>
                               </Avatar>
                               <div className="flex-1 min-w-0">
-                                <p className="text-sm font-medium text-slate-900 truncate">
-                                  {typeof user.name === 'string' ? user.name : 'Unknown User'}
-                                </p>
-                                <p className="text-xs text-slate-500 truncate">
-                                  {typeof user.email === 'string' ? user.email : 'No email'}
-                                </p>
+                                <div className="flex items-center space-x-2">
+                                  <p className="text-sm font-medium text-foreground truncate shrink-0 max-w-[45%]">
+                                    {typeof user.name === 'string' ? user.name : 'Unknown User'}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground truncate">
+                                    {(() => {
+                                      const e = user.email as any;
+                                      return typeof e === 'string' ? e : (e?.college || e?.personal || 'No email');
+                                    })()}
+                                  </p>
+                                </div>
                                 <div className="flex items-center gap-2 mt-1">
                                   {user.type && (
                                     <Badge variant="secondary" className="text-xs">
