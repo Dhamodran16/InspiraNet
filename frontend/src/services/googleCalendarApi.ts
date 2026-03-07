@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
+const API_BASE_URL = import.meta.env.VITE_API_URL || import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
 
 // Create axios instance for Google Calendar API calls
 const googleCalendarApi = axios.create({
@@ -30,7 +30,7 @@ googleCalendarApi.interceptors.response.use(
   (response) => response,
   (error) => {
     console.log('API Error:', error.response?.status, error.message);
-    
+
     // Handle specific error types
     if (error.response?.status === 401) {
       console.error('Authentication failed - token may be expired');
@@ -41,7 +41,7 @@ googleCalendarApi.interceptors.response.use(
     } else if (error.code === 'ERR_NAME_NOT_RESOLVED') {
       console.error('Cannot resolve backend URL - check network connection');
     }
-    
+
     return Promise.reject(error);
   }
 );
@@ -214,7 +214,7 @@ export const getMeetingDuration = (startTime: string, endTime: string): string =
   const end = new Date(endTime);
   const durationMs = end.getTime() - start.getTime();
   const durationMinutes = Math.floor(durationMs / (1000 * 60));
-  
+
   if (durationMinutes < 60) {
     return `${durationMinutes} minutes`;
   } else {

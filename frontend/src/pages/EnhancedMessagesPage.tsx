@@ -52,6 +52,7 @@ import { socketService } from '@/services/socketService';
 import api from '@/services/api';
 import { encryptMessage, decryptMessage } from '@/utils/messageEncryption';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import Linkify from '@/components/ui/Linkify';
 
 interface User {
   _id: string;
@@ -87,6 +88,15 @@ interface Message {
   status?: 'sending' | 'sent' | 'delivered' | 'read' | 'failed';
   isOwn?: boolean;
   tempId?: string;
+  replyTo?: {
+    messageId: string;
+    content: string;
+    senderName: string;
+  };
+  reactions?: Array<{
+    emoji: string;
+    userId: string;
+  }>;
 }
 
 interface Conversation {
@@ -144,6 +154,50 @@ const EnhancedMessagesPage: React.FC = () => {
   const [memberToRemove, setMemberToRemove] = useState<User | null>(null);
   const [showDeleteGroupDialog, setShowDeleteGroupDialog] = useState(false);
   const [isDeletingGroup, setIsDeletingGroup] = useState(false);
+  const [replyingTo, setReplyingTo] = useState<Message | null>(null);
+
+  const handleReaction = async (messageId: string, emoji: string) => {
+    // 1. Optimistic UI update
+    setMessages(prev => prev.map(msg => {
+      if (msg._id === messageId) {
+        const reactions = [...(msg.reactions || [])];
+        const existingIndex = reactions.findIndex(r => r.userId === user?._id);
+
+        if (existingIndex > -1) {
+          if (reactions[existingIndex].emoji === emoji) {
+            reactions.splice(existingIndex, 1);
+          } else {
+            reactions[existingIndex] = { ...reactions[existingIndex], emoji };
+          }
+        } else {
+          reactions.push({ emoji, userId: user?._id || '' });
+        }
+        return { ...msg, reactions };
+      }
+      return msg;
+    }));
+
+    // 2. API Call
+    try {
+      await api.post(`/api/messages/${messageId}/reaction`, { emoji });
+    } catch (error) {
+      console.error('Failed to send reaction:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to update reaction',
+        variant: 'destructive'
+      });
+      // Revert if needed? Usually we just let it be for speed
+    }
+  };
+
+  const handleReply = (message: Message) => {
+    setReplyingTo(message);
+    // Focus input
+    if (inputRef.current) {
+      inputRef.current.focus();
+    }
+  };
 
   // Separate state for Add Members (not reusing group creation state)
   const [addMemberSearchTerm, setAddMemberSearchTerm] = useState('');
@@ -163,7 +217,8 @@ const EnhancedMessagesPage: React.FC = () => {
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const selectedConversationRef = useRef<string | null>(null);
   const messageRefs = useRef<Map<string, HTMLDivElement>>(new Map());
-  const longPressTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // Refs that always hold the latest values — safe to read inside socket callbacks
   const userRef = useRef(user);
   const conversationsRef = useRef(conversations);
@@ -435,112 +490,89 @@ const EnhancedMessagesPage: React.FC = () => {
         isRead: false,
         isEncrypted: incoming.isEncrypted || false,
         status: isOwnMessage ? 'delivered' : undefined,
-        isOwn: isOwnMessage
+        isOwn: isOwnMessage,
+        replyTo: incoming.replyTo,
+        reactions: incoming.reactions
       };
 
       // Decrypt message if needed
       const handleDecryption = async () => {
-        if (normalizedMessage.isEncrypted && normalizedMessage.content && !normalizedMessage.content.startsWith('[') && normalizedMessage.messageType === 'text') {
+        // Reuse the normalizedMessage from outer scope
+
+        // Decrypt if needed
+        if (normalizedMessage.isEncrypted && normalizedMessage.content && user) {
           try {
-            // Use conversationsRef to avoid stale closure
-            const participants = conversationsRef.current.find(c => c._id === convId)?.participants.map(p => p._id) || [processedSenderId, userRef.current?._id].filter(Boolean) as string[];
-            normalizedMessage.content = await decryptMessage(normalizedMessage.content, participants);
+            const participants = conversationsRef.current.find(c => c._id === convId)
+              ?.participants.map(p => p._id) || [processedSenderId, userRef.current?._id].filter(Boolean) as string[];
+
+            const decrypted = await decryptMessage(normalizedMessage.content, participants);
+            if (decrypted) normalizedMessage.content = decrypted;
           } catch (err) {
-            console.error('Decryption failed for incoming message:', err);
+            console.error('Failed to decrypt in socket listener:', err);
           }
         }
 
-        // Always update conversation preview first (for chat list)
-        applyConversationPreview(convId, normalizedMessage, {
-          resetUnread: Boolean(isCurrentConversation),
-          incrementUnread: !isCurrentConversation && !isOwnMessage
-        });
-
-        // Update conversation view if it's the current conversation
+        // Update current conversation view
         if (isCurrentConversation) {
-          if (isOwnMessage) {
-            // SENDER SIDE: Update own message from optimistic/sent to delivered
-            setMessages(prev => {
-              let foundMatch = false;
-              const updated = prev.map(msg => {
-                // Match by actual ID (most reliable)
-                const matchesById = String(msg._id) === String(normalizedMessage._id);
+          setMessages(prev => {
+            let updatedOptimistic = false;
 
-                // Match by content, metadata and sending/sent status (for optimistic matching)
-                const matchesOptimistic = String(msg._id).startsWith('temp_') &&
-                  (msg.status === 'sending' || msg.status === 'sent') &&
-                  msg.content.trim() === normalizedMessage.content.trim() &&
-                  msg.messageType === normalizedMessage.messageType &&
-                  msg.fileName === normalizedMessage.fileName;
+            const updated = prev.map(msg => {
+              // Match by actual ID
+              const matchesById = String(msg._id) === String(normalizedMessage._id);
 
-                // Fallback for race condition where API response might have already updated ID
-                const matchesFallback = !matchesById && !matchesOptimistic &&
-                  msg.content.trim() === normalizedMessage.content.trim() &&
-                  msg.status === 'sent' &&
-                  msg.senderId === processedSenderId;
+              // Match by temp ID if present
+              const matchesTempId = msg.tempId && normalizedMessage.tempId && String(msg.tempId) === String(normalizedMessage.tempId);
 
-                if (matchesById || matchesOptimistic || matchesFallback) {
-                  foundMatch = true;
-                  return {
-                    ...normalizedMessage,
-                    status: 'delivered' as const,
-                    isOwn: true
-                  };
-                }
-                return msg;
-              });
+              // Match by content/type fallback if still on temp ID
+              const isTemp = String(msg._id).startsWith('temp_');
+              const matchesOptimistic = isTemp &&
+                (msg.status === 'sending' || msg.status === 'sent') &&
+                msg.content?.trim() === normalizedMessage.content?.trim() &&
+                msg.messageType === normalizedMessage.messageType;
 
-              if (!foundMatch) {
-                const alreadyExists = prev.some(m => String(m._id) === String(normalizedMessage._id));
-                if (alreadyExists) return prev;
-                return [...updated, { ...normalizedMessage, status: 'delivered' as const, isOwn: true }];
+              if (matchesById || matchesTempId || matchesOptimistic) {
+                updatedOptimistic = true;
+                return {
+                  ...msg,
+                  ...normalizedMessage,
+                  isOwn: isOwnMessage,
+                  status: 'delivered' as const,
+                  replyTo: normalizedMessage.replyTo || msg.replyTo,
+                  reactions: normalizedMessage.reactions || msg.reactions || []
+                };
               }
-
-              return updated;
-            });
-          } else {
-            // RECEIVER SIDE: Add received message instantly
-            setMessages(prev => {
-              const exists = prev.some(msg => String(msg._id) === String(normalizedMessage._id));
-              if (exists) {
-                return prev.map(msg =>
-                  String(msg._id) === String(normalizedMessage._id)
-                    ? { ...msg, ...normalizedMessage, isOwn: false }
-                    : msg
-                );
-              }
-
-              // Check for potential duplication via content/time fallback
-              const likelyExists = prev.some(msg =>
-                msg.content.trim() === normalizedMessage.content.trim() &&
-                String(msg.senderId) === processedSenderId &&
-                Math.abs(new Date(msg.createdAt).getTime() - new Date(normalizedMessage.createdAt).getTime()) < 5000
-              );
-              if (likelyExists) return prev;
-
-              return [...prev, { ...normalizedMessage, isOwn: false }];
+              return msg;
             });
 
-            requestAnimationFrame(() => {
-              scrollToLastMessage(true);
-            });
+            if (!updatedOptimistic) {
+              // Check for duplication before appending
+              const alreadyExists = prev.some(m => String(m._id) === String(normalizedMessage._id));
+              if (alreadyExists) return prev;
 
-            try {
-              socketService.markMessagesAsRead(convId, [normalizedMessage._id]);
-            } catch { }
-          }
-        } else {
+              return [...updated, { ...normalizedMessage, isOwn: isOwnMessage, status: 'delivered' as const }];
+            }
+
+            return updated;
+          });
+
+          // Re-scroll for new messages from others
           if (!isOwnMessage) {
-            socketService.emitMessageDelivered(convId, normalizedMessage._id);
-            toast({
-              title: 'New message',
-              description: incoming?.senderName ? `From ${incoming.senderName}` : 'You received a new message'
-            });
+            requestAnimationFrame(() => scrollToLastMessage(true));
           }
         }
       };
 
       handleDecryption();
+    });
+
+    socketService.onMessageReaction((data) => {
+      setMessages(prev => prev.map(msg => {
+        if (msg._id === data.messageId) {
+          return { ...msg, reactions: data.reactions };
+        }
+        return msg;
+      }));
     });
 
     socketService.onTyping((data: any) => {
@@ -967,10 +999,7 @@ const EnhancedMessagesPage: React.FC = () => {
   };
 
   const handleSendMessage = async () => {
-    if (!newMessage.trim() && !selectedFile) return;
-    if (!selectedConversation) return;
-
-    const messageContent = newMessage.trim();
+    const messageContent = (newMessage || '').trim();
     setNewMessage('');
     if (inputRef.current) {
       inputRef.current.style.height = '40px'; // Reset to min-height
@@ -1046,7 +1075,7 @@ const EnhancedMessagesPage: React.FC = () => {
         senderName: user.name,
         // Match backend's logic: if content is empty but has media, use [type] placeholder
         // Also ensure content is trimmed as backend does
-        content: messageContent.trim() || (mediaUrl ? `[${messageType}]` : ''),
+        content: (messageContent || '').trim() || (mediaUrl ? `[${messageType}]` : ''),
         messageType: messageType as 'text' | 'image' | 'video' | 'pdf' | 'file',
         mediaUrl,
         fileName,
@@ -1055,8 +1084,16 @@ const EnhancedMessagesPage: React.FC = () => {
         isRead: false,
         isEncrypted: isEncrypted,
         status: 'sending',
-        tempId: `temp_${Date.now()}` // Add explicit tempId for matching
+        tempId: `temp_${Date.now()}`, // Add explicit tempId for matching
+        replyTo: replyingTo ? {
+          messageId: replyingTo._id,
+          content: replyingTo.content,
+          senderName: replyingTo.senderName
+        } : undefined
       };
+
+      // Reset reply state
+      setReplyingTo(null);
 
       // Add optimistic message immediately
       setMessages(prev => [...prev, tempMessage!]);
@@ -1074,42 +1111,53 @@ const EnhancedMessagesPage: React.FC = () => {
         fileName,
         fileSize,
         messageType,
-        isEncrypted
+        isEncrypted,
+        replyTo: tempMessage.replyTo,
+        tempId: tempMessage._id // We use the message's _id as tempId
       });
 
       if (response.data.success) {
         const serverMessage = response.data.message;
 
-        // CRITICAL: Check if the socket already added this message by ID
-        // This prevents duplication if socket arrives before API response
         setMessages(prev => {
+          // Check if socket already added/updated it
           const alreadyExistsByRealId = prev.some(msg => String(msg._id) === String(serverMessage._id));
 
           if (alreadyExistsByRealId) {
-            // Socket already added it. Remove the optimistic message.
+            // Socket already updated it, just cleanup any remaining temp message
             return prev.filter(msg => String(msg._id) !== String(tempMessage!._id));
           }
 
-          // Otherwise, update the optimistic message with server data
-          return prev.map(msg => {
-            // Robust matching: by temp ID, or by content + filename + type
-            const matchesTempId = String(msg._id) === String(tempMessage!._id);
-            const matchesContent = String(msg._id).startsWith('temp_') &&
-              msg.content.trim() === serverMessage.content.trim() &&
-              msg.messageType === serverMessage.messageType &&
-              msg.fileName === serverMessage.fileName &&
-              msg.status === 'sending';
-
-            if (matchesTempId || matchesContent) {
+          // Update optimistic message with real ID and data
+          let usedTempId = false;
+          const updated = prev.map(msg => {
+            if (String(msg._id) === String(tempMessage!._id)) {
+              usedTempId = true;
               return {
                 ...msg,
-                ...serverMessage, // Use everything from server including actual _id
-                status: 'sent', // Will be updated to 'delivered' when socket confirms
+                ...serverMessage,
+                status: 'sent' as const,
                 isOwn: true
               };
             }
+            // Fallback matching
+            if (msg.status === 'sending' &&
+              msg.content?.trim() === serverMessage.content?.trim() &&
+              msg.messageType === serverMessage.messageType) {
+              usedTempId = true;
+              return { ...msg, ...serverMessage, status: 'sent' as const, isOwn: true };
+            }
             return msg;
           });
+
+          if (!usedTempId) {
+            // If temp message wasn't found (already replaced by socket?), check again
+            const exists = prev.some(m => String(m._id) === String(serverMessage._id));
+            if (exists) return prev;
+            return [...prev, { ...serverMessage, status: 'sent', isOwn: true }];
+          }
+
+          return updated;
         });
 
         // Update conversation preview with sent status
@@ -1372,7 +1420,7 @@ const EnhancedMessagesPage: React.FC = () => {
       }
     } else {
       // Creating new group
-      if (!groupName.trim()) {
+      if (!(groupName || '').trim()) {
         toast({
           title: "Error",
           description: "Group name is required.",
@@ -1391,10 +1439,10 @@ const EnhancedMessagesPage: React.FC = () => {
       }
 
       try {
-        const response = await api.post('/api/messages/conversation/group', {
-          participants: selectedMembers.map(member => member._id),
-          groupName: groupName.trim(),
-          groupDescription: groupDescription.trim()
+        const response = await api.post('/api/conversations/group', {
+          members: selectedMembers.map(m => m._id),
+          groupName: (groupName || '').trim(),
+          groupDescription: (groupDescription || '').trim()
         });
 
         if (response.status === 201) {
@@ -2055,17 +2103,25 @@ const EnhancedMessagesPage: React.FC = () => {
       }
     };
 
-    const handleMouseDown = () => {
+    const handleLongPress = (e: React.TouchEvent | React.MouseEvent) => {
       if (isSelectMode) return;
-      longPressTimeoutRef.current = setTimeout(() => {
+
+      // Prevent browser context menu
+      longPressTimerRef.current = setTimeout(() => {
         setIsSelectMode(true);
-        setSelectedMessages([message._id]);
-      }, 500); // 500ms for long press
+        toggleMessageSelection(message._id);
+
+        // Vibrate if supported
+        if ('vibrate' in navigator) {
+          navigator.vibrate(50);
+        }
+      }, 500);
     };
 
-    const handleMouseUp = () => {
-      if (longPressTimeoutRef.current) {
-        clearTimeout(longPressTimeoutRef.current);
+    const cancelLongPress = () => {
+      if (longPressTimerRef.current) {
+        clearTimeout(longPressTimerRef.current);
+        longPressTimerRef.current = null;
       }
     };
 
@@ -2073,46 +2129,32 @@ const EnhancedMessagesPage: React.FC = () => {
       <div
         key={message._id}
         data-message-id={message._id}
-        className={`flex ${isOwn ? 'justify-end' : 'justify-start'} mb-3 group relative cursor-pointer select-none`}
+        className={`flex ${isOwn ? 'justify-end' : 'justify-start'} mb-3 group relative select-none`}
         onClick={handleMessageClick}
-        onMouseDown={handleMouseDown}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseUp}
-        onTouchStart={handleMouseDown}
-        onTouchEnd={handleMouseUp}
+        onContextMenu={(e) => {
+          if (!isSelectMode) e.preventDefault();
+        }}
       >
-        {/* Message container with proper alignment - includes checkbox inside */}
-        <div className={`flex items-end max-w-xs lg:max-w-md ${isOwn ? 'flex-row-reverse' : 'flex-row'} relative`}>
-          {/* Selection checkbox - Modern design with animation */}
-          {isSelectMode && (
-            <div className={`flex items-center ${isOwn ? 'mr-3' : 'ml-3'} z-10`}>
-              <div className="relative">
-                <input
-                  type="checkbox"
-                  checked={isSelected}
-                  onChange={() => toggleMessageSelection(message._id)}
-                  className="w-6 h-6 text-blue-600 bg-white border-2 border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 cursor-pointer transition-all duration-200 hover:border-blue-400 hover:scale-110 checked:bg-blue-600 checked:border-blue-600 appearance-none"
-                  onClick={(e) => e.stopPropagation()}
-                  style={{
-                    backgroundImage: isSelected ? 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 20 20\' fill=\'white\'%3E%3Cpath fill-rule=\'evenodd\' d=\'M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z\' clip-rule=\'evenodd\'/%3E%3C/svg%3E")' : 'none',
-                    backgroundSize: 'contain',
-                    backgroundPosition: 'center',
-                    backgroundRepeat: 'no-repeat'
-                  }}
-                />
-                {isSelected && (
-                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                    <Check className="h-4 w-4 text-white" />
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
+        {/* Selection indicator - Far left positioning - Only show when explicitly in select mode */}
+        <div
+          className={`flex items-center justify-center transition-all duration-300 ${isSelectMode ? 'w-10 opacity-100' : 'w-0 opacity-0 overflow-hidden'} z-10 shrink-0 self-center h-full`}
+          onClick={(e) => {
+            e.stopPropagation();
+            toggleMessageSelection(message._id);
+          }}
+        >
+          <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${isSelected ? 'bg-blue-600 border-blue-600' : 'bg-card/80 border-border'}`}>
+            {isSelected && <Check className="h-3 w-3 text-white" />}
+          </div>
+        </div>
+
+        {/* Message container with proper alignment */}
+        <div className={`flex items-end max-w-[85%] lg:max-w-md ${isOwn ? 'flex-row-reverse' : 'flex-row'} relative min-w-0`}>
           {/* Avatar - only show for received messages */}
           {!isOwn && (
-            <div className="w-8 h-8 flex-shrink-0 mr-2 bg-gray-300 rounded-full flex items-center justify-center">
-              <span className="text-xs font-medium">
-                {(message.senderName?.charAt(0) || 'U').toUpperCase()}
+            <div className="w-8 h-8 flex-shrink-0 mr-2 bg-gray-300 rounded-full flex items-center justify-center mb-1">
+              <span className="text-xs font-medium uppercase">
+                {message.senderName?.charAt(0) || 'U'}
               </span>
             </div>
           )}
@@ -2120,10 +2162,77 @@ const EnhancedMessagesPage: React.FC = () => {
           {/* Message content container */}
           <div className={`flex flex-col ${isOwn ? 'items-end' : 'items-start'}`}>
             {/* Message bubble with sender name inside for group chats */}
-            <div className={`message-bubble px-4 py-3 rounded-2xl relative border ${isOwn
+            <div className={`message-bubble px-4 py-3 rounded-2xl relative border shadow-sm transition-all duration-200 ${isOwn
               ? 'message-bubble-own rounded-br-md'
-              : 'message-bubble-other rounded-bl-md'
-              } ${isSelected ? 'ring-2 ring-primary/50' : ''}`}>
+              : 'message-bubble-other rounded-bl-md bg-card border-border text-foreground hover:border-blue-300'
+              } ${isSelected ? 'ring-2 ring-blue-500 scale-[0.98]' : ''}`}
+              onTouchStart={handleLongPress}
+              onTouchEnd={cancelLongPress}
+              onTouchMove={cancelLongPress}
+              onMouseDown={handleLongPress}
+              onMouseUp={cancelLongPress}
+              onMouseLeave={cancelLongPress}
+            >
+              {/* Quick Reaction Bar - Tagging like Insta/WhatsApp */}
+              {!isSelectMode && (
+                <div className={`absolute -top-12 ${isOwn ? 'right-0' : 'left-0'} opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-all duration-200 bg-card/95 backdrop-blur-sm shadow-[0_8px_30px_rgb(0,0,0,0.12)] rounded-full px-1 py-1 flex items-center gap-0 border border-border/60 z-50 scale-90 hover:scale-100 origin-bottom whitespace-nowrap overflow-hidden transition-all h-[44px]`}>
+                  {['❤️', '👍', '😂', '😮', '😢', '🔥'].map(emoji => (
+                    <button
+                      key={emoji}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleReaction(message._id, emoji);
+                      }}
+                      className="w-9 h-9 flex items-center justify-center hover:scale-125 transition-all text-xl filter grayscale hover:grayscale-0 relative group/emoji"
+                      title={emoji}
+                    >
+                      <span className="transform group-hover/emoji:scale-125 transition-transform duration-200">{emoji}</span>
+                    </button>
+                  ))}
+                  <div className="w-px h-6 bg-slate-200/50 mx-1 self-center" />
+                  <button
+                    className="h-9 px-3 flex items-center justify-center text-xs font-bold text-blue-600 hover:bg-blue-50/10 rounded-r-full transition-colors group/reply"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleReply(message);
+                    }}
+                  >
+                    <div className="flex items-center gap-1">
+                      <MessageSquare className="h-3.5 w-3.5" />
+                      <span>Reply</span>
+                    </div>
+                  </button>
+                </div>
+              )}
+
+              {/* Replied-to message context */}
+              {message.replyTo && (
+                <div
+                  className={`mb-2 p-2 rounded-lg border-l-4 bg-black/5 flex flex-col cursor-pointer hover:bg-black/10 transition-all min-w-0 max-w-full ${isOwn ? 'border-amber-400 bg-amber-400/10' : 'border-blue-500 bg-blue-500/10'
+                    }`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const el = messageRefs.current.get(message.replyTo!.messageId);
+                    if (el) {
+                      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                      el.classList.add('ring-4', 'ring-blue-400/50', 'transition-all', 'duration-500');
+                      setTimeout(() => el.classList.remove('ring-4', 'ring-blue-400/50'), 2000);
+                    }
+                  }}
+                >
+                  <div className="flex items-center justify-between mb-0.5">
+                    <div className="flex items-center gap-1.5 overflow-hidden">
+                      <span className={`text-[10px] font-bold uppercase truncate ${isOwn ? 'text-amber-600' : 'text-blue-600'}`}>
+                        {message.replyTo.senderName}
+                      </span>
+                    </div>
+                    <MessageSquare className="h-2.5 w-2.5 opacity-40 flex-shrink-0" />
+                  </div>
+                  <p className="text-xs line-clamp-1 opacity-80 italic break-all">
+                    {message.replyTo.content}
+                  </p>
+                </div>
+              )}
               {/* Sender name inside message bubble - ONLY for group chats */}
               {!isOwn && selectedConversation?.isGroupChat && (
                 <div className="text-xs font-semibold mb-1.5 opacity-90 message-sender-subtle">
@@ -2158,7 +2267,9 @@ const EnhancedMessagesPage: React.FC = () => {
                         </div>
                       </div>
                       {message.content && message.content !== '[image]' && (
-                        <p className="text-sm">{message.content}</p>
+                        <p className="text-sm whitespace-pre-wrap break-words">
+                          <Linkify text={message.content} />
+                        </p>
                       )}
                     </div>
                   ) : message.messageType === 'video' || (message.mediaUrl && message.fileName?.match(/\.(mp4|webm|ogg|mov|avi|wmv)$/i)) ? (
@@ -2185,7 +2296,9 @@ const EnhancedMessagesPage: React.FC = () => {
                         </div>
                       </div>
                       {message.content && message.content !== '[video]' && message.content !== '[file]' && (
-                        <p className="text-sm">{message.content}</p>
+                        <p className="text-sm whitespace-pre-wrap break-words">
+                          <Linkify text={message.content} />
+                        </p>
                       )}
                     </div>
                   ) : message.mediaUrl && message.fileName?.match(/\.(mp3|wav|ogg|webm)$/i) ? (
@@ -2212,7 +2325,9 @@ const EnhancedMessagesPage: React.FC = () => {
                         </div>
                       </div>
                       {message.content && message.content !== '[file]' && (
-                        <p className="text-sm">{message.content}</p>
+                        <p className="text-sm whitespace-pre-wrap break-words">
+                          <Linkify text={message.content} />
+                        </p>
                       )}
                     </div>
                   ) : (
@@ -2238,50 +2353,49 @@ const EnhancedMessagesPage: React.FC = () => {
 
               {/* Text content */}
               {message.content && message.messageType === 'text' && (
-                <p className="text-sm whitespace-pre-wrap break-words">{message.content}</p>
+                <p className="text-sm whitespace-pre-wrap break-words">
+                  <Linkify text={message.content} />
+                </p>
               )}
 
               {/* Message metadata */}
               <div className="flex items-center justify-end mt-1 space-x-1">
-                <span className="text-xs opacity-75">{messageTime}</span>
+                <span className="text-[10px] opacity-60">{messageTime}</span>
                 {isOwn && (
                   <div className="flex items-center ml-1">
                     {message.status === 'sending' && (
-                      <div className="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin opacity-50" />
+                      <div className="w-2.5 h-2.5 border border-current border-t-transparent rounded-full animate-spin opacity-40" />
                     )}
                     {message.status === 'sent' && (
-                      <div className="flex">
-                        <Check className="h-3 w-3 opacity-50" />
-                      </div>
+                      <Check className="h-3 w-3 opacity-40" />
                     )}
                     {message.status === 'delivered' && (
                       <div className="flex">
-                        <Check className="h-3 w-3 opacity-50" />
-                        <Check className="h-3 w-3 -ml-1 opacity-50" />
+                        <Check className="h-3 w-3 opacity-40" />
+                        <Check className="h-3 w-3 -ml-1 opacity-40" />
                       </div>
                     )}
                     {message.status === 'read' && (
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <div className="flex cursor-help">
-                            <Check className="h-3 w-3 text-blue-400" />
-                            <Check className="h-3 w-3 -ml-1 text-blue-400" />
-                          </div>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>Read {message.readBy && message.readBy.length > 0 ? `by ${message.readBy.length} ${message.readBy.length === 1 ? 'person' : 'people'}` : ''}</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    )}
-                    {!message.status && (
                       <div className="flex">
-                        <Check className="h-3 w-3 opacity-50" />
+                        <Check className="h-3 w-3 text-blue-500" />
+                        <Check className="h-3 w-3 -ml-1 text-blue-500" />
                       </div>
                     )}
-                    {message.status === 'failed' && <X className="h-3 w-3 text-red-400" />}
                   </div>
                 )}
               </div>
+
+              {/* Reaction Badges */}
+              {message.reactions && message.reactions.length > 0 && (
+                <div className={`absolute -bottom-3 ${isOwn ? 'left-0' : 'right-0'} flex items-center gap-0.5 bg-white shadow-sm border border-slate-100 rounded-full px-1.5 py-0.5 z-10`}>
+                  {Array.from(new Set(message.reactions.map(r => r.emoji))).map(emoji => (
+                    <span key={emoji} className="text-xs">{emoji}</span>
+                  ))}
+                  {message.reactions.length > 1 && (
+                    <span className="text-[10px] text-slate-500 font-bold ml-0.5">{message.reactions.length}</span>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -2296,12 +2410,13 @@ const EnhancedMessagesPage: React.FC = () => {
 
     // Apply search filter
     if (searchTerm) {
+      const term = (searchTerm || '').toLowerCase();
       if (conv.isGroupChat) {
-        return conv.groupName?.toLowerCase().includes(searchTerm.toLowerCase());
+        return (conv.groupName || '').toLowerCase().includes(term);
       } else {
         return conv.participants.some(p =>
-          p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          p.department?.toLowerCase().includes(searchTerm.toLowerCase())
+          (p.name || '').toLowerCase().includes(term) ||
+          (p.department || '').toLowerCase().includes(term)
         );
       }
     }
@@ -2333,19 +2448,22 @@ const EnhancedMessagesPage: React.FC = () => {
 
   return (
     <TooltipProvider>
-      <div className="messages-theme h-full w-full bg-background text-foreground p-4 overflow-hidden flex flex-col items-center">
-        <div className="flex-1 w-full max-w-[1400px] flex md:flex-row flex-col gap-6 overflow-hidden">
+      <div className="messages-theme h-full w-full bg-background text-foreground p-0 md:p-4 overflow-hidden flex flex-col items-center">
+        <div className="flex-1 w-full max-w-[1400px] flex md:flex-row flex-col gap-0 md:gap-6 overflow-hidden">
           {/* Chat List - Left Panel */}
-          <Card className={`rounded-3xl border border-slate-200 flex flex-col shadow-none shrink-0 h-full overflow-hidden ${selectedConversation ? 'hidden md:flex' : 'flex'} w-full md:w-[360px]`}>
+          <Card className={`rounded-none md:rounded-3xl border-0 md:border border-border flex flex-col shadow-none shrink-0 h-full overflow-hidden ${selectedConversation ? 'hidden md:flex' : 'flex'} w-full md:w-[360px] bg-card text-card-foreground`}>
             {/* Header */}
-            <div className="p-5 border-b border-slate-100 rounded-t-3xl bg-white shrink-0">
+            <div className="p-4 md:p-5 border-b border-border rounded-t-none md:rounded-t-3xl bg-card shrink-0">
               <div className="flex items-center justify-between mb-4">
-                <div>
-                  <h1 className="text-2xl font-semibold text-slate-900 flex items-center gap-2">
+                <div className="hidden md:block">
+                  <h1 className="text-2xl font-semibold text-foreground flex items-center gap-2">
                     <MessageSquare className="h-5 w-5 text-blue-600" />
                     Messages
                   </h1>
-                  <p className="text-sm text-slate-500">All your chats in one place</p>
+                  <p className="text-sm text-muted-foreground">All your chats in one place</p>
+                </div>
+                <div className="md:hidden">
+                  <h1 className="text-lg font-bold text-foreground">Chats</h1>
                 </div>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -2372,18 +2490,18 @@ const EnhancedMessagesPage: React.FC = () => {
 
               {/* Search */}
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   placeholder="Search conversations..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 bg-slate-50 border-slate-200 rounded-full text-slate-900 placeholder-slate-500 focus-visible:ring-blue-500"
+                  className="pl-10 bg-muted/50 border-border rounded-full text-foreground placeholder-muted-foreground focus-visible:ring-blue-500"
                 />
               </div>
             </div>
 
             {/* Filter Buttons */}
-            <div className="px-5 py-3 border-b border-slate-100 bg-white shrink-0">
+            <div className="px-4 md:px-5 py-3 border-b border-border bg-card shrink-0 shadow-sm z-10 relative">
               <div className="flex flex-wrap gap-2">
                 {[
                   { key: 'all', label: 'All' },
@@ -2395,9 +2513,9 @@ const EnhancedMessagesPage: React.FC = () => {
                     variant="outline"
                     size="sm"
                     onClick={() => setActiveFilter(filter.key)}
-                    className={`rounded-full px-4 ${activeFilter === filter.key
+                    className={`rounded-full px-4 h-8 text-xs ${activeFilter === filter.key
                       ? 'bg-blue-600 text-white border-blue-600'
-                      : 'border-slate-200 text-slate-600'
+                      : 'border-border text-muted-foreground hover:bg-muted/50'
                       }`}
                   >
                     {filter.label}
@@ -2407,7 +2525,7 @@ const EnhancedMessagesPage: React.FC = () => {
             </div>
 
             {/* Chat List */}
-            <div className="flex-1 overflow-y-auto bg-white min-h-0">
+            <div className="flex-1 overflow-y-auto bg-muted/10 min-h-0">
               {filteredConversations.length === 0 ? (
                 <div className="flex flex-col items-center justify-center text-center px-6 py-12 text-slate-500">
                   <MessageSquare className="h-12 w-12 text-slate-300 mb-3" />
@@ -2421,11 +2539,13 @@ const EnhancedMessagesPage: React.FC = () => {
                   const isActive = selectedConversation?._id === conversation._id;
 
                   return (
-                    <button
+                    <div
                       key={conversation._id}
                       onClick={() => setSelectedConversation(conversation)}
-                      className={`w-full flex items-center gap-3 px-4 py-3 transition-colors border-b border-slate-100 ${isActive ? 'bg-blue-50' : 'hover:bg-slate-50'
+                      className={`w-full flex items-center gap-3 px-4 py-3 transition-colors border-b border-border/50 cursor-pointer min-w-0 relative ${isActive ? 'bg-blue-600/10 dark:bg-blue-600/20' : 'bg-card hover:bg-muted/40'
                         }`}
+                      role="button"
+                      tabIndex={0}
                     >
                       <div className="relative">
                         {isGroup ? (
@@ -2444,18 +2564,18 @@ const EnhancedMessagesPage: React.FC = () => {
                           <span className="absolute -bottom-1 -right-1 block h-3.5 w-3.5 rounded-full border-2 border-white bg-green-500" />
                         )}
                       </div>
-                      <div className="flex-1 min-w-0 text-left">
-                        <div className="flex items-center justify-between">
-                          <h3 className="font-semibold text-slate-900 truncate">
+                      <div className="flex-1 min-w-0 overflow-hidden text-left">
+                        <div className="flex items-center justify-between gap-x-2 min-w-0">
+                          <h3 className="font-semibold text-foreground truncate flex-1">
                             {isGroup ? conversation.groupName : otherParticipant?.name}
                           </h3>
-                          <span className="text-xs text-slate-500">
+                          <span className="text-xs text-muted-foreground shrink-0">
                             {conversation.lastMessageTime ? formatTime(conversation.lastMessageTime) : ''}
                           </span>
                         </div>
-                        <div className="flex items-center justify-between mt-1 gap-2">
-                          <div className="flex items-center gap-1.5 flex-1 min-w-0">
-                            <p className="text-sm text-slate-500 truncate flex-1">
+                        <div className="flex items-center justify-between mt-1 gap-x-2 min-w-0">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm text-muted-foreground line-clamp-1 break-all">
                               {(() => {
                                 if (typeof conversation.lastMessage === 'string') {
                                   return conversation.lastMessage;
@@ -2468,6 +2588,8 @@ const EnhancedMessagesPage: React.FC = () => {
                                 return lastMsg.content || 'No messages yet';
                               })()}
                             </p>
+                          </div>
+                          <div className="flex items-center gap-1 shrink-0">
                             {/* Read receipt indicator for own messages */}
                             {(() => {
                               if (typeof conversation.lastMessage === 'object' && conversation.lastMessage !== null) {
@@ -2485,18 +2607,18 @@ const EnhancedMessagesPage: React.FC = () => {
                                 if (isOwnMessage && lastMsg.status) {
                                   if (lastMsg.status === 'sent') {
                                     return (
-                                      <Check className="h-3 w-3 text-slate-400 flex-shrink-0" />
+                                      <Check className="h-3 w-3 text-slate-400" />
                                     );
                                   } else if (lastMsg.status === 'delivered') {
                                     return (
-                                      <div className="flex items-center flex-shrink-0">
+                                      <div className="flex items-center">
                                         <Check className="h-3 w-3 text-slate-400" />
                                         <Check className="h-3 w-3 text-slate-400 -ml-1" />
                                       </div>
                                     );
                                   } else if (lastMsg.status === 'read') {
                                     return (
-                                      <div className="flex items-center flex-shrink-0">
+                                      <div className="flex items-center">
                                         <Check className="h-3 w-3 text-blue-500" />
                                         <Check className="h-3 w-3 text-blue-500 -ml-1" />
                                       </div>
@@ -2514,7 +2636,7 @@ const EnhancedMessagesPage: React.FC = () => {
                           )}
                         </div>
                       </div>
-                    </button>
+                    </div>
                   );
                 })
               )}
@@ -2522,11 +2644,11 @@ const EnhancedMessagesPage: React.FC = () => {
           </Card>
 
           {/* Chat Area - Right Panel */}
-          <Card className={`flex-1 flex flex-col min-h-0 h-full border border-slate-200 shadow-none rounded-3xl overflow-hidden ${selectedConversation ? 'flex' : 'hidden md:flex'}`}>
+          <Card className={`flex-1 flex flex-col min-h-0 h-full border-0 md:border border-border shadow-none rounded-none md:rounded-3xl overflow-hidden bg-card text-card-foreground ${selectedConversation ? 'flex' : 'hidden md:flex'}`}>
             {selectedConversation ? (
               <>
                 {/* Chat Header - Transforms in Select Mode */}
-                <div className={`border-b px-4 md:px-6 py-3 flex items-center justify-between gap-3 shrink-0 transition-colors duration-200 ${isSelectMode ? 'bg-blue-600 text-white' : 'bg-white/90 backdrop-blur'}`}>
+                <div className={`border-b border-border px-4 md:px-6 py-3 flex items-center justify-between gap-3 shrink-0 transition-colors duration-200 ${isSelectMode ? 'bg-blue-600 text-white' : 'bg-card/90 backdrop-blur'}`}>
                   {isSelectMode ? (
                     <div className="flex items-center justify-between w-full">
                       <div className="flex items-center space-x-4">
@@ -2617,12 +2739,12 @@ const EnhancedMessagesPage: React.FC = () => {
                             }
                           }}
                         >
-                          <h2 className="font-semibold text-slate-900">
+                          <h2 className="font-semibold text-foreground">
                             {selectedConversation.isGroupChat
                               ? selectedConversation.groupName
                               : selectedConversation.participants.find(p => p._id !== user._id)?.name || 'Unknown'}
                           </h2>
-                          <p className="text-sm text-slate-500">
+                          <p className="text-sm text-muted-foreground">
                             {selectedConversation.isGroupChat
                               ? `${selectedConversation.participants.length} members`
                               : (selectedConversation.participants.find(p => p._id !== user._id)?.isOnline ? 'Online now' : 'Recently active')}
@@ -2641,13 +2763,13 @@ const EnhancedMessagesPage: React.FC = () => {
                               onChange={(e) => {
                                 const val = e.target.value;
                                 setMessageSearchTerm(val);
-                                const term = val.toLowerCase().trim();
+                                const term = (val || '').toLowerCase().trim();
                                 if (term) {
                                   const matches = messages
                                     .filter(msg =>
-                                      msg.content?.toLowerCase().includes(term) ||
-                                      msg.senderName?.toLowerCase().includes(term) ||
-                                      msg.fileName?.toLowerCase().includes(term)
+                                      (msg.content || '').toLowerCase().includes(term) ||
+                                      (msg.senderName || '').toLowerCase().includes(term) ||
+                                      (msg.fileName || '').toLowerCase().includes(term)
                                     )
                                     .map(msg => msg._id);
                                   setSearchMatchIds(matches);
@@ -2741,7 +2863,7 @@ const EnhancedMessagesPage: React.FC = () => {
                 {/* Messages Area */}
                 <div
                   ref={scrollAreaRef}
-                  className="flex-1 bg-[#f7f9fc] overflow-y-auto px-4 md:px-6 py-4 min-h-0"
+                  className="flex-1 bg-background overflow-y-auto px-4 md:px-6 py-4 min-h-0 message-scroll-area"
                 >
                   <div className="space-y-4">
                     {loading || authLoading ? (
@@ -2776,9 +2898,9 @@ const EnhancedMessagesPage: React.FC = () => {
                         ) : (
                           <div className="flex items-center justify-center h-full min-h-[400px]">
                             <div className="text-center space-y-3 px-6">
-                              <MessageSquare className="h-16 w-16 text-slate-300 mx-auto" />
-                              <h3 className="text-lg font-semibold text-slate-700">No messages yet</h3>
-                              <p className="text-sm text-slate-500">Send a message to begin the conversation.</p>
+                              <MessageSquare className="h-16 w-16 text-muted-foreground/30 mx-auto" />
+                              <h3 className="text-lg font-semibold text-foreground">No messages yet</h3>
+                              <p className="text-sm text-muted-foreground">Send a message to begin the conversation.</p>
                             </div>
                           </div>
                         )}
@@ -2786,14 +2908,14 @@ const EnhancedMessagesPage: React.FC = () => {
                         {/* Typing indicator */}
                         {typingUsers.size > 0 && (
                           <div className="flex justify-start">
-                            <div className="bg-white rounded-lg px-3 py-2 border border-slate-200">
+                            <div className="bg-muted/50 rounded-lg px-3 py-2 border border-border">
                               <div className="flex items-center space-x-1">
                                 <div className="flex space-x-1">
-                                  <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce"></div>
-                                  <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                                  <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                                  <div className="w-2 h-2 bg-muted-foreground/50 rounded-full animate-bounce"></div>
+                                  <div className="w-2 h-2 bg-muted-foreground/50 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                                  <div className="w-2 h-2 bg-muted-foreground/50 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
                                 </div>
-                                <span className="text-sm text-slate-500 ml-2">
+                                <span className="text-sm text-muted-foreground ml-2">
                                   {Array.from(typingUsers).length === 1
                                     ? 'Someone is typing...'
                                     : `${Array.from(typingUsers).length} people are typing...`}
@@ -2808,18 +2930,43 @@ const EnhancedMessagesPage: React.FC = () => {
                 </div>
 
                 {/* Message Input - Modern styling */}
-                <div className="bg-white border-t border-slate-200 p-4 shrink-0">
+                <div className="bg-card border-t border-border p-4 shrink-0">
+                  {/* Replying to preview */}
+                  {replyingTo && (
+                    <div className="flex items-center justify-between p-3 mb-3 bg-muted rounded-xl border-l-[6px] border-blue-600 transition-all animate-in slide-in-from-bottom-2 shadow-sm">
+                      <div className="flex-1 min-w-0 pr-4">
+                        <div className="flex items-center gap-2 mb-1">
+                          <MessageSquare className="h-3.5 w-3.5 text-blue-600" />
+                          <span className="text-[11px] font-extrabold text-blue-600 uppercase tracking-wider">
+                            Replying to {replyingTo.senderName}
+                          </span>
+                        </div>
+                        <p className="text-sm text-foreground line-clamp-1 italic font-medium">
+                          {replyingTo.content}
+                        </p>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setReplyingTo(null)}
+                        className="h-8 w-8 p-0 text-muted-foreground hover:text-red-600 hover:bg-muted/80 rounded-full shrink-0"
+                      >
+                        <X className="h-5 w-5" />
+                      </Button>
+                    </div>
+                  )}
+
                   {/* Selected file display */}
                   {selectedFile && (
-                    <div className="flex items-center justify-between p-3 mb-3 bg-blue-50 rounded-lg border border-blue-200">
+                    <div className="flex items-center justify-between p-3 mb-3 bg-blue-600/10 rounded-lg border border-blue-600/20">
                       <div className="flex items-center space-x-2">
                         <File className="h-4 w-4 text-blue-600" />
-                        <span className="text-sm font-medium text-slate-900">{selectedFile.name}</span>
-                        <span className="text-xs text-slate-500">
+                        <span className="text-sm font-medium text-foreground">{selectedFile.name}</span>
+                        <span className="text-xs text-muted-foreground">
                           ({formatFileSize(selectedFile.size)})
                         </span>
                       </div>
-                      <Button variant="ghost" size="sm" onClick={removeSelectedFile} className="text-slate-500 hover:text-slate-700 rounded-full">
+                      <Button variant="ghost" size="sm" onClick={removeSelectedFile} className="text-muted-foreground hover:text-foreground rounded-full">
                         <X className="h-4 w-4" />
                       </Button>
                     </div>
@@ -2827,13 +2974,13 @@ const EnhancedMessagesPage: React.FC = () => {
 
                   {/* Emoji picker */}
                   {showEmojiPicker && (
-                    <div className="mb-3 p-3 bg-white border border-slate-200 rounded-lg shadow-lg">
+                    <div className="mb-3 p-3 bg-card border border-border rounded-lg shadow-lg">
                       <div className="grid grid-cols-8 gap-1 max-h-32 overflow-y-auto">
                         {emojis.map((emoji) => (
                           <button
                             key={emoji}
                             onClick={() => addEmoji(emoji)}
-                            className="p-2 hover:bg-slate-100 rounded text-lg transition-colors"
+                            className="p-2 hover:bg-muted rounded text-lg transition-colors"
                           >
                             {emoji}
                           </button>
@@ -2852,12 +2999,12 @@ const EnhancedMessagesPage: React.FC = () => {
                       <Plus className="h-5 w-5" />
                     </Button>
 
-                    <div className="flex-1 flex items-center bg-slate-100 border border-slate-200 rounded-full px-4 py-2 focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-blue-500 transition-all">
+                    <div className="flex-1 flex items-center bg-muted border border-border rounded-full px-4 py-2 focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-blue-500 transition-all">
                       <Button
                         variant="ghost"
                         size="sm"
                         onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                        className="p-1 text-slate-600 hover:text-blue-600 rounded-full"
+                        className="p-1 text-muted-foreground hover:text-blue-600 rounded-full"
                       >
                         <Smile className="h-5 w-5" />
                       </Button>
@@ -2868,14 +3015,14 @@ const EnhancedMessagesPage: React.FC = () => {
                         onChange={handleTyping}
                         onKeyDown={handleKeyPress}
                         placeholder="Type a message..."
-                        className="flex-1 border-0 bg-transparent focus-visible:ring-0 text-sm placeholder-slate-500 text-slate-900 resize-none min-h-[40px] max-h-[150px] py-2"
+                        className="flex-1 border-0 bg-transparent focus-visible:ring-0 text-sm placeholder-muted-foreground text-foreground resize-none min-h-[40px] max-h-[150px] py-2"
                         rows={1}
                       />
                     </div>
 
                     <Button
                       onClick={handleSendMessage}
-                      disabled={!newMessage.trim() && !selectedFile}
+                      disabled={!(newMessage || '').trim() && !selectedFile}
                       className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <Send className="h-4 w-4" />
@@ -3115,7 +3262,7 @@ const EnhancedMessagesPage: React.FC = () => {
               </Button>
               <Button
                 onClick={handleGroupCreation}
-                disabled={!groupName.trim() || selectedMembers.length < 2}
+                disabled={!(groupName || '').trim() || selectedMembers.length < 2}
                 className="bg-blue-600 hover:bg-blue-700"
               >
                 Create Group ({selectedMembers.length} members)
@@ -3170,12 +3317,12 @@ const EnhancedMessagesPage: React.FC = () => {
                         <p className="text-xs text-slate-600 truncate mt-1">
                           {typeof admin.email === 'string' ? admin.email : 'No email'}
                         </p>
-                        <div className="flex items-center space-x-2 mt-1">
-                          <Badge variant="secondary" className="text-xs">
+                        <div className="flex flex-wrap items-center gap-2 mt-1.5">
+                          <Badge variant="secondary" className="text-[10px] md:text-xs">
                             {typeof admin.type === 'string' ? admin.type : 'Unknown'}
                           </Badge>
                           {admin.department && (
-                            <Badge variant="outline" className="text-xs">
+                            <Badge variant="outline" className="text-[10px] md:text-xs max-w-[150px] truncate block">
                               {typeof admin.department === 'string' ? admin.department : 'Unknown Dept'}
                             </Badge>
                           )}
@@ -3268,12 +3415,12 @@ const EnhancedMessagesPage: React.FC = () => {
                           <p className="text-xs text-slate-500 truncate">
                             {typeof member.email === 'string' ? member.email : 'No email'}
                           </p>
-                          <div className="flex items-center space-x-2 mt-1">
-                            <Badge variant="secondary" className="text-xs">
+                          <div className="flex flex-wrap items-center gap-2 mt-1.5">
+                            <Badge variant="secondary" className="text-[10px] md:text-xs">
                               {typeof member.type === 'string' ? member.type : 'Unknown'}
                             </Badge>
                             {member.department && (
-                              <Badge variant="outline" className="text-xs">
+                              <Badge variant="outline" className="text-[10px] md:text-xs max-w-[150px] truncate block">
                                 {typeof member.department === 'string' ? member.department : 'Unknown Dept'}
                               </Badge>
                             )}

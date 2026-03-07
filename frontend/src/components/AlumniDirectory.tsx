@@ -6,27 +6,29 @@ import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { 
-  Search, 
-  Filter, 
-  Users, 
-  Building, 
-  MapPin, 
-  Calendar, 
-  Mail, 
+import {
+  Search,
+  Filter,
+  Users,
+  Building,
+  MapPin,
+  Calendar,
+  Mail,
   MessageSquare,
   UserPlus,
   UserMinus,
   Eye,
   RefreshCw,
   Linkedin,
-  Clock
+  Clock,
+  Share2
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from '@/hooks/use-toast';
 import api from '@/services/api';
 import { useNavigate } from 'react-router-dom';
 import { socketService } from '@/services/socketService';
+import ShareModal from '@/components/ui/ShareModal';
 
 interface User {
   _id: string;
@@ -72,6 +74,9 @@ export default function AlumniDirectory() {
   const [totalUsers, setTotalUsers] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [profileShareData, setProfileShareData] = useState<{
+    url: string; title: string; text: string; imageUrl?: string;
+  } | null>(null);
   const { user } = useAuth();
   const navigate = useNavigate();
 
@@ -94,7 +99,7 @@ export default function AlumniDirectory() {
           type: typeFilter !== 'all' ? typeFilter : undefined
         }
       });
-      
+
       setUsers(response.data.users);
       setTotalUsers(response.data.pagination.total);
       setTotalPages(response.data.pagination.totalPages);
@@ -201,7 +206,7 @@ export default function AlumniDirectory() {
   const handleFollow = async (userId: string) => {
     try {
       await api.post(`/api/follows/request/${userId}`);
-      setUsers(prev => prev.map(u => 
+      setUsers(prev => prev.map(u =>
         u._id === userId ? { ...u, followRequestStatus: 'pending' } : u
       ));
       toast({
@@ -222,8 +227,8 @@ export default function AlumniDirectory() {
       console.log('🔄 Attempting to unfollow user:', userId);
       const response = await api.delete(`/api/follows/unfollow/${userId}`);
       console.log('✅ Unfollow response:', response.data);
-      
-      setUsers(prev => prev.map(u => 
+
+      setUsers(prev => prev.map(u =>
         u._id === userId ? { ...u, isFollowing: false } : u
       ));
       toast({
@@ -232,10 +237,10 @@ export default function AlumniDirectory() {
       });
     } catch (error: any) {
       console.error('❌ Unfollow error:', error);
-      
+
       // Handle different error cases
       let errorMessage = "Failed to unfollow user";
-      
+
       if (error.response?.status === 400) {
         const errorData = error.response.data;
         if (errorData.error) {
@@ -248,7 +253,7 @@ export default function AlumniDirectory() {
       } else if (error.response?.status === 500) {
         errorMessage = "Server error occurred";
       }
-      
+
       toast({
         title: "Error",
         description: errorMessage,
@@ -261,7 +266,7 @@ export default function AlumniDirectory() {
     try {
       // Create or get existing conversation
       const response = await api.post('/api/conversations', { participantId: userId });
-      
+
       // Navigate to messages section with the conversation
       navigate(`/dashboard?section=messages&conversation=${response.data.conversation._id}`);
     } catch (error) {
@@ -296,19 +301,40 @@ export default function AlumniDirectory() {
     loadUsers().finally(() => setIsRefreshing(false));
   };
 
+  const handleShareProfile = (profileUser: User, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const baseUrl = window.location.origin;
+    const profileUrl = `${baseUrl}/profile/${profileUser._id}`;
+
+    // Build a descriptive text from whatever info is available
+    const parts: string[] = [];
+    if (profileUser.designation) parts.push(profileUser.designation);
+    if (profileUser.company) parts.push(`at ${profileUser.company}`);
+    if (profileUser.department) parts.push(`• ${profileUser.department}`);
+    if (profileUser.batch) parts.push(`(Batch ${profileUser.batch})`);
+    const shareText = profileUser.bio || parts.join(' ') || '';
+
+    setProfileShareData({
+      url: profileUrl,
+      title: `${profileUser.name}'s Profile on InspiraNet`,
+      text: shareText,
+      imageUrl: profileUser.avatar,
+    });
+  };
+
   const getUserBatch = (user: User) => {
     // Check all possible batch locations
-    const batch = user.batch || 
-                  user.studentInfo?.batch || 
-                  'N/A';
+    const batch = user.batch ||
+      user.studentInfo?.batch ||
+      'N/A';
     return batch;
   };
   const getUserDepartment = (user: User) => {
     // Check all possible department locations
-    const department = user.department || 
-                      user.studentInfo?.department || 
-                      user.facultyInfo?.department || 
-                      'N/A';
+    const department = user.department ||
+      user.studentInfo?.department ||
+      user.facultyInfo?.department ||
+      'N/A';
     return department;
   };
   const getUserCompany = (user: User) => user.company || 'Not specified';
@@ -357,7 +383,7 @@ export default function AlumniDirectory() {
               />
             </div>
           </div>
-          
+
           {/* Filters Row */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="space-y-2">
@@ -450,8 +476,8 @@ export default function AlumniDirectory() {
         <div className="w-full">
           <div className="alumni-grid w-full">
             {users.map((user) => (
-              <Card 
-                key={user._id} 
+              <Card
+                key={user._id}
                 className="group hover:shadow-xl transition-all duration-300 cursor-pointer hover:scale-[1.02] h-full w-full border border-border/50 bg-card/50 backdrop-blur-sm hover:border-primary/30"
                 onClick={() => handleViewProfile(user._id)}
               >
@@ -464,7 +490,7 @@ export default function AlumniDirectory() {
                         {user.name.charAt(0).toUpperCase()}
                       </AvatarFallback>
                     </Avatar>
-                    
+
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center space-x-2 mb-2">
                         <h3 className="text-lg sm:text-xl font-bold text-foreground truncate">
@@ -474,7 +500,7 @@ export default function AlumniDirectory() {
                           {user.type}
                         </Badge>
                       </div>
-                      
+
                       {/* Department and Batch Info */}
                       <div className="space-y-2">
                         {user.department && (
@@ -502,7 +528,7 @@ export default function AlumniDirectory() {
                         <span className="text-muted-foreground">{user.location}</span>
                       </div>
                     )}
-                    
+
                     {/* Company and Designation */}
                     {user.company && (
                       <div className="flex items-center space-x-2 text-sm">
@@ -510,7 +536,7 @@ export default function AlumniDirectory() {
                         <span className="text-muted-foreground">{user.company}</span>
                       </div>
                     )}
-                    
+
                     {user.designation && (
                       <div className="flex items-center space-x-2 text-sm ml-6">
                         <span className="text-muted-foreground">{user.designation}</span>
@@ -545,8 +571,8 @@ export default function AlumniDirectory() {
                     <Button
                       size="sm"
                       variant={
-                        user.isFollowing ? "outline" : 
-                        user.followRequestStatus === 'pending' ? "secondary" : "default"
+                        user.isFollowing ? "outline" :
+                          user.followRequestStatus === 'pending' ? "secondary" : "default"
                       }
                       onClick={(e) => {
                         e.stopPropagation();
@@ -586,15 +612,15 @@ export default function AlumniDirectory() {
                     <div className="flex space-x-2">
                       {/* Message Button */}
                       {(user.isFollowing || user.isFollowedBy || user.followRequestStatus === 'accepted') && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleMessage(user._id);
-                        }}
-                        className="flex-1 transition-all duration-300 hover:scale-105"
-                      >
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleMessage(user._id);
+                          }}
+                          className="flex-1 transition-all duration-300 hover:scale-105"
+                        >
                           <MessageSquare className="h-4 w-4 mr-2" />
                           Message
                         </Button>
@@ -613,6 +639,17 @@ export default function AlumniDirectory() {
                         <Eye className="h-4 w-4 mr-2" />
                         Profile
                       </Button>
+
+                      {/* Share Profile Button */}
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={(e) => handleShareProfile(user, e)}
+                        className="flex-shrink-0 transition-all duration-300 hover:scale-105 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                        title="Share profile"
+                      >
+                        <Share2 className="h-4 w-4" />
+                      </Button>
                     </div>
                   </div>
                 </CardContent>
@@ -620,7 +657,7 @@ export default function AlumniDirectory() {
             ))}
           </div>
         </div>
-        
+
         {/* Pagination */}
         {totalPages > 1 && (
           <div className="flex justify-center mt-8">
@@ -652,8 +689,8 @@ export default function AlumniDirectory() {
           <div className="text-center py-12">
             <Users className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
             <p className="text-lg text-muted-foreground mb-4">No alumni found matching your search criteria.</p>
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={() => {
                 setSearchQuery("");
                 setBatchFilter("all");
@@ -666,6 +703,13 @@ export default function AlumniDirectory() {
           </div>
         )}
       </div>
+
+      {/* Profile Share Modal */}
+      <ShareModal
+        open={!!profileShareData}
+        onClose={() => setProfileShareData(null)}
+        shareData={profileShareData}
+      />
     </section>
   );
 }

@@ -17,6 +17,7 @@ const messageSchema = new mongoose.Schema({
     type: String,
     required: true
   },
+  tempId: { type: String }, // For optimistic UI matching
   content: {
     type: String,
     required: true,
@@ -140,7 +141,28 @@ const messageSchema = new mongoose.Schema({
       type: Number, // in hours
       default: null
     }
-  }
+  },
+  // Contextual Replies support
+  replyTo: {
+    messageId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Message'
+    },
+    content: String,
+    senderName: String
+  },
+  // Message Reactions support
+  reactions: [{
+    emoji: String,
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    },
+    createdAt: {
+      type: Date,
+      default: Date.now
+    }
+  }]
 }, {
   timestamps: true
 });
@@ -154,12 +176,13 @@ messageSchema.index({ 'deletionMetadata.deletedForEveryone': 1 });
 messageSchema.index({ 'deletionMetadata.hardDeleted': 1 });
 messageSchema.index({ 'autoDelete.enabled': 1, 'autoDelete.expiresAt': 1 });
 messageSchema.index({ 'deletionMetadata.graceDeleteQueued': 1 });
+messageSchema.index({ 'replyTo.messageId': 1 });
 
 // Virtual for timeAgo
-messageSchema.virtual('timeAgo').get(function() {
+messageSchema.virtual('timeAgo').get(function () {
   const now = new Date();
   const diffInSeconds = Math.floor((now - this.createdAt) / 1000);
-  
+
   if (diffInSeconds < 60) return 'Just now';
   if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)} minutes ago`;
   if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)} hours ago`;
@@ -168,7 +191,7 @@ messageSchema.virtual('timeAgo').get(function() {
 });
 
 // Method to mark message as read
-messageSchema.methods.markAsRead = function(userId) {
+messageSchema.methods.markAsRead = function (userId) {
   if (!this.readBy.some(read => read.userId.toString() === userId.toString())) {
     this.readBy.push({
       userId: userId,
@@ -180,55 +203,59 @@ messageSchema.methods.markAsRead = function(userId) {
 };
 
 // Method to soft delete message for a user
-messageSchema.methods.softDeleteForUser = function(userId) {
+messageSchema.methods.softDeleteForUser = function (userId) {
   if (!this.deletedBy.some(deleted => deleted.userId.toString() === userId.toString())) {
     this.deletedBy.push({
       userId: userId,
-      deletedAt: new Date()
+      deletedAt: new Date(),
+      deleteMode: 'forMe'
     });
   }
   return this.save();
 };
 
 // Static method to get messages for a conversation (excluding deleted messages for user)
-messageSchema.statics.getMessagesForConversation = function(conversationId, userId, page = 1, limit = 50) {
+messageSchema.statics.getMessagesForConversation = function (conversationId, userId, page = 1, limit = 50) {
+  // Ensure userId is properly formatted as ObjectId for comparison
+  const userIdObj = userId instanceof mongoose.Types.ObjectId
+    ? userId
+    : (mongoose.Types.ObjectId.isValid(userId) ? new mongoose.Types.ObjectId(userId) : userId);
+
   return this.find({
     conversationId,
+    // Exclude messages hard deleted
     'deletionMetadata.hardDeleted': { $ne: true },
+    // Handle messages deleted for everyone
     $or: [
-      // Not deleted for everyone
       { 'deletionMetadata.deletedForEveryone': { $ne: true } },
-      // Or deleted for everyone but user is the sender (they can still see it)
-      { senderId: userId }
+      { 'deletionMetadata.deletedForEveryone': { $exists: false } },
+      { senderId: userIdObj }
     ],
-    // Exclude messages deleted for this user
-    $and: [
+    // Exclude messages already deleted for THIS user (forMe mode)
+    // This allows User B to see all messages even if User A cleared the chat
+    $nor: [
       {
-        $or: [
-          { 'deletedBy.userId': { $ne: userId } },
-          { 
-            'deletedBy': { 
-              $elemMatch: { 
-                userId: userId, 
-                deleteMode: { $ne: 'forMe' } 
-              } 
-            } 
-          },
-          { deletedBy: { $exists: false } }
-        ]
+        deletedBy: {
+          $elemMatch: {
+            userId: userIdObj,
+            deleteMode: 'forMe'
+          }
+        }
       }
     ]
   })
-  .sort({ createdAt: -1 })
-  .skip((page - 1) * limit)
-  .limit(limit)
-  .populate('senderId', 'name avatar type')
-  .populate('readBy.userId', 'name avatar')
-  .populate('deletedBy.userId', 'name')
-  .populate('deletionMetadata.deletedForEveryoneBy', 'name');
+    .sort({ createdAt: -1 })
+    .skip((page - 1) * limit)
+    .limit(limit)
+    .populate('senderId', 'name avatar type')
+    .populate('readBy.userId', 'name avatar')
+    .populate('deletedBy.userId', 'name')
+    .populate('deletionMetadata.deletedForEveryoneBy', 'name')
+    .populate('reactions.userId', 'name avatar');
 };
 
 // Ensure virtual fields are serialized
 messageSchema.set('toJSON', { virtuals: true });
+messageSchema.set('toObject', { virtuals: true });
 
 module.exports = mongoose.model('Message', messageSchema);

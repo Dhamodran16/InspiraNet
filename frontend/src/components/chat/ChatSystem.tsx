@@ -10,6 +10,7 @@ import { MessageCircle, Send, Search, MoreVertical, Phone, Video } from 'lucide-
 import { useAuth } from '@/contexts/AuthContext';
 import { api } from '@/services/api';
 import { toast } from '@/hooks/use-toast';
+import Linkify from '@/components/ui/Linkify';
 
 interface Message {
   _id: string;
@@ -183,7 +184,7 @@ export default function ChatSystem() {
     return otherParticipant.name.toLowerCase().includes(searchQuery.toLowerCase());
   });
 
-  const filteredUsers = users && Array.isArray(users) ? users.filter(u => 
+  const filteredUsers = users && Array.isArray(users) ? users.filter(u =>
     u.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     u.email.toLowerCase().includes(searchQuery.toLowerCase())
   ) : [];
@@ -199,7 +200,7 @@ export default function ChatSystem() {
               <MessageCircle className="h-4 w-4" />
             </Button>
           </div>
-          
+
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
@@ -217,13 +218,12 @@ export default function ChatSystem() {
             {filteredConversations.map((conversation) => {
               const otherParticipant = getOtherParticipant(conversation);
               const isSelected = selectedConversation?._id === conversation._id;
-              
+
               return (
                 <Card
                   key={conversation._id}
-                  className={`mb-2 cursor-pointer transition-all hover:bg-muted/50 ${
-                    isSelected ? 'ring-2 ring-primary bg-primary/5' : ''
-                  }`}
+                  className={`mb-2 cursor-pointer transition-all hover:bg-muted/50 ${isSelected ? 'ring-2 ring-primary bg-primary/5' : ''
+                    }`}
                   onClick={() => {
                     setSelectedConversation(conversation);
                     loadMessages(conversation._id);
@@ -237,7 +237,7 @@ export default function ChatSystem() {
                           {otherParticipant.name.charAt(0).toUpperCase()}
                         </AvatarFallback>
                       </Avatar>
-                      
+
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between">
                           <h3 className="font-medium text-sm truncate">
@@ -280,7 +280,7 @@ export default function ChatSystem() {
                             {user.name.charAt(0).toUpperCase()}
                           </AvatarFallback>
                         </Avatar>
-                        
+
                         <div className="flex-1 min-w-0">
                           <h3 className="font-medium text-sm truncate">
                             {user.name}
@@ -322,7 +322,7 @@ export default function ChatSystem() {
                     </p>
                   </div>
                 </div>
-                
+
                 <div className="flex items-center space-x-2">
                   <Button size="sm" variant="ghost">
                     <Phone className="h-4 w-4" />
@@ -343,14 +343,14 @@ export default function ChatSystem() {
                 {messages.map((message) => {
                   // Fix: Handle senderId as object or string
                   let messageSenderId;
-                  
+
                   // Handle senderId as object or string
                   if (typeof message.senderId === 'object' && message.senderId !== null) {
                     messageSenderId = message.senderId._id?.toString() || message.senderId.toString();
                   } else {
                     messageSenderId = message.senderId?.toString();
                   }
-                  
+
                   const isOwn = message.isOwn !== undefined ? message.isOwn : (messageSenderId === user?._id?.toString());
                   const messageTime = new Date(message.createdAt).toLocaleTimeString([], {
                     hour: '2-digit',
@@ -373,7 +373,7 @@ export default function ChatSystem() {
                             </span>
                           </div>
                         )}
-                        
+
                         {/* Message content container */}
                         <div className={`flex flex-col ${isOwn ? 'items-end' : 'items-start'}`}>
                           {/* Sender name above message - ONLY for group chats */}
@@ -382,19 +382,19 @@ export default function ChatSystem() {
                               {message.senderName || 'Unknown User'}
                             </div>
                           )}
-                          
+
                           {/* Message bubble */}
                           <div
-                            className={`px-4 py-2 rounded-lg ${
-                              isOwn
+                            className={`px-4 py-2 rounded-lg ${isOwn
                                 ? 'bg-primary text-primary-foreground'
                                 : 'bg-muted text-muted-foreground'
-                            }`}
+                              }`}
                           >
-                            <p className="text-sm">{message.content}</p>
-                            <div className={`flex items-center justify-between mt-1 text-xs ${
-                              isOwn ? 'text-primary-foreground/70' : 'text-muted-foreground'
-                            }`}>
+                            <p className="text-sm whitespace-pre-wrap break-words">
+                              <Linkify text={message.content} />
+                            </p>
+                            <div className={`flex items-center justify-between mt-1 text-xs ${isOwn ? 'text-primary-foreground/70' : 'text-muted-foreground'
+                              }`}>
                               <span>{messageTime}</span>
                               {isOwn && message.isRead && (
                                 <div className="flex items-center space-x-1">

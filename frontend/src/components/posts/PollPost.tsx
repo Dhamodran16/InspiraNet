@@ -10,6 +10,7 @@ import { Post } from '@/services/postsApi';
 import { User } from '@/contexts/AuthContext';
 import { socketService } from '@/services/socketService';
 import MediaLightbox from './MediaLightbox';
+import Linkify from '@/components/ui/Linkify';
 
 // Using Post type from postsApi which has pollDetails with _id for options
 
@@ -414,8 +415,8 @@ const PollPost: React.FC<PollPostProps> = ({
               {currentPost.pollDetails?.question || 'Poll Question'}
             </h3>
             {currentPost.content && (
-              <p className="text-gray-600 dark:text-gray-400 text-xs mb-2">
-                {currentPost.content}
+              <p className="text-gray-600 dark:text-gray-400 text-xs mb-2 whitespace-pre-wrap">
+                <Linkify text={currentPost.content} />
               </p>
             )}
           </div>

@@ -573,4 +573,112 @@ export const uploadPortfolio = async (file: File, onProgress?: (progress: number
   return uploadFile('/api/users/portfolio', file, onProgress);
 };
 
+// ===== GROUPS SYSTEM =====
+
+// Create a new group
+export const createGroup = async (groupData: any): Promise<any> => {
+  try {
+    const response = await api.post('/api/groups', groupData);
+    return response.data;
+  } catch (error) {
+    console.error('Error creating group:', error);
+    throw error;
+  }
+};
+
+// Get all groups
+export const getGroups = async (params: {
+  page?: number;
+  limit?: number;
+  search?: string;
+  tag?: string;
+}): Promise<any> => {
+  try {
+    const response = await api.get('/api/groups', { params });
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching groups:', error);
+    throw error;
+  }
+};
+
+// Get group by ID
+export const getGroupById = async (groupId: string): Promise<any> => {
+  try {
+    const response = await api.get(`/api/groups/${groupId}`);
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching group by ID:', error);
+    throw error;
+  }
+};
+
+// Join a group
+export const joinGroup = async (groupId: string): Promise<any> => {
+  try {
+    const response = await api.post(`/api/groups/${groupId}/join`);
+    return response.data;
+  } catch (error) {
+    console.error('Error joining group:', error);
+    throw error;
+  }
+};
+
+// Leave a group
+export const leaveGroup = async (groupId: string): Promise<any> => {
+  try {
+    const response = await api.post(`/api/groups/${groupId}/leave`);
+    return response.data;
+  } catch (error) {
+    console.error('Error leaving group:', error);
+    throw error;
+  }
+};
+
+// Create a post in a group
+export const createGroupPost = async (groupId: string, postData: any): Promise<any> => {
+  try {
+    const response = await api.post(`/api/groups/${groupId}/posts`, postData);
+    return response.data;
+  } catch (error) {
+    console.error('Error creating group post:', error);
+    throw error;
+  }
+};
+
+// Get group posts
+export const getGroupPosts = async (groupId: string, page = 1, limit = 20): Promise<any> => {
+  try {
+    const response = await api.get(`/api/groups/${groupId}/posts`, {
+      params: { page, limit }
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching group posts:', error);
+    throw error;
+  }
+};
+
+// Update a group
+export const updateGroup = async (groupId: string, groupData: any): Promise<any> => {
+  try {
+    const response = await api.put(`/api/groups/${groupId}`, groupData);
+    return response.data;
+  } catch (error) {
+    console.error('Error updating group:', error);
+    throw error;
+  }
+};
+
+// Delete a group
+export const deleteGroup = async (groupId: string): Promise<any> => {
+  try {
+    const response = await api.delete(`/api/groups/${groupId}`);
+    return response.data;
+  } catch (error) {
+    console.error('Error deleting group:', error);
+    throw error;
+  }
+};
+
 export default api;

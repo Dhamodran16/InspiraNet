@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useParams } from 'react-router-dom';
 import { Toaster } from '@/components/ui/toaster';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { ThemeProvider } from '@/contexts/ThemeContext';
@@ -32,6 +32,13 @@ const LoadingSpinner = () => (
     <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
   </div>
 );
+
+// Helper for deep link redirects
+const DeepLinkRedirect = ({ section }: { section: 'home' | 'placements' }) => {
+  const { postId, id } = useParams();
+  const targetId = postId || id;
+  return <Navigate to={`/dashboard?section=${section}${targetId ? `&id=${targetId}` : ''}`} replace />;
+};
 
 function App() {
   useEffect(() => {
@@ -80,6 +87,8 @@ function App() {
                 <Route path="/signin" element={<SignInPage />} />
                 <Route path="/signup" element={<SignUpPage />} />
                 <Route path="/dashboard" element={<DashboardPage />} />
+                <Route path="/post/:postId" element={<DeepLinkRedirect section="home" />} />
+                <Route path="/placements/:id" element={<DeepLinkRedirect section="placements" />} />
                 <Route path="/profile" element={<Profile />} />
                 <Route path="/profile/:userId" element={<OtherUserProfile />} />
                 <Route path="/profile/edit" element={<EditProfile />} />

@@ -10,7 +10,7 @@ const NotificationService = require('../services/notificationService');
 // Get all conversations for the authenticated user (only with mutually followed users)
 router.get('/', authenticateToken, async (req, res) => {
   try {
-    console.log('🔍 Conversations route accessed by user:', req.user._id);
+    console.log('📨 [API] GET /api/conversations hit by user:', req.user?._id);
 
     const userId = req.user._id;
 
@@ -618,41 +618,10 @@ router.get('/:id/messages', authenticateToken, async (req, res) => {
     console.log('🔍 Loading messages for user:', userIdForQuery.toString(), 'in conversation:', conversationId);
     console.log('🔍 Query userId type:', userIdForQuery.constructor.name);
 
-    // First, get total count of ALL messages in conversation (for debugging)
-    const totalMessagesInConversation = await Message.countDocuments({ conversationId: conversationId });
-    console.log('📊 Total messages in conversation (before filtering):', totalMessagesInConversation);
+    // Use the static method from Message model for consistent filtering
+    const messages = await Message.getMessagesForConversation(conversationId, userId, parseInt(page), parseInt(limit));
 
-    // Get messages with the query
-    const messages = await Message.find(query)
-      .populate('senderId', 'name avatar type department')
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(parseInt(limit))
-      .lean();
-
-    console.log('✅ Found', messages.length, 'messages for user:', userIdForQuery.toString(), 'after filtering');
-
-    // Enhanced debug: Check a sample message's deletedBy array
-    if (messages.length === 0 && totalMessagesInConversation > 0) {
-      console.log('⚠️ WARNING: No messages found but conversation has', totalMessagesInConversation, 'messages');
-      const sampleMessages = await Message.find({ conversationId: conversationId }).limit(3).lean();
-      sampleMessages.forEach((msg, idx) => {
-        console.log(`📝 Sample message ${idx + 1} (${msg._id}):`, {
-          deletedByCount: msg.deletedBy?.length || 0,
-          deletedBy: msg.deletedBy?.map(d => ({
-            userId: d.userId?.toString(),
-            deleteMode: d.deleteMode,
-            matchesCurrentUser: d.userId?.toString() === userIdForQuery.toString()
-          })) || [],
-          currentUserId: userIdForQuery.toString(),
-          wouldBeExcluded: msg.deletedBy?.some(d =>
-            d.userId?.toString() === userIdForQuery.toString() && d.deleteMode === 'forMe'
-          ) || false
-        });
-      });
-    }
-
-    // Count total messages with same filtering
+    // Count total messages with same filtering logic for pagination
     const total = await Message.countDocuments({
       conversationId: conversationId,
       'deletionMetadata.hardDeleted': { $ne: true },
@@ -675,7 +644,7 @@ router.get('/:id/messages', authenticateToken, async (req, res) => {
 
     res.json({
       success: true,
-      messages: messages.reverse(), // Reverse to get chronological order
+      messages: messages.reverse(), // Reverse to get chronological order for frontend
       pagination: {
         currentPage: parseInt(page),
         totalPages: Math.ceil(total / limit),
@@ -689,6 +658,93 @@ router.get('/:id/messages', authenticateToken, async (req, res) => {
   }
 });
 
+// Add reaction to a message (Fallback route in conversations)
+router.post('/messages/:messageId/reaction', authenticateToken, async (req, res) => {
+  try {
+    const { messageId } = req.params;
+    const { emoji } = req.body;
+    const userId = req.user._id;
+
+    console.log(`📨 [API] POST /api/conversations/messages/${messageId}/reaction - Emoji: ${emoji}`);
+
+    if (!emoji) {
+      return res.status(400).json({ error: 'Emoji is required' });
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(messageId)) {
+      return res.status(400).json({ error: 'Invalid message ID' });
+    }
+
+    const message = await Message.findById(messageId);
+    if (!message) {
+      return res.status(404).json({ error: 'Message not found' });
+    }
+
+    // Check if user is part of the conversation
+    const conversation = await Conversation.findOne({
+      _id: message.conversationId,
+      participants: userId,
+      isActive: true
+    });
+
+    if (!conversation) {
+      return res.status(403).json({ error: 'Not authorized to react to this message' });
+    }
+
+    // Initialize reactions if undefined
+    if (!message.reactions) {
+      message.reactions = [];
+    }
+
+    // Toggle reaction: if already exists with same emoji, remove it; else add/replace
+    const existingIndex = message.reactions.findIndex(
+      r => r.userId.toString() === userId.toString()
+    );
+
+    if (existingIndex > -1) {
+      if (message.reactions[existingIndex].emoji === emoji) {
+        // Remove if same emoji
+        message.reactions.splice(existingIndex, 1);
+      } else {
+        // Replace with new emoji
+        message.reactions[existingIndex].emoji = emoji;
+        message.reactions[existingIndex].createdAt = new Date();
+      }
+    } else {
+      // Add new reaction
+      message.reactions.push({
+        emoji,
+        userId,
+        createdAt: new Date()
+      });
+    }
+
+    await message.save();
+
+    // Emit socket event for real-time reaction update
+    const io = req.app.get('io');
+    if (io) {
+      conversation.participants.forEach(participantId => {
+        io.to(`user_${participantId.toString()}`).emit('message_reaction', {
+          messageId,
+          conversationId: message.conversationId,
+          reactions: message.reactions,
+          userId,
+          emoji
+        });
+      });
+    }
+
+    res.json({
+      success: true,
+      reactions: message.reactions
+    });
+  } catch (error) {
+    console.error('Error handling reaction in conversations route:', error);
+    res.status(500).json({ error: 'Failed to update reaction' });
+  }
+});
+
 // Post a message to a conversation
 router.post('/:id/messages', authenticateToken, async (req, res) => {
   try {
@@ -698,7 +754,7 @@ router.post('/:id/messages', authenticateToken, async (req, res) => {
 
     const conversationId = req.params.id;
     const userId = req.user._id;
-    const { content, mediaUrl, fileName, fileSize, messageType = 'text' } = req.body;
+    const { content, mediaUrl, fileName, fileSize, messageType = 'text', replyTo, isEncrypted = false, tempId } = req.body;
 
     console.log('📋 Extracted values:', {
       content: content,
@@ -708,7 +764,9 @@ router.post('/:id/messages', authenticateToken, async (req, res) => {
       mediaUrl: mediaUrl ? mediaUrl.substring(0, 50) + '...' : null,
       fileName,
       fileSize,
-      messageType
+      messageType,
+      hasReply: !!replyTo,
+      isEncrypted
     });
 
     console.log('Request params:', { conversationId, userId: userId.toString() });
@@ -869,6 +927,13 @@ router.post('/:id/messages', authenticateToken, async (req, res) => {
       mediaUrl: mediaUrl || null,
       fileName: fileName || null,
       fileSize: fileSize || null,
+      isEncrypted: isEncrypted || false,
+      tempId: tempId || null,
+      replyTo: replyTo ? {
+        messageId: replyTo.messageId,
+        content: replyTo.content,
+        senderName: replyTo.senderName
+      } : undefined,
       status: 'sent'
     });
 

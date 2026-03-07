@@ -5,7 +5,8 @@ const User = require('../models/User');
 const authenticateToken = async (req, res, next) => {
   try {
     const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
+    const token = authHeader && authHeader.split(' ')[1];
+    // Bearer TOKEN
 
     console.log('Auth middleware - Path:', req.path);
     console.log('Auth middleware - Token present:', !!token);
@@ -17,9 +18,9 @@ const authenticateToken = async (req, res, next) => {
     console.log('Auth middleware - JWT_SECRET present:', !!process.env.JWT_SECRET);
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     console.log('Auth middleware - Token decoded, userId:', decoded.userId);
-    
+
     const user = await User.findById(decoded.userId).select('-password');
-    
+
     if (!user) {
       console.log('Auth middleware - User not found for userId:', decoded.userId);
       return res.status(401).json({ error: 'Invalid token' });
@@ -52,8 +53,8 @@ const requireVerification = (req, res, next) => {
 const requireUserType = (allowedTypes) => {
   return (req, res, next) => {
     if (!allowedTypes.includes(req.user.type)) {
-      return res.status(403).json({ 
-        error: `Access denied. Required user types: ${allowedTypes.join(', ')}` 
+      return res.status(403).json({
+        error: `Access denied. Required user types: ${allowedTypes.join(', ')}`
       });
     }
     next();

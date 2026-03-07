@@ -14,18 +14,18 @@ const DEFAULT_FRONTEND = 'http://localhost:8083';
 
 // Development configuration
 export const devConfig: URLConfig = {
-  apiUrl: import.meta.env.VITE_BACKEND_URL || DEFAULT_BACKEND,
-  socketUrl: import.meta.env.VITE_SOCKET_URL || import.meta.env.VITE_BACKEND_URL || DEFAULT_BACKEND,
-  meetingUrl: import.meta.env.VITE_MEETING_URL || import.meta.env.VITE_BACKEND_URL || DEFAULT_BACKEND,
+  apiUrl: import.meta.env.VITE_API_URL || import.meta.env.VITE_BACKEND_URL || DEFAULT_BACKEND,
+  socketUrl: import.meta.env.VITE_SOCKET_URL || import.meta.env.VITE_API_URL || import.meta.env.VITE_BACKEND_URL || DEFAULT_BACKEND,
+  meetingUrl: import.meta.env.VITE_MEETING_URL || import.meta.env.VITE_API_URL || import.meta.env.VITE_BACKEND_URL || DEFAULT_BACKEND,
   frontendUrl: import.meta.env.VITE_FRONTEND_URL || DEFAULT_FRONTEND,
   environment: 'development'
 };
 
 // Production configuration (uses same environment-driven URLs to support local hosting)
 export const prodConfig: URLConfig = {
-  apiUrl: import.meta.env.VITE_BACKEND_URL || DEFAULT_BACKEND,
-  socketUrl: import.meta.env.VITE_SOCKET_URL || import.meta.env.VITE_BACKEND_URL || DEFAULT_BACKEND,
-  meetingUrl: import.meta.env.VITE_MEETING_URL || import.meta.env.VITE_BACKEND_URL || DEFAULT_BACKEND,
+  apiUrl: import.meta.env.VITE_API_URL || import.meta.env.VITE_BACKEND_URL || DEFAULT_BACKEND,
+  socketUrl: import.meta.env.VITE_SOCKET_URL || import.meta.env.VITE_API_URL || import.meta.env.VITE_BACKEND_URL || DEFAULT_BACKEND,
+  meetingUrl: import.meta.env.VITE_MEETING_URL || import.meta.env.VITE_API_URL || import.meta.env.VITE_BACKEND_URL || DEFAULT_BACKEND,
   frontendUrl: import.meta.env.VITE_FRONTEND_URL || DEFAULT_FRONTEND,
   environment: 'production'
 };

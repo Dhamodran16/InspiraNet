@@ -283,44 +283,46 @@ export default function ProfileView({ profileUserId }: ProfileViewProps) {
 			</div>
 
 			<div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6 mb-6">
-				<div className="flex items-start justify-between">
-					<div className="flex items-start space-x-6">
-						<Avatar className="h-24 w-24">
+				<div className="flex flex-col md:flex-row items-start justify-between gap-6">
+					<div className="flex flex-col md:flex-row items-start md:space-x-6 w-full">
+						<Avatar className="h-24 w-24 mb-4 md:mb-0">
 							<AvatarImage src={profile.avatar} alt={profile.name} />
 							<AvatarFallback className="text-2xl">{profile.name?.charAt(0)?.toUpperCase()}</AvatarFallback>
 						</Avatar>
-						<div className="flex-1">
-							<div className="flex items-center space-x-3 mb-2">
+						<div className="flex-1 min-w-0">
+							<div className="flex flex-wrap items-center gap-2 mb-2">
 								{/* Edit Profile functionality removed as requested */}
-								<h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">{profile.name}</h1>
-								<Badge variant="secondary" className="text-sm">{profile.type?.charAt(0).toUpperCase() + profile.type?.slice(1)}</Badge>
-								{(profile.batch || profile.studentInfo?.batch || (profile.type === 'alumni' && profile.alumniInfo?.graduationYear)) && (
-									<Badge variant="outline" className="text-sm">
-										Batch {profile.batch || profile.studentInfo?.batch || (profile.type === 'alumni' ? profile.alumniInfo?.graduationYear : '')}
-									</Badge>
-								)}
+								<h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-gray-100 truncate">{profile.name}</h1>
+								<div className="flex gap-1">
+									<Badge variant="secondary" className="text-xs">{profile.type?.charAt(0).toUpperCase() + profile.type?.slice(1)}</Badge>
+									{(profile.batch || profile.studentInfo?.batch || (profile.type === 'alumni' && profile.alumniInfo?.graduationYear)) && (
+										<Badge variant="outline" className="text-xs">
+											Batch {profile.batch || profile.studentInfo?.batch || (profile.type === 'alumni' ? profile.alumniInfo?.graduationYear : '')}
+										</Badge>
+									)}
+								</div>
 							</div>
 
 							<div className="text-gray-600 dark:text-gray-400 space-y-1 mb-4">
 								{profile.department && (
-									<p className="flex items-center space-x-2"><GraduationCap className="h-4 w-4" /><span>{profile.department}</span></p>
+									<p className="flex items-center space-x-2 text-sm"><GraduationCap className="h-4 w-4" /><span>{profile.department}</span></p>
 								)}
 								{profile.company && (
-									<p className="flex items-center space-x-2">
+									<p className="flex items-center space-x-2 text-sm">
 										<Building className="h-4 w-4" />
 										{/* Edit Profile functionality removed as requested */}
 										<span>{profile.company}</span>
 									</p>
 								)}
 								{profile.designation && (
-									<p className="flex items-center space-x-2">
+									<p className="flex items-center space-x-2 text-sm">
 										<Briefcase className="h-4 w-4" />
 										{/* Edit Profile functionality removed as requested */}
 										<span>{profile.designation}</span>
 									</p>
 								)}
 								{profile.location && (
-									<p className="flex items-center space-x-2">
+									<p className="flex items-center space-x-2 text-sm">
 										<MapPin className="h-4 w-4" />
 										{/* Edit Profile functionality removed as requested */}
 										<span>{profile.location}</span>
@@ -331,18 +333,18 @@ export default function ProfileView({ profileUserId }: ProfileViewProps) {
 							{profile.bio && (
 								<div className="mb-4">
 									{/* Edit Profile functionality removed as requested */}
-									<p className="text-gray-700 dark:text-gray-300">{profile.bio}</p>
+									<p className="text-sm md:text-base text-gray-700 dark:text-gray-300">{profile.bio}</p>
 								</div>
 							)}
 						</div>
 					</div>
 
-					<div className="flex flex-col space-y-2">
+					<div className="flex flex-row md:flex-col space-x-2 md:space-x-0 md:space-y-2 w-full md:w-auto">
 						{!isOwnProfile && (
 							<>
-								<Button onClick={isFollowing ? handleUnfollow : handleFollow} variant={isFollowing ? 'outline' : 'default'} className="w-full">{isFollowing ? 'Unfollow' : 'Follow'}</Button>
+								<Button onClick={isFollowing ? handleUnfollow : handleFollow} variant={isFollowing ? 'outline' : 'default'} className="flex-1 md:w-full">{isFollowing ? 'Unfollow' : 'Follow'}</Button>
 								{(isFollowing || isFollowedBy) && (
-									<Button onClick={handleMessage} variant="outline" className="w-full"><MessageSquare className="h-4 w-4 mr-2" />Message</Button>
+									<Button onClick={handleMessage} variant="outline" className="flex-1 md:w-full"><MessageSquare className="h-4 w-4 mr-2" />Message</Button>
 								)}
 							</>
 						)}

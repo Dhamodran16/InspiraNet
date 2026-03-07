@@ -5,17 +5,17 @@ import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { 
-  Send, 
-  ArrowLeft, 
-  Search, 
-  UserPlus, 
+import {
+  Send,
+  ArrowLeft,
+  Search,
+  UserPlus,
   MessageSquare,
   Users,
   UserCheck,
   Clock,
   Smile,
-  Paperclip, 
+  Paperclip,
   Image as ImageIcon,
   Mic,
   MoreVertical,
@@ -28,12 +28,13 @@ import { socketService } from '@/services/socketService';
 import api from '@/services/api';
 import { AdvancedMessageEncryption, EncryptedMessage } from '@/utils/messageEncryption';
 import SecureKeyService from '@/services/secureKeyService';
+import Linkify from '@/components/ui/Linkify';
 
 interface User {
-    _id: string;
-    name: string;
-    avatar?: string;
-    type: string;
+  _id: string;
+  name: string;
+  avatar?: string;
+  type: string;
   department?: string;
   batch?: string;
   isFollowing?: boolean;
@@ -123,7 +124,7 @@ const MessagesPage: React.FC = () => {
           try {
             const conversationId = secureKeyService.getConversationId(user!._id, selectedUser._id);
             const sharedSecret = await secureKeyService.getSharedSecret([user!._id, selectedUser._id], conversationId);
-            
+
             const encryptedMessage: EncryptedMessage = {
               encryptedData: incoming.encryptedData,
               iv: incoming.iv,
@@ -134,7 +135,7 @@ const MessagesPage: React.FC = () => {
               messageType: 'message',
               conversationId
             };
-            
+
             decryptedContent = await AdvancedMessageEncryption.decryptMessage(
               encryptedMessage,
               sharedSecret,
@@ -160,12 +161,12 @@ const MessagesPage: React.FC = () => {
         // Mark as read
         try {
           socketService.markMessagesAsRead(convId, [newMsg._id]);
-        } catch {}
+        } catch { }
       } else {
         // Subtle toast for new message in other conversation
         try {
           toast({ title: 'New message', description: incoming?.senderName ? `From ${incoming.senderName}` : 'You received a new message' });
-        } catch {}
+        } catch { }
       }
 
       // Also refresh conversations
@@ -182,7 +183,7 @@ const MessagesPage: React.FC = () => {
     try {
       setLoading(true);
       console.log('👥 Loading users for messaging...');
-      
+
       // Prefer backend messageable-users list (mutuals)
       let messageableUsers: any[] = [];
       try {
@@ -196,7 +197,7 @@ const MessagesPage: React.FC = () => {
         messageableUsers = response.data.users?.filter((u: any) => u.canMessage) || [];
       }
       console.log('💬 Messageable users:', messageableUsers.length);
-      
+
       setUsers(messageableUsers);
     } catch (error) {
       console.error('❌ Error loading users:', error);
@@ -220,7 +221,7 @@ const MessagesPage: React.FC = () => {
       try {
         const ids = convs.map((c: any) => c._id).filter(Boolean);
         if (ids.length > 0) socketService.joinConversations(ids);
-      } catch {}
+      } catch { }
     } catch (error) {
       console.error('Error loading conversations:', error);
     }
@@ -230,14 +231,14 @@ const MessagesPage: React.FC = () => {
     try {
       setLoading(true);
       console.log('📥 Loading messages for user:', userId);
-      
+
       // Create or get conversation
       const conversationResponse = await api.post('/api/conversations', {
         participantId: userId
       });
-      
+
       console.log('💬 Conversation created/retrieved:', conversationResponse.data);
-      
+
       if (conversationResponse.data.conversation) {
         const conversationId = conversationResponse.data.conversation._id;
         console.log('💬 Fetching messages for conversation:', conversationId);
@@ -245,8 +246,8 @@ const MessagesPage: React.FC = () => {
         // Join socket room for real-time updates
         try {
           socketService.joinConversations([conversationId]);
-        } catch {}
-        
+        } catch { }
+
         const messagesResponse = await api.get(`/api/conversations/${conversationId}/messages`);
         console.log('📨 Messages loaded:', messagesResponse.data.messages?.length || 0, 'messages');
         // Server already returns decrypted content when applicable
@@ -256,7 +257,7 @@ const MessagesPage: React.FC = () => {
         try {
           const ids = msgs.map((m: any) => m._id);
           socketService.markMessagesAsRead(conversationId, ids);
-        } catch {}
+        } catch { }
       } else {
         console.warn('⚠️ No conversation found for user:', userId);
         setMessages([]);
@@ -264,7 +265,7 @@ const MessagesPage: React.FC = () => {
     } catch (error) {
       console.error('❌ Error loading messages:', error);
       setMessages([]);
-      toast({ 
+      toast({
         title: "Error",
         description: "Failed to load messages. Please try again.",
         variant: "destructive"
@@ -301,7 +302,7 @@ const MessagesPage: React.FC = () => {
     try {
       const messageContent = newMessage.trim();
       console.log('📤 Sending message to user:', selectedUser._id, 'Content:', messageContent);
-      
+
       setNewMessage('');
 
       // Create or get conversation
@@ -314,7 +315,7 @@ const MessagesPage: React.FC = () => {
       if (conversationResponse.data.conversation) {
         const conversationId = conversationResponse.data.conversation._id;
         console.log('💬 Using conversation ID:', conversationId);
-        
+
         // Optimistic UI append
         const tempId = `temp_${Date.now()}`;
         const optimistic: Message = {
@@ -331,7 +332,7 @@ const MessagesPage: React.FC = () => {
         // Encrypt the message
         const convId = secureKeyService.getConversationId(user._id, selectedUser._id);
         const sharedSecret = await secureKeyService.getSharedSecret([user._id, selectedUser._id], convId);
-        
+
         const encryptedMessage = await AdvancedMessageEncryption.encryptMessage(
           newMessage,
           user._id,
@@ -367,10 +368,10 @@ const MessagesPage: React.FC = () => {
       }
     } catch (error) {
       console.error('❌ Error sending message:', error);
-      
+
       // Restore the message if sending failed
       setNewMessage(newMessage);
-      
+
       toast({
         title: "Error",
         description: "Failed to send message. Please try again.",
@@ -396,7 +397,7 @@ const MessagesPage: React.FC = () => {
     inputRef.current?.focus();
   };
 
-  const filteredUsers = users.filter(user => 
+  const filteredUsers = users.filter(user =>
     user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     user.department?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     user.batch?.toLowerCase().includes(searchTerm.toLowerCase())
@@ -411,11 +412,11 @@ const MessagesPage: React.FC = () => {
     const date = new Date(dateString);
     const now = new Date();
     const diffInDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
-    
+
     if (diffInDays === 0) return 'Today';
     if (diffInDays === 1) return 'Yesterday';
     if (diffInDays < 7) return date.toLocaleDateString([], { weekday: 'long' });
-      return date.toLocaleDateString();
+    return date.toLocaleDateString();
   };
 
   if (!user) {
@@ -441,10 +442,10 @@ const MessagesPage: React.FC = () => {
                   <Users className="h-5 w-5" />
                   Messages
                 </CardTitle>
-              <Input
+                <Input
                   placeholder="Search users..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
                   className="w-full"
                 />
               </CardHeader>
@@ -454,19 +455,18 @@ const MessagesPage: React.FC = () => {
                     <div
                       key={user._id}
                       onClick={() => setSelectedUser(user)}
-                      className={`flex items-center space-x-3 p-4 cursor-pointer transition-colors border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 ${
-                        selectedUser?._id === user._id
+                      className={`flex items-center space-x-3 p-4 cursor-pointer transition-colors border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 ${selectedUser?._id === user._id
                           ? 'bg-blue-50 dark:bg-blue-900/20 border-l-4 border-l-blue-500'
                           : ''
-                      }`}
+                        }`}
                     >
                       <Avatar className="h-12 w-12">
                         <AvatarImage src={user.avatar} />
                         <AvatarFallback className="bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400">
                           {user.name?.charAt(0)?.toUpperCase() || 'U'}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div className="flex-1 min-w-0">
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 min-w-0">
                         <p className="font-semibold text-gray-900 dark:text-gray-100 truncate">{user.name}</p>
                         <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
                           {user.department} • {user.batch}
@@ -482,29 +482,29 @@ const MessagesPage: React.FC = () => {
                 </div>
               </CardContent>
             </Card>
-        </div>
+          </div>
 
           {/* Chat Area - Instagram Style */}
           <div className="lg:col-span-2">
             <Card className="h-[calc(100vh-12rem)]">
               {selectedUser ? (
-            <>
-              {/* Chat Header */}
+                <>
+                  {/* Chat Header */}
                   <CardHeader className="border-b bg-gray-50 dark:bg-gray-800 dark:border-gray-700">
-                <div className="flex items-center space-x-3">
+                    <div className="flex items-center space-x-3">
                       <Avatar className="h-10 w-10">
                         <AvatarImage src={selectedUser.avatar} />
                         <AvatarFallback className="bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400">
                           {selectedUser.name?.charAt(0)?.toUpperCase() || 'U'}
-                    </AvatarFallback>
-                  </Avatar>
+                        </AvatarFallback>
+                      </Avatar>
                       <div className="flex-1">
                         <CardTitle className="text-lg dark:text-gray-100">{selectedUser.name}</CardTitle>
                         <p className="text-sm text-gray-500 dark:text-gray-400">
                           {selectedUser.department} • {selectedUser.batch}
-                    </p>
-                  </div>
-                </div>
+                        </p>
+                      </div>
+                    </div>
                   </CardHeader>
 
                   {/* Messages Area */}
@@ -520,16 +520,17 @@ const MessagesPage: React.FC = () => {
                             className={`flex ${isSelf ? 'justify-end' : 'justify-start'}`}
                           >
                             <div
-                              className={`max-w-xs lg:max-w-md px-4 py-2 rounded-2xl ${
-                                isSelf
+                              className={`max-w-xs lg:max-w-md px-4 py-2 rounded-2xl ${isSelf
                                   ? 'bg-blue-500 text-white rounded-br-md'
                                   : 'bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded-bl-md border border-gray-200 dark:border-gray-600'
-                              }`}
+                                }`}
                             >
                               <p className={`text-xs mb-1 ${isSelf ? 'text-blue-100' : 'text-gray-600 dark:text-gray-400'}`}>
                                 {message.senderName || (isSelf ? user?.name : selectedUser?.name)}
                               </p>
-                              <p className="text-sm">{message.content}</p>
+                              <p className="text-sm whitespace-pre-wrap break-words">
+                                <Linkify text={message.content} />
+                              </p>
                               <p className={`text-xs mt-1 ${isSelf ? 'text-blue-100' : 'text-gray-500 dark:text-gray-400'}`}>
                                 {new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                               </p>
@@ -537,13 +538,13 @@ const MessagesPage: React.FC = () => {
                           </div>
                         );
                       })}
-                      
+
                     </div>
-              </div>
+                  </div>
 
                   {/* Message Input - Instagram Style */}
                   <div className="border-t dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
-                <div className="flex items-center space-x-2">
+                    <div className="flex items-center space-x-2">
                       <Button
                         variant="ghost"
                         size="sm"
@@ -551,7 +552,7 @@ const MessagesPage: React.FC = () => {
                         onClick={() => setShowEmojiPicker(!showEmojiPicker)}
                       >
                         <Smile className="h-5 w-5 text-gray-500 dark:text-gray-400" />
-                  </Button>
+                      </Button>
                       <Button
                         variant="ghost"
                         size="sm"
@@ -572,26 +573,26 @@ const MessagesPage: React.FC = () => {
                         }}
                       >
                         <Paperclip className="h-5 w-5 text-gray-500 dark:text-gray-400" />
-                  </Button>
-                  <div className="flex-1 relative">
-                    <Input
+                      </Button>
+                      <div className="flex-1 relative">
+                        <Input
                           ref={inputRef}
-                      value={newMessage}
+                          value={newMessage}
                           onChange={handleInputChange}
                           onKeyPress={(e) => e.key === 'Enter' && !e.shiftKey && handleSendMessage()}
                           placeholder="Message..."
                           className="rounded-full border-gray-300 dark:border-gray-600 focus:border-blue-500 focus:ring-blue-500 pr-12 dark:bg-gray-700 dark:text-gray-100"
                         />
                       </div>
-                    <Button
+                      <Button
                         onClick={handleSendMessage}
                         disabled={!newMessage.trim()}
                         className="rounded-full bg-blue-500 hover:bg-blue-600 text-white p-2 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         <Send className="h-5 w-5" />
-                    </Button>
-                  </div>
-                    
+                      </Button>
+                    </div>
+
                     {/* Emoji Picker */}
                     {showEmojiPicker && (
                       <div className="mt-2 p-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-lg">
@@ -605,20 +606,20 @@ const MessagesPage: React.FC = () => {
                               {emoji}
                             </button>
                           ))}
-                </div>
+                        </div>
                       </div>
                     )}
-              </div>
-            </>
-          ) : (
+                  </div>
+                </>
+              ) : (
                 <div className="flex items-center justify-center h-full">
-              <div className="text-center">
+                  <div className="text-center">
                     <MessageSquare className="h-16 w-16 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
                     <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">Select a conversation</h3>
                     <p className="text-gray-500 dark:text-gray-400">Choose a user from the list to start messaging</p>
-              </div>
-            </div>
-          )}
+                  </div>
+                </div>
+              )}
             </Card>
           </div>
         </div>

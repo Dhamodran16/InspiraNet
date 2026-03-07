@@ -5,6 +5,9 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import {
   Bell,
+  BellRing,
+  Users,
+  Radio,
   UserPlus,
   Heart,
   MessageSquare,
@@ -245,113 +248,126 @@ export function NotificationList({ onNotificationClick, onMarkAllRead }: Notific
 
   return (
     <div className="space-y-4">
-      {/* Header with filters and actions */}
-      <div className="flex items-center justify-between">
-        <div className="flex space-x-2">
-          <Button
-            variant={filter === 'all' ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setFilter('all')}
-          >
-            All
-          </Button>
-          <Button
-            variant={filter === 'unread' ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setFilter('unread')}
-          >
-            Unread
-          </Button>
-          <Button
-            variant={filter === 'read' ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setFilter('read')}
-          >
-            Read
-          </Button>
-          <Button
-            variant={filter === 'connection' ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setFilter('connection')}
-          >
-            Connections
-          </Button>
-          <Button
-            variant={filter === 'communication' ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setFilter('communication')}
-          >
-            Messages
-          </Button>
-          <Button
-            variant={filter === 'follow_requests' ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setFilter('follow_requests')}
-          >
-            Follow Requests
-          </Button>
+      {/* Header with filters and actions - Made responsive with horizontal scroll */}
+      {/* Header with filters and actions - Made responsive with horizontal scroll */}
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-6">
+        <div className="w-full sm:w-auto overflow-x-auto scrollbar-none">
+          <div className="flex space-x-2 min-w-max pb-1">
+            <button
+              onClick={() => setFilter('all')}
+              className={`px-4 py-2 rounded-full text-xs sm:text-sm font-medium transition-all flex items-center gap-2 border ${filter === 'all' ? 'bg-blue-600 text-white border-blue-600 shadow-sm' : 'bg-transparent text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
+            >
+              <Bell className="h-4 w-4" />
+              All
+            </button>
+            <button
+              onClick={() => setFilter('unread')}
+              className={`px-4 py-2 rounded-full text-xs sm:text-sm font-medium transition-all flex items-center gap-2 border ${filter === 'unread' ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm' : 'bg-transparent text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
+            >
+              <BellRing className="h-4 w-4" />
+              Unread
+            </button>
+            <button
+              onClick={() => setFilter('connection')}
+              className={`px-4 py-2 rounded-full text-xs sm:text-sm font-medium transition-all flex items-center gap-2 border ${filter === 'connection' ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm' : 'bg-transparent text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
+            >
+              <Users className="h-4 w-4" />
+              Network
+            </button>
+            <button
+              onClick={() => setFilter('communication')}
+              className={`px-4 py-2 rounded-full text-xs sm:text-sm font-medium transition-all flex items-center gap-2 border ${filter === 'communication' ? 'bg-pink-600 text-white border-pink-600 shadow-sm' : 'bg-transparent text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
+            >
+              <Radio className="h-4 w-4" />
+              Alerts
+            </button>
+            <button
+              onClick={() => setFilter('follow_requests')}
+              className={`px-4 py-2 rounded-full text-xs sm:text-sm font-medium transition-all flex items-center gap-2 border ${filter === 'follow_requests' ? 'bg-amber-600 text-white border-amber-600 shadow-sm' : 'bg-transparent text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
+            >
+              <UserPlus className="h-4 w-4" />
+              Follow
+            </button>
+          </div>
         </div>
 
-        <Button variant="outline" size="sm" onClick={handleMarkAllRead}>
-          Mark All Read
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={handleMarkAllRead}
+          className="h-9 px-3 rounded-full text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 font-semibold flex-shrink-0 transition-all w-full sm:w-auto whitespace-nowrap"
+        >
+          <CheckCircle className="h-4 w-4 mr-1.5" />
+          Mark all read
         </Button>
       </div>
 
       {/* Notifications list */}
-      <div className="space-y-3">
+      <div className="flex flex-col gap-2.5 sm:gap-3 px-3 sm:px-0 mt-2 sm:mt-3">
         {notifications.map((notification) => (
-          <Card
+          <div
             key={notification._id}
-            className={`border-l-4 ${getNotificationColor(notification.type)} ${!notification.isRead ? 'ring-2 ring-blue-200 dark:ring-blue-900/50' : ''
-              }`}
+            className={`transition-all duration-300 transform hover:scale-[1.005] sm:rounded-lg sm:border-l-4 sm:border shadow-sm hover:shadow-md ${getNotificationColor(notification.type)} ${!notification.isRead ? 'bg-blue-50/40 ring-1 ring-blue-100/50' : 'bg-white sm:bg-card'
+              } p-3 sm:p-3 relative overflow-hidden group`}
           >
-            <CardContent className="p-4">
-              <div className="flex items-start space-x-3">
-                <div className="flex-shrink-0">
-                  {getNotificationIcon(notification.type)}
+            <div className="p-0">
+              <div className="flex items-start gap-2.5">
+                <div className="flex-shrink-0 pt-0.5">
+                  <div className="scale-90 transform origin-top">
+                    {getNotificationIcon(notification.type)}
+                  </div>
                 </div>
 
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center space-x-2 mb-1">
-                    <h4 className="font-medium text-sm">{notification.title}</h4>
-                    {!notification.isRead && (
-                      <Badge variant="secondary" className="text-xs">
-                        New
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mb-1">
+                    <h4 className="font-semibold text-[13px] sm:text-sm leading-tight break-words flex-1 min-w-[100px]">
+                      {notification.title}
+                    </h4>
+                    <div className="flex items-center gap-1 ml-auto">
+                      {!notification.isRead && (
+                        <Badge variant="secondary" className="text-[9px] px-1 h-3.5 leading-none">
+                          New
+                        </Badge>
+                      )}
+                      <Badge variant="outline" className="text-[9px] px-1 h-3.5 leading-none opacity-70">
+                        {notification.category}
                       </Badge>
-                    )}
-                    <Badge variant="outline" className="text-xs">
-                      {notification.category}
-                    </Badge>
+                    </div>
                   </div>
 
-                  <p className="text-sm text-muted-foreground mb-2">
-                    {notification.message}
-                  </p>
+                  {notification.message && (
+                    <p className="text-[12px] sm:text-[13px] text-muted-foreground mb-2 line-clamp-2 md:line-clamp-none leading-snug">
+                      {notification.message}
+                    </p>
+                  )}
 
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2 text-xs text-muted-foreground">
+                  <div className="flex flex-wrap items-center justify-between gap-2 mt-1 pt-1 border-t border-black/5 dark:border-white/5">
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[9px] sm:text-[10px] text-muted-foreground/80">
                       {notification.senderId && (
-                        <div className="flex items-center space-x-1">
-                          <Avatar className="h-4 w-4">
+                        <div className="flex items-center gap-1">
+                          <Avatar className="h-3.5 w-3.5">
                             <AvatarImage src={notification.senderId.avatar} />
-                            <AvatarFallback>
+                            <AvatarFallback className="text-[7px]">
                               {notification.senderId.name.charAt(0).toUpperCase()}
                             </AvatarFallback>
                           </Avatar>
-                          <span>{notification.senderId.name}</span>
+                          <span className="max-w-[80px] truncate font-medium">{notification.senderId.name}</span>
                         </div>
                       )}
-                      <span>•</span>
+                      <span className="opacity-40">•</span>
                       <span>{formatDistanceToNow(new Date(notification.createdAt), { addSuffix: true })}</span>
                     </div>
 
-                    <div className="flex space-x-1">
+                    <div className="flex items-center gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
                       {!notification.isRead && (
                         <Button
                           size="sm"
                           variant="ghost"
-                          onClick={() => markAsRead(notification._id)}
-                          className="h-6 w-6 p-0"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            markAsRead(notification._id);
+                          }}
+                          className="h-5 w-5 p-0 hover:bg-blue-100/50"
                         >
                           <Eye className="h-3 w-3" />
                         </Button>
@@ -359,8 +375,11 @@ export function NotificationList({ onNotificationClick, onMarkAllRead }: Notific
                       <Button
                         size="sm"
                         variant="ghost"
-                        onClick={() => deleteNotification(notification._id)}
-                        className="h-6 w-6 p-0 text-red-500 hover:text-red-700"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          deleteNotification(notification._id);
+                        }}
+                        className="h-5 w-5 p-0 text-red-500 hover:text-red-700 hover:bg-red-100/50"
                       >
                         <Trash2 className="h-3 w-3" />
                       </Button>
@@ -368,18 +387,19 @@ export function NotificationList({ onNotificationClick, onMarkAllRead }: Notific
                   </div>
                 </div>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         ))}
       </div>
 
       {/* Load more button */}
       {hasMore && (
-        <div className="text-center">
+        <div className="text-center pt-4">
           <Button
             variant="outline"
             onClick={() => loadNotifications(currentPage + 1, true)}
             disabled={loading}
+            className="w-full sm:w-auto h-9 sm:h-10 text-xs sm:text-sm"
           >
             {loading ? 'Loading...' : 'Load More'}
           </Button>

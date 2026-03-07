@@ -5,6 +5,7 @@ import { Post } from '@/services/postsApi';
 import { User } from '@/contexts/AuthContext';
 import BasePost from './BasePost';
 import MediaLightbox from './MediaLightbox';
+import Linkify from '@/components/ui/Linkify';
 
 interface GeneralPostProps {
   post: Post;
@@ -159,7 +160,7 @@ export default function GeneralPost({
         {post.content && (
           <div className="px-4 py-2">
             <p className="text-gray-900 dark:text-gray-100 whitespace-pre-wrap text-[13px] leading-relaxed">
-              {post.content}
+              <Linkify text={post.content} />
             </p>
           </div>
         )}

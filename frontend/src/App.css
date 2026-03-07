@@ -11,9 +11,11 @@
   will-change: filter;
   transition: filter 300ms;
 }
+
 .logo:hover {
   filter: drop-shadow(0 0 2em #646cffaa);
 }
+
 .logo.react:hover {
   filter: drop-shadow(0 0 2em #61dafbaa);
 }
@@ -22,6 +24,7 @@
   from {
     transform: rotate(0deg);
   }
+
   to {
     transform: rotate(360deg);
   }
@@ -149,15 +152,20 @@
   border-radius: 1rem;
   padding: 0.75rem 1rem;
   position: relative;
+  user-select: text !important;
+  -webkit-user-select: text !important;
+  -webkit-touch-callout: default !important;
 }
 
-.message-bubble.own {
+.message-bubble.own,
+.message-bubble-own {
   background-color: #3b82f6;
   color: white;
   border-bottom-right-radius: 0.25rem;
 }
 
-.message-bubble.other {
+.message-bubble.other,
+.message-bubble-other {
   background-color: #f3f4f6;
   color: #1f2937;
   border: 1px solid #e5e7eb;
@@ -232,7 +240,7 @@
   .message-bubble {
     max-width: 240px;
   }
-  
+
   .message-avatar {
     width: 1.75rem;
     height: 1.75rem;

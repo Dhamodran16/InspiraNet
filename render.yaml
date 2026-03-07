@@ -56,5 +56,7 @@ services:
         value: https://inspiranet-backend.onrender.com
       - key: VITE_FRONTEND_URL
         value: https://inspiranet.onrender.com
+      - key: VITE_BACKEND_URL
+        value: https://inspiranet-backend.onrender.com
       - key: NODE_ENV
         value: production

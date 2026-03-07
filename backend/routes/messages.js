@@ -388,11 +388,11 @@ router.get('/conversations/:conversationId/messages', authenticateToken, async (
 
     // Format messages for frontend
     const formattedMessages = messages.reverse().map(msg => {
-      const isOwn = msg.senderId._id.toString() === req.user._id.toString();
+      const isOwn = msg.senderId?._id?.toString() === req.user?._id?.toString();
 
       return {
         _id: msg._id,
-        senderId: msg.senderId._id,
+        senderId: msg.senderId?._id || msg.senderId,
         senderName: msg.senderName,
         content: msg.content,
         messageType: msg.messageType,
@@ -403,7 +403,11 @@ router.get('/conversations/:conversationId/messages', authenticateToken, async (
         readBy: msg.readBy,
         createdAt: msg.createdAt,
         timeAgo: msg.timeAgo,
-        isOwn: isOwn
+        isOwn: isOwn,
+        replyTo: msg.replyTo,
+        reactions: msg.reactions,
+        isEncrypted: msg.isEncrypted || false,
+        deletionMetadata: msg.deletionMetadata
       };
     });
 
@@ -447,7 +451,7 @@ router.get('/conversations/:conversationId/messages', authenticateToken, async (
 router.post('/conversations/:conversationId/messages', authenticateToken, async (req, res) => {
   try {
     const { conversationId } = req.params;
-    const { content, mediaUrl, fileName, fileSize, messageType = 'text' } = req.body;
+    const { content, mediaUrl, fileName, fileSize, messageType = 'text', isEncrypted = false, replyTo, tempId } = req.body;
     const senderId = req.user._id;
 
     if (!content && !mediaUrl) {
@@ -478,7 +482,7 @@ router.post('/conversations/:conversationId/messages', authenticateToken, async 
 
     // Create message
     const message = new Message({
-      conversationId,
+      conversationId: new mongoose.Types.ObjectId(conversationId),
       senderId,
       senderName: req.user.name,
       content: content || '',
@@ -486,7 +490,13 @@ router.post('/conversations/:conversationId/messages', authenticateToken, async 
       mediaUrl,
       fileName,
       fileSize,
-      isEncrypted: false
+      isEncrypted: isEncrypted || false,
+      tempId,
+      replyTo: replyTo ? {
+        messageId: replyTo.messageId,
+        content: replyTo.content,
+        senderName: replyTo.senderName
+      } : undefined
     });
 
     await message.save();
@@ -530,42 +540,30 @@ router.post('/conversations/:conversationId/messages', authenticateToken, async 
     if (io) {
       // Emit to all participants in the conversation
       conversation.participants.forEach(participantId => {
-        if (participantId.toString() !== senderId.toString()) {
-          io.to(`user_${participantId}`).emit('new_message', {
-            conversationId: conversation._id,
-            message: {
-              _id: message._id,
-              senderId: message.senderId._id,
-              senderName: message.senderName,
-              content: content,
-              messageType: message.messageType,
-              mediaUrl: message.mediaUrl,
-              fileName: message.fileName,
-              fileSize: message.fileSize,
-              isEncrypted: false,
-              createdAt: message.createdAt,
-              isOwn: false // This is correct - other participants receive isOwn: false
-            }
-          });
-        } else {
-          // Send to sender with isOwn: true
-          io.to(`user_${participantId}`).emit('new_message', {
-            conversationId: conversation._id,
-            message: {
-              _id: message._id,
-              senderId: message.senderId._id,
-              senderName: message.senderName,
-              content: content,
-              messageType: message.messageType,
-              mediaUrl: message.mediaUrl,
-              fileName: message.fileName,
-              fileSize: message.fileSize,
-              isEncrypted: false,
-              createdAt: message.createdAt,
-              isOwn: true // Sender receives isOwn: true
-            }
-          });
-        }
+        const participantRoom = `user_${participantId.toString()}`;
+        const isSelf = participantId.toString() === senderId.toString();
+
+        console.log(`📡 Emitting message to ${isSelf ? 'sender' : 'recipient'}: ${participantRoom}`);
+
+        io.to(participantRoom).emit('new_message', {
+          conversationId: conversation._id,
+          message: {
+            _id: message._id,
+            senderId: message.senderId._id || message.senderId,
+            senderName: message.senderName,
+            content: message.content,
+            messageType: message.messageType,
+            mediaUrl: message.mediaUrl,
+            fileName: message.fileName,
+            fileSize: message.fileSize,
+            isEncrypted: message.isEncrypted || false,
+            createdAt: message.createdAt,
+            isOwn: isSelf,
+            tempId: message.tempId,
+            replyTo: message.replyTo,
+            reactions: message.reactions || []
+          }
+        });
       });
     }
 
@@ -574,22 +572,105 @@ router.post('/conversations/:conversationId/messages', authenticateToken, async 
       message: {
         _id: message._id,
         conversationId: conversation._id,
-        senderId: message.senderId._id,
+        senderId: message.senderId._id || message.senderId,
         senderName: message.senderName,
-        content: content,
+        content: message.content,
         messageType: message.messageType,
         mediaUrl: message.mediaUrl,
         fileName: message.fileName,
         fileSize: message.fileSize,
-        isEncrypted: false,
+        isEncrypted: message.isEncrypted || false,
         createdAt: message.createdAt,
-        isOwn: true
+        isOwn: true,
+        tempId: message.tempId,
+        replyTo: message.replyTo,
+        reactions: message.reactions || []
       }
     });
 
   } catch (error) {
     console.error('Error sending message:', error);
     res.status(500).json({ error: 'Failed to send message' });
+  }
+});
+// Add reaction to a message
+router.post('/:messageId/reaction', authenticateToken, async (req, res) => {
+  try {
+    const { messageId } = req.params;
+    const { emoji } = req.body;
+    const userId = req.user._id;
+
+    if (!emoji) {
+      return res.status(400).json({ error: 'Emoji is required' });
+    }
+
+    const message = await Message.findById(messageId);
+    if (!message) {
+      return res.status(404).json({ error: 'Message not found' });
+    }
+
+    // Check if user is part of the conversation
+    const conversation = await Conversation.findOne({
+      _id: message.conversationId,
+      participants: userId,
+      isActive: true
+    });
+
+    if (!conversation) {
+      return res.status(403).json({ error: 'Not authorized to react to this message' });
+    }
+
+    // Initialize reactions if undefined
+    if (!message.reactions) {
+      message.reactions = [];
+    }
+
+    // Toggle reaction: if already exists with same emoji, remove it; else add/replace
+    const existingIndex = message.reactions.findIndex(
+      r => r.userId.toString() === userId.toString()
+    );
+
+    if (existingIndex > -1) {
+      if (message.reactions[existingIndex].emoji === emoji) {
+        // Remove if same emoji
+        message.reactions.splice(existingIndex, 1);
+      } else {
+        // Replace with new emoji
+        message.reactions[existingIndex].emoji = emoji;
+        message.reactions[existingIndex].createdAt = new Date();
+      }
+    } else {
+      // Add new reaction
+      message.reactions.push({
+        emoji,
+        userId,
+        createdAt: new Date()
+      });
+    }
+
+    await message.save();
+
+    // Emit socket event for real-time reaction update
+    const io = req.app.get('io');
+    if (io) {
+      conversation.participants.forEach(participantId => {
+        io.to(`user_${participantId.toString()}`).emit('message_reaction', {
+          messageId,
+          conversationId: message.conversationId,
+          reactions: message.reactions,
+          userId,
+          emoji
+        });
+      });
+    }
+
+    res.json({
+      success: true,
+      reactions: message.reactions
+    });
+  } catch (error) {
+    console.error('Error handling reaction:', error);
+    res.status(500).json({ error: 'Failed to update reaction' });
   }
 });
 

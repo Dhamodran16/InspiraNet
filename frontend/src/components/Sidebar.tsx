@@ -21,6 +21,9 @@ import { cn } from "@/lib/utils";
 import { socketService } from "@/services/socketService";
 
 
+import { useIsMobile } from "@/hooks/use-mobile";
+import { Sheet, SheetContent } from "@/components/ui/sheet";
+
 interface SidebarProps {
   currentSection: string;
   onSectionChange: (section: string) => void;
@@ -28,9 +31,21 @@ interface SidebarProps {
   onCollapseChange?: (collapsed: boolean) => void;
   isCollapsed?: boolean;
   onToggleCollapse?: () => void;
+  isMobileOpen?: boolean;
+  onMobileOpenChange?: (open: boolean) => void;
 }
 
-export default function Sidebar({ currentSection, onSectionChange, onLogout, onCollapseChange, isCollapsed, onToggleCollapse }: SidebarProps) {
+export default function Sidebar({
+  currentSection,
+  onSectionChange,
+  onLogout,
+  onCollapseChange,
+  isCollapsed,
+  onToggleCollapse,
+  isMobileOpen = false,
+  onMobileOpenChange
+}: SidebarProps) {
+  const isMobile = useIsMobile();
   const [unreadMessages, setUnreadMessages] = useState(0);
   const [unreadNotifications, setUnreadNotifications] = useState(0);
   const [isHovered, setIsHovered] = useState(false);
@@ -169,24 +184,17 @@ export default function Sidebar({ currentSection, onSectionChange, onLogout, onC
     onLogout();
   };
 
-  return (
-    <div
-      className={cn(
-        "sidebar-theme fixed left-0 top-0 h-screen bg-background text-foreground transition-all duration-700 ease-out z-50 border border-border shadow-lg backdrop-blur-sm",
-        isHovered ? "w-64" : "w-16"
-      )}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-      style={{
-        transform: isHovered ? 'translateX(0)' : 'translateX(0)',
-        filter: isHovered ? 'drop-shadow(0 20px 25px rgb(0 0 0 / 0.1))' : 'drop-shadow(0 4px 6px rgb(0 0 0 / 0.05))'
-      }}
-    >
+  const renderSidebarContent = (isMobileView: boolean) => (
+    <div className={cn(
+      "flex flex-col h-full sidebar-theme bg-background text-foreground",
+      !isMobileView && "border-r border-border shadow-lg backdrop-blur-sm transition-all duration-700 ease-out",
+      !isMobileView && (isHovered ? "w-64" : "w-16")
+    )}>
       {/* Header Section */}
       <div className="flex-shrink-0 p-4 border-b border-border bg-gradient-to-r from-purple-50 to-blue-50 dark:from-slate-900 dark:to-slate-800">
         <div className={cn(
           "flex items-center transition-all duration-500 ease-out",
-          isHovered ? "justify-start" : "justify-center"
+          (isHovered || isMobileView) ? "justify-start" : "justify-center"
         )}>
           <div className="relative group">
             <img
@@ -194,13 +202,13 @@ export default function Sidebar({ currentSection, onSectionChange, onLogout, onC
               alt="KEC Alumni Network Logo"
               className={cn(
                 "rounded-lg shadow-lg transition-all duration-500 ease-out transform group-hover:scale-110",
-                isHovered ? "h-10 w-10" : "h-8 w-8"
+                (isHovered || isMobileView) ? "h-10 w-10" : "h-8 w-8"
               )}
             />
             {/* Online indicator with pulse animation */}
             <div className="absolute -bottom-1 -right-1 h-2 w-2 bg-green-500 rounded-full border-2 border-white animate-pulse"></div>
           </div>
-          {isHovered && (
+          {(isHovered || isMobileView) && (
             <div className="ml-3 flex flex-col animate-in slide-in-from-left-3 duration-500 ease-out">
               <span className="text-lg font-bold leading-tight text-foreground bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
                 KEC Alumni
@@ -216,13 +224,16 @@ export default function Sidebar({ currentSection, onSectionChange, onLogout, onC
         <div
           className={cn(
             "flex items-center cursor-pointer hover:bg-gradient-to-r hover:from-purple-50 hover:to-blue-50 p-3 rounded-xl transition-all duration-500 ease-out group transform hover:scale-105",
-            isHovered ? "justify-start space-x-3" : "justify-center"
+            (isHovered || isMobileView) ? "justify-start space-x-3" : "justify-center"
           )}
-          onClick={() => onSectionChange("profile")}
+          onClick={() => {
+            onSectionChange("profile");
+            if (isMobileView && onMobileOpenChange) onMobileOpenChange(false);
+          }}
         >
           <Avatar className={cn(
             "transition-all duration-500 ease-out ring-2 ring-transparent group-hover:ring-purple-200",
-            isHovered ? "h-10 w-10" : "h-8 w-8"
+            (isHovered || isMobileView) ? "h-10 w-10" : "h-8 w-8"
           )}>
             <AvatarImage src={user?.avatar} alt="User" />
             <AvatarFallback className="bg-slate-100 text-slate-600 font-bold text-sm">
@@ -230,7 +241,7 @@ export default function Sidebar({ currentSection, onSectionChange, onLogout, onC
             </AvatarFallback>
           </Avatar>
 
-          {isHovered && (
+          {(isHovered || isMobileView) && (
             <div className="flex-1 min-w-0 animate-in slide-in-from-left-3 duration-500 ease-out">
               <div className="font-semibold text-sm truncate text-foreground group-hover:text-purple-700 transition-colors duration-300">
                 {userName}
@@ -258,18 +269,21 @@ export default function Sidebar({ currentSection, onSectionChange, onLogout, onC
                     ? "bg-gradient-to-r from-purple-600 to-blue-600 text-white hover:from-purple-700 hover:to-blue-700 shadow-lg rounded-xl"
                     : "hover:bg-gradient-to-r hover:from-gray-50 hover:to-purple-50 rounded-xl dark:hover:from-slate-900 dark:hover:to-slate-800"
                 )}
-                onClick={() => onSectionChange(item.id)}
+                onClick={() => {
+                  onSectionChange(item.id);
+                  if (isMobileView && onMobileOpenChange) onMobileOpenChange(false);
+                }}
               >
                 <div className={cn(
                   "flex items-center w-full transition-all duration-500 ease-out",
-                  isHovered ? "justify-start" : "justify-center"
+                  (isHovered || isMobileView) ? "justify-start" : "justify-center"
                 )}>
                   <item.icon className={cn(
                     "h-5 w-5 flex-shrink-0 transition-all duration-300 group-hover:scale-110",
                     currentSection === item.id ? "text-white" : "text-muted-foreground group-hover:text-purple-600"
                   )} />
 
-                  {isHovered && (
+                  {(isHovered || isMobileView) && (
                     <div className="flex-1 flex items-center justify-between ml-3 animate-in slide-in-from-left-3 duration-500 ease-out">
                       <span className="font-medium transition-colors duration-300 group-hover:text-foreground">
                         {item.name}
@@ -294,6 +308,7 @@ export default function Sidebar({ currentSection, onSectionChange, onLogout, onC
           </div>
         </ScrollArea>
       </nav>
+
       {/* Footer Actions Section - Fixed at bottom */}
       <div className="flex-shrink-0 p-2 border-t border-border bg-gradient-to-r from-gray-50 to-white dark:from-slate-900 dark:to-slate-900">
         <div className="space-y-2">
@@ -301,12 +316,15 @@ export default function Sidebar({ currentSection, onSectionChange, onLogout, onC
             variant="ghost"
             className={cn(
               "w-full justify-start text-muted-foreground hover:text-purple-700 h-11 text-sm font-medium transition-all duration-500 ease-out hover:bg-gradient-to-r hover:from-purple-50 hover:to-blue-50 rounded-xl transform hover:scale-105 group dark:hover:from-slate-900 dark:hover:to-slate-800",
-              isHovered ? "px-3" : "px-0 justify-center"
+              (isHovered || isMobileView) ? "px-3" : "px-0 justify-center"
             )}
-            onClick={() => onSectionChange("settings")}
+            onClick={() => {
+              onSectionChange("settings");
+              if (isMobileView && onMobileOpenChange) onMobileOpenChange(false);
+            }}
           >
             <Settings className="h-5 w-5 transition-all duration-300 group-hover:scale-110 group-hover:text-purple-600" />
-            {isHovered && (
+            {(isHovered || isMobileView) && (
               <span className="font-medium ml-3 animate-in slide-in-from-left-3 duration-500 ease-out transition-colors duration-300 group-hover:text-purple-700">
                 Settings
               </span>
@@ -317,12 +335,12 @@ export default function Sidebar({ currentSection, onSectionChange, onLogout, onC
             variant="ghost"
             className={cn(
               "w-full justify-start text-muted-foreground hover:text-red-600 h-12 text-sm font-medium transition-all duration-500 ease-out hover:bg-gradient-to-r hover:from-red-50 hover:to-pink-50 rounded-xl transform hover:scale-105 group dark:hover:from-slate-900 dark:hover:to-[#361618]",
-              isHovered ? "justify-start" : "justify-center"
+              (isHovered || isMobileView) ? "justify-start" : "justify-center"
             )}
             onClick={handleLogout}
           >
             <LogOut className="h-5 w-5 transition-all duration-300 group-hover:scale-110 group-hover:text-red-600" />
-            {isHovered && (
+            {(isHovered || isMobileView) && (
               <span className="font-medium ml-3 animate-in slide-in-from-left-3 duration-500 ease-out transition-colors duration-300 group-hover:text-red-700">
                 Logout
               </span>
@@ -330,6 +348,29 @@ export default function Sidebar({ currentSection, onSectionChange, onLogout, onC
           </Button>
         </div>
       </div>
+    </div>
+  );
+
+  if (isMobile) {
+    return (
+      <Sheet open={isMobileOpen} onOpenChange={onMobileOpenChange}>
+        <SheetContent side="left" className="p-0 w-64 border-none">
+          {renderSidebarContent(true)}
+        </SheetContent>
+      </Sheet>
+    );
+  }
+
+  return (
+    <div
+      className={cn(
+        "hidden md:block sidebar-theme fixed left-0 top-0 h-screen z-50 transition-all duration-700 ease-out",
+        isHovered ? "w-64" : "w-16"
+      )}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+    >
+      {renderSidebarContent(false)}
     </div>
   );
 }

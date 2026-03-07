@@ -8,12 +8,13 @@ import { Input } from '../components/ui/input';
 import { Card, CardContent } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
 import { Separator } from '../components/ui/separator';
-import { 
-  Mic, MicOff, Video, VideoOff, Monitor, 
+import { cn } from '../lib/utils';
+import { useIsMobile } from '../hooks/use-mobile';
+import {
+  Mic, MicOff, Video, VideoOff, Monitor,
   Phone, Hand, Users, MessageCircle, MoreHorizontal,
   Send, X, Crown, User
 } from 'lucide-react';
-
 interface Participant {
   id: string;
   username: string;
@@ -37,7 +38,8 @@ export default function MeetingRoom() {
   const { roomId: urlRoomId } = useParams<{ roomId: string }>();
   const { user } = useAuth();
   const { toast } = useToast();
-  
+  const isMobile = useIsMobile();
+
   // State variables
   const [roomId, setRoomId] = useState(urlRoomId || '');
   const [username, setUsername] = useState(user?.name || '');
@@ -53,7 +55,7 @@ export default function MeetingRoom() {
   const [wasMutedByHost, setWasMutedByHost] = useState(false);
   const [unreadMessageCount, setUnreadMessageCount] = useState(0);
   const [isReactionNotificationShowing, setIsReactionNotificationShowing] = useState(false);
-  
+
   // Refs
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
@@ -63,7 +65,7 @@ export default function MeetingRoom() {
 
   // Socket
   const [meetingSocket, setMeetingSocket] = useState<Socket | null>(null);
-  
+
   // Chat state
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
@@ -84,15 +86,15 @@ export default function MeetingRoom() {
   // Load RTC configuration
   const loadRTCConfig = useCallback(async () => {
     try {
-      const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
+      const backendUrl = import.meta.env.VITE_API_URL || import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
       const response = await fetch(`${backendUrl}/config`);
       if (response.ok) {
         const data = await response.json();
         if (data && data.rtcConfig && Array.isArray(data.rtcConfig.iceServers)) {
           setRtcConfig(data.rtcConfig);
         }
-        }
-      } catch (error) {
+      }
+    } catch (error) {
       console.warn('Could not load RTC config, using defaults');
     }
   }, []);
@@ -104,13 +106,13 @@ export default function MeetingRoom() {
       reconnection: true,
       reconnectionAttempts: 8,
       reconnectionDelay: 1000,
-      });
-      
-      setMeetingSocket(socket);
-      
-      return () => {
-        socket.disconnect();
-      };
+    });
+
+    setMeetingSocket(socket);
+
+    return () => {
+      socket.disconnect();
+    };
   }, []);
 
   // Load RTC config and initialize meeting
@@ -140,8 +142,8 @@ export default function MeetingRoom() {
     if (!meetingSocket) return;
 
     const socket = meetingSocket;
-      
-      // Listen for media state updates
+
+    // Listen for media state updates
     socket.on('media-state-update', handleParticipantUpdate);
 
     // Listen for room joining confirmation
@@ -170,15 +172,15 @@ export default function MeetingRoom() {
     socket.on('user-connected', async (userId: string, userName: string) => {
       console.log(`User connected: ${userId} (${userName})`);
       peerUsernamesRef.current[userId] = userName;
-      
+
       try {
         const peerConnection = createPeerConnection(userId);
         const offer = await peerConnection.createOffer();
         await peerConnection.setLocalDescription(offer);
-        
+
         console.log(`Sending offer to ${userId}`);
         socket.emit('offer', offer, userId);
-        
+
         updateParticipantsList();
       } catch (error) {
         console.error('Error in user-connected handler:', error);
@@ -188,32 +190,32 @@ export default function MeetingRoom() {
     // Listen for existing users in room
     socket.on('room-users', async (users: any[]) => {
       console.log('Existing users in room:', users);
-      
+
       users.forEach((user) => {
         peerUsernamesRef.current[user.id] = user.username;
       });
-      
+
       users.forEach((user) => {
         createPeerConnection(user.id);
       });
-      
+
       updateParticipantsList();
     });
 
     // Listen for offers
     socket.on('offer', async (offer: any, senderId: string) => {
       console.log('Received offer from:', senderId);
-      
+
       try {
         let peerConnection = peerConnectionsRef.current[senderId];
         if (!peerConnection) {
           peerConnection = createPeerConnection(senderId);
         }
-        
+
         await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
         const answer = await peerConnection.createAnswer();
         await peerConnection.setLocalDescription(answer);
-        
+
         console.log(`Sending answer to ${senderId}`);
         socket.emit('answer', answer, senderId);
       } catch (error) {
@@ -224,7 +226,7 @@ export default function MeetingRoom() {
     // Listen for answers
     socket.on('answer', async (answer: any, senderId: string) => {
       console.log('Received answer from:', senderId);
-      
+
       const peerConnection = peerConnectionsRef.current[senderId];
       if (peerConnection) {
         try {
@@ -238,7 +240,7 @@ export default function MeetingRoom() {
     // Listen for ICE candidates
     socket.on('ice-candidate', async (candidate: any, senderId: string) => {
       console.log('Received ICE candidate from:', senderId);
-      
+
       const peerConnection = peerConnectionsRef.current[senderId];
       if (peerConnection) {
         try {
@@ -252,16 +254,16 @@ export default function MeetingRoom() {
     // Listen for user disconnections
     socket.on('user-disconnected', (userId: string, userName: string) => {
       console.log(`User disconnected: ${userId} (${userName})`);
-      
+
       if (peerConnectionsRef.current[userId]) {
         peerConnectionsRef.current[userId].close();
         delete peerConnectionsRef.current[userId];
       }
-      
+
       delete peerUsernamesRef.current[userId];
       updateParticipantsList();
-        
-        toast({
+
+      toast({
         title: "Participant Left",
         description: `${userName} has left the room`,
       });
@@ -270,7 +272,7 @@ export default function MeetingRoom() {
     // Listen for messages
     socket.on('receive-message', (data: Message) => {
       setMessages(prev => [...prev, data]);
-      
+
       if (data.senderId !== socket.id && !isChatOpen) {
         setUnreadMessageCount(prev => prev + 1);
       }
@@ -278,7 +280,7 @@ export default function MeetingRoom() {
 
     // Listen for message likes
     socket.on('message-liked', ({ messageId, likes }: { messageId: string; likes: number }) => {
-      setMessages(prev => prev.map(msg => 
+      setMessages(prev => prev.map(msg =>
         msg.id === messageId ? { ...msg, likes } : msg
       ));
     });
@@ -286,11 +288,11 @@ export default function MeetingRoom() {
     // Listen for hand raises
     socket.on('user-raised-hand', (userId: string, raised: boolean, userName: string) => {
       console.log(`Hand raise event received: userId=${userId}, raised=${raised}, userName=${userName}`);
-      
-      setParticipants(prev => prev.map(p => 
+
+      setParticipants(prev => prev.map(p =>
         p.id === userId ? { ...p, isHandRaised: raised } : p
       ));
-      
+
       if (raised) {
         toast({
           title: "Hand Raised",
@@ -302,15 +304,15 @@ export default function MeetingRoom() {
     // Listen for reactions
     socket.on('user-reaction', (userId: string, emoji: string, userName: string) => {
       console.log(`Reaction received from ${userId}: ${emoji} by ${userName}`);
-      
+
       if (userId !== socket.id && !isReactionNotificationShowing) {
         setIsReactionNotificationShowing(true);
-    
-    toast({
+
+        toast({
           title: "Reaction",
           description: `${userName} reacted with ${emoji}!`,
         });
-        
+
         setTimeout(() => setIsReactionNotificationShowing(false), 3000);
       }
     });
@@ -327,14 +329,14 @@ export default function MeetingRoom() {
     // Listen for host mute all
     socket.on('host-mute-all', () => {
       console.log('Received host-mute-all event');
-      
+
       if (localStreamRef.current) {
         const audioTrack = localStreamRef.current.getAudioTracks()[0];
         if (audioTrack) {
           audioTrack.enabled = false;
           setWasMutedByHost(true);
           setIsMuted(true);
-          
+
           toast({
             title: "Muted by Host",
             description: "You were muted by the host",
@@ -349,7 +351,7 @@ export default function MeetingRoom() {
       console.log('Received room-info:', info);
       const hostId = info && info.hostId ? info.hostId : null;
       setIsHost(hostId === socket.id);
-      
+
       if (hostId === socket.id) {
         toast({
           title: "Host Status",
@@ -394,7 +396,7 @@ export default function MeetingRoom() {
     peerConnection.oniceconnectionstatechange = () => {
       console.log(`ICE connection state with ${userId}:`, peerConnection.iceConnectionState);
     };
-    
+
     if (localStreamRef.current) {
       localStreamRef.current.getTracks().forEach((track) => {
         peerConnection.addTrack(track, localStreamRef.current!);
@@ -482,11 +484,11 @@ export default function MeetingRoom() {
     }
 
     if (!username.trim()) {
-        toast({
+      toast({
         title: "Error",
         description: "Please enter your name",
-          variant: "destructive"
-        });
+        variant: "destructive"
+      });
       return;
     }
 
@@ -494,7 +496,7 @@ export default function MeetingRoom() {
 
     try {
       await initializeLocalStream();
-      
+
       // Use existing roomId from URL or generate new one if creating
       const targetRoomId = roomId || generateRoomId();
       if (!roomId) {
@@ -508,8 +510,8 @@ export default function MeetingRoom() {
         id: meetingSocket?.id || 'local',
         username,
         isHost: true,
-      isMuted: false,
-      isVideoOff: false,
+        isMuted: false,
+        isVideoOff: false,
         isHandRaised: false
       }]);
 
@@ -535,11 +537,11 @@ export default function MeetingRoom() {
     if (!localStreamRef.current) return;
 
     const audioTrack = localStreamRef.current.getAudioTracks()[0];
-      if (audioTrack) {
-        audioTrack.enabled = !audioTrack.enabled;
-        const newMutedState = !audioTrack.enabled;
-        setIsMuted(newMutedState);
-        
+    if (audioTrack) {
+      audioTrack.enabled = !audioTrack.enabled;
+      const newMutedState = !audioTrack.enabled;
+      setIsMuted(newMutedState);
+
       if (newMutedState && wasMutedByHost) {
         setWasMutedByHost(false);
         toast({
@@ -557,16 +559,16 @@ export default function MeetingRoom() {
     if (!localStreamRef.current) return;
 
     const videoTrack = localStreamRef.current.getVideoTracks()[0];
-      if (videoTrack) {
-        videoTrack.enabled = !videoTrack.enabled;
-        const newVideoOffState = !videoTrack.enabled;
-        setIsVideoOff(newVideoOffState);
-        
-        meetingSocket?.emit('participant_media_update', {
-          roomId,
+    if (videoTrack) {
+      videoTrack.enabled = !videoTrack.enabled;
+      const newVideoOffState = !videoTrack.enabled;
+      setIsVideoOff(newVideoOffState);
+
+      meetingSocket?.emit('participant_media_update', {
+        roomId,
         isMuted,
-          isVideoOff: newVideoOffState
-        });
+        isVideoOff: newVideoOffState
+      });
     }
   }, [meetingSocket, roomId, isMuted]);
 
@@ -600,7 +602,7 @@ export default function MeetingRoom() {
     } catch (error) {
       console.error('Error toggling screen share:', error);
       if (error instanceof Error && error.name === 'NotAllowedError') {
-      toast({
+        toast({
           title: "Permission Denied",
           description: "Screen sharing permission was denied. Please allow screen sharing and try again.",
           variant: "destructive"
@@ -609,8 +611,8 @@ export default function MeetingRoom() {
         toast({
           title: "Screen Share Error",
           description: "Failed to start screen sharing. Please try again.",
-        variant: "destructive"
-      });
+          variant: "destructive"
+        });
       }
     }
   }, [isScreenSharing, toast]);
@@ -631,7 +633,7 @@ export default function MeetingRoom() {
         }
       });
     }
-    
+
     setIsScreenSharing(false);
     meetingSocket?.emit('update-media-state', { screenSharing: false });
   }, [meetingSocket]);
@@ -640,14 +642,14 @@ export default function MeetingRoom() {
   const toggleHandRaise = useCallback(() => {
     const newHandRaisedState = !isHandRaised;
     setIsHandRaised(newHandRaisedState);
-    
+
     meetingSocket?.emit('raise-hand', newHandRaisedState);
   }, [isHandRaised, meetingSocket]);
 
   // Send reaction
   const sendReaction = useCallback((emoji: string) => {
     meetingSocket?.emit('reaction', emoji);
-    
+
     toast({
       title: "Reaction Sent",
       description: `You reacted with ${emoji}`,
@@ -658,7 +660,7 @@ export default function MeetingRoom() {
   const hostMuteAll = useCallback(() => {
     if (isHost) {
       meetingSocket?.emit('host-mute-all');
-      
+
       toast({
         title: "All Muted",
         description: "All participants have been muted",
@@ -751,7 +753,7 @@ export default function MeetingRoom() {
           <Card className="bg-gray-800 border-gray-700">
             <CardContent className="p-6">
               <h1 className="text-2xl font-bold mb-6 text-center">Join Meeting</h1>
-              
+
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium mb-2">Room ID</label>
@@ -761,8 +763,8 @@ export default function MeetingRoom() {
                     placeholder="Enter room ID"
                     className="bg-gray-700 border-gray-600 text-white"
                   />
-            </div>
-                
+                </div>
+
                 <div>
                   <label className="block text-sm font-medium mb-2">Your Name</label>
                   <Input
@@ -771,253 +773,348 @@ export default function MeetingRoom() {
                     placeholder="Enter your name"
                     className="bg-gray-700 border-gray-600 text-white"
                   />
-            </div>
-            
-              <Button 
+                </div>
+
+                <Button
                   onClick={handleCreateMeeting}
                   disabled={isJoining || !roomId.trim() || !username.trim()}
                   className="w-full bg-blue-600 hover:bg-blue-700"
                 >
                   {isJoining ? 'Joining...' : 'Join Meeting'}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white relative">
-      {/* Main video area */}
-        <div className="flex-1 p-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {/* Local video */}
-            <div className="relative bg-gray-800 rounded-lg overflow-hidden">
-              <video
-                ref={localVideoRef}
-                autoPlay
-                playsInline
-                muted
-              className="w-full h-64 object-cover"
+    <div className="flex flex-col h-screen bg-gray-900 text-white overflow-hidden relative">
+      <div className="flex-1 flex flex-col md:flex-row min-h-0 relative">
+        <div className="flex-1 p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 overflow-y-auto">
+          {/* Main User Video */}
+          <div className="relative rounded-lg overflow-hidden bg-gray-800 border border-gray-700 aspect-video md:aspect-auto">
+            <video
+              ref={localVideoRef}
+              autoPlay
+              playsInline
+              muted
+              className="w-full h-full object-cover"
             />
-                <div className="absolute bottom-2 left-2 bg-black bg-opacity-50 px-2 py-1 rounded text-sm">
-                  {username} (You)
-              </div>
-            {isHandRaised && (
-              <div className="absolute top-2 right-2 bg-blue-500 px-2 py-1 rounded text-sm">
-                ✋
-                </div>
-              )}
+            <div className="absolute bottom-2 left-2 bg-black bg-opacity-50 px-2 py-1 rounded text-sm">
+              {username} (You)
             </div>
-              
-          {/* Remote videos would be rendered here */}
+            {isHandRaised && (
+              <div className="absolute top-2 right-2 bg-blue-500 px-2 py-1 rounded text-sm group">
+                ✋ <span className="hidden group-hover:inline ml-1">Hand Raised</span>
+              </div>
+            )}
+            {/* Show mic state icon if muted */}
+            {isMuted && (
+              <div className="absolute top-2 left-2 bg-red-500 p-1 rounded-full text-xs">
+                <MicOff className="w-3 h-3" />
+              </div>
+            )}
           </div>
-        </div>
 
-      {/* Controls */}
-      <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 flex gap-4 bg-gray-800 p-4 rounded-full border border-gray-600">
+          {/* Remote videos would be rendered here in a real implementation */}
+          {/* For demonstration of grid layout */}
+        </div>
+      </div>
+
+      {/* Controls - Made responsive */}
+      <div className={cn(
+        "fixed bottom-6 left-1/2 transform -translate-x-1/2 flex items-center justify-center p-2 bg-gray-800 rounded-2xl md:rounded-full border border-gray-600 transition-all z-40 max-w-[95vw] shadow-2xl",
+        isMobile ? "gap-2 px-3 py-2" : "gap-4 p-4"
+      )}>
         <Button
           onClick={toggleMic}
-          variant={isMuted ? "destructive" : "default"}
+          variant={isMuted ? "destructive" : "secondary"}
           size="icon"
-          className="w-12 h-12 rounded-full"
+          className={cn("rounded-full", isMobile ? "w-10 h-10" : "w-12 h-12")}
+          title={isMuted ? "Unmute" : "Mute"}
         >
-          {isMuted ? <MicOff /> : <Mic />}
+          {isMuted ? <MicOff className={isMobile ? "w-4 h-4" : ""} /> : <Mic className={isMobile ? "w-4 h-4" : ""} />}
         </Button>
-        
+
         <Button
           onClick={toggleVideo}
-          variant={isVideoOff ? "destructive" : "default"}
+          variant={isVideoOff ? "destructive" : "secondary"}
           size="icon"
-          className="w-12 h-12 rounded-full"
+          className={cn("rounded-full", isMobile ? "w-10 h-10" : "w-12 h-12")}
+          title={isVideoOff ? "Start Video" : "Stop Video"}
         >
-          {isVideoOff ? <VideoOff /> : <Video />}
+          {isVideoOff ? <VideoOff className={isMobile ? "w-4 h-4" : ""} /> : <Video className={isMobile ? "w-4 h-4" : ""} />}
         </Button>
-        
-        <Button
-          onClick={toggleScreenShare}
-          variant={isScreenSharing ? "default" : "secondary"}
-          size="icon"
-          className="w-12 h-12 rounded-full"
-        >
-          <Monitor />
-        </Button>
-        
+
+        {!isMobile && (
+          <Button
+            onClick={toggleScreenShare}
+            variant={isScreenSharing ? "default" : "secondary"}
+            size="icon"
+            className="w-12 h-12 rounded-full hidden sm:flex"
+            title="Share Screen"
+          >
+            <Monitor />
+          </Button>
+        )}
+
         <Button
           onClick={toggleHandRaise}
           variant={isHandRaised ? "default" : "secondary"}
           size="icon"
-          className="w-12 h-12 rounded-full"
+          className={cn("rounded-full", isMobile ? "w-10 h-10" : "w-12 h-12")}
+          title="Raise Hand"
         >
-          <Hand />
+          <Hand className={isMobile ? "w-4 h-4" : ""} />
         </Button>
-        
+
         <Button
-          onClick={() => setIsChatOpen(!isChatOpen)}
+          onClick={() => {
+            setIsChatOpen(!isChatOpen);
+            setIsParticipantsOpen(false);
+            setUnreadMessageCount(0);
+          }}
           variant={isChatOpen ? "default" : "secondary"}
           size="icon"
-          className="w-12 h-12 rounded-full relative"
+          className={cn("rounded-full relative", isMobile ? "w-10 h-10" : "w-12 h-12")}
+          title="Chat"
         >
-          <MessageCircle />
+          <MessageCircle className={isMobile ? "w-4 h-4" : ""} />
           {unreadMessageCount > 0 && (
-            <Badge className="absolute -top-2 -right-2 w-5 h-5 p-0 text-xs">
+            <Badge className="absolute -top-1 -right-1 min-w-[1.25rem] h-5 p-0 text-xs flex items-center justify-center">
               {unreadMessageCount > 99 ? '99+' : unreadMessageCount}
             </Badge>
           )}
         </Button>
-        
-                <Button
-          onClick={() => setIsParticipantsOpen(!isParticipantsOpen)}
+
+        <Button
+          onClick={() => {
+            setIsParticipantsOpen(!isParticipantsOpen);
+            setIsChatOpen(false);
+          }}
           variant={isParticipantsOpen ? "default" : "secondary"}
           size="icon"
-          className="w-12 h-12 rounded-full"
+          className={cn("rounded-full", isMobile ? "w-10 h-10" : "w-12 h-12")}
+          title="Participants"
         >
-          <Users />
-                          </Button>
-        
+          <Users className={isMobile ? "w-4 h-4" : ""} />
+        </Button>
+
         {isHost && (
-                          <Button
+          <Button
             onClick={hostMuteAll}
             variant="destructive"
             size="icon"
-            className="w-12 h-12 rounded-full"
+            className={cn("rounded-full", isMobile ? "w-10 h-10" : "w-12 h-12")}
+            title="Mute All"
           >
-            <MicOff />
-                          </Button>
+            <MicOff className={isMobile ? "w-4 h-4" : ""} />
+          </Button>
         )}
-        
-                          <Button
+
+        <Button
           onClick={endCall}
           variant="destructive"
           size="icon"
-          className="w-12 h-12 rounded-full"
+          className={cn("rounded-full", isMobile ? "w-10 h-10" : "w-12 h-12")}
+          title="End Call"
         >
-          <Phone />
-                </Button>
-              </div>
+          <Phone className={isMobile ? "w-4 h-4" : ""} />
+        </Button>
+      </div>
 
-      {/* Chat Panel */}
+      {/* Chat Panel - Made responsive */}
       {isChatOpen && (
-        <div className="fixed right-6 top-6 bottom-24 w-80 bg-gray-800 rounded-lg border border-gray-600 flex flex-col">
-          <div className="p-4 border-b border-gray-600 flex justify-between items-center">
-            <h3 className="font-semibold">Chat</h3>
-                          <Button
-                            variant="ghost"
+        <div className={cn(
+          "fixed bg-gray-800 border-gray-600 flex flex-col z-[60] shadow-2xl transition-all duration-300",
+          isMobile
+            ? "inset-0 w-full rounded-none"
+            : "right-6 top-6 bottom-24 w-80 rounded-lg border"
+        )}>
+          <div className="p-4 border-b border-gray-600 flex justify-between items-center bg-gray-700/50">
+            <h3 className="font-semibold text-lg flex items-center gap-2">
+              <MessageCircle className="w-5 h-5 text-blue-400" />
+              Chat
+            </h3>
+            <Button
+              variant="ghost"
               size="icon"
               onClick={() => setIsChatOpen(false)}
-              className="h-8 w-8"
-                          >
+              className="h-8 w-8 hover:bg-gray-600 rounded-full"
+            >
               <X />
-                          </Button>
-                    </div>
-          
-          <div className="flex-1 overflow-y-auto p-4 space-y-3">
-            {messages.map((message) => (
-              <div
-                key={message.id}
-                className={`p-3 rounded-lg ${
-                  message.senderId === meetingSocket?.id
-                    ? 'bg-blue-600 ml-auto max-w-xs'
-                    : 'bg-gray-700 mr-auto max-w-xs'
-                }`}
-              >
-                <div className="text-xs text-gray-300 mb-1">
-                  {message.user}
-                  </div>
-                <div className="text-sm">{message.text}</div>
-                <div className="text-xs text-gray-400 mt-1">
-                  {new Date(message.timestamp).toLocaleTimeString()}
-                    </div>
+            </Button>
+          </div>
+
+          <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin scrollbar-thumb-gray-600">
+            {messages.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-full text-gray-400 space-y-2">
+                <MessageCircle className="w-12 h-12 opacity-20" />
+                <p className="text-sm">No messages yet. Say hello!</p>
               </div>
-            ))}
-            
-                {typingUsers.length > 0 && (
-                  <div className="text-sm text-gray-400 italic">
+            ) : (
+              messages.map((message) => (
+                <div
+                  key={message.id}
+                  className={cn(
+                    "flex flex-col max-w-[85%] animate-in fade-in slide-in-from-bottom-2",
+                    message.senderId === (meetingSocket?.id || 'me')
+                      ? 'ml-auto'
+                      : 'mr-auto'
+                  )}
+                >
+                  <div className={cn(
+                    "px-4 py-2 rounded-2xl text-sm",
+                    message.senderId === (meetingSocket?.id || 'me')
+                      ? 'bg-blue-600 text-white rounded-tr-none'
+                      : 'bg-gray-700 text-white rounded-tl-none'
+                  )}>
+                    <div className="text-[10px] opacity-70 mb-1 font-semibold flex items-center gap-1">
+                      <User className="w-2 h-2" /> {message.user}
+                    </div>
+                    <div className="leading-relaxed">{message.text}</div>
+                    <div className="text-[9px] opacity-50 mt-1 text-right italic">
+                      {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+
+            {typingUsers.length > 0 && (
+              <div className="text-xs text-gray-400 italic flex items-center gap-1">
+                <span className="flex gap-0.5">
+                  <span className="w-1 h-1 bg-gray-400 rounded-full animate-bounce"></span>
+                  <span className="w-1 h-1 bg-gray-400 rounded-full animate-bounce [animation-delay:0.2s]"></span>
+                  <span className="w-1 h-1 bg-gray-400 rounded-full animate-bounce [animation-delay:0.4s]"></span>
+                </span>
                 {typingUsers.length === 1 ? 'Someone is typing...' : 'Multiple people are typing...'}
-                  </div>
-                )}
               </div>
-          
-          <div className="p-4 border-t border-gray-600">
+            )}
+          </div>
+
+          <div className="p-4 border-t border-gray-600 bg-gray-700/30">
             <div className="flex gap-2">
-                  <Input
+              <Input
                 value={newMessage}
                 onChange={(e) => {
                   setNewMessage(e.target.value);
                   handleTyping(e.target.value.length > 0);
                 }}
                 onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
-                    placeholder="Type a message..."
-                className="flex-1 bg-gray-700 border-gray-600 text-white"
-                  />
-              <Button onClick={sendMessage} size="icon" className="w-10 h-10">
+                placeholder="Type a message..."
+                className="flex-1 bg-gray-700 border-gray-600 text-white focus:ring-blue-500 rounded-xl"
+              />
+              <Button onClick={sendMessage} size="icon" className="w-10 h-10 rounded-xl bg-blue-600 hover:bg-blue-500 shrink-0">
                 <Send className="w-4 h-4" />
-                  </Button>
-                </div>
-              </div>
+              </Button>
             </div>
-          )}
+          </div>
+        </div>
+      )}
 
-            {/* Participants Panel */}
+      {/* Participants Panel - Made responsive */}
       {isParticipantsOpen && (
-        <div className="fixed right-6 top-6 bottom-24 w-80 bg-gray-800 rounded-lg border border-gray-600 flex flex-col">
-          <div className="p-4 border-b border-gray-600 flex justify-between items-center">
-            <h3 className="font-semibold">Participants ({participants.length})</h3>
+        <div className={cn(
+          "fixed bg-gray-800 border-gray-600 flex flex-col z-[60] shadow-2xl transition-all duration-300",
+          isMobile
+            ? "inset-0 w-full rounded-none"
+            : "right-6 top-6 bottom-24 w-80 rounded-lg border"
+        )}>
+          <div className="p-4 border-b border-gray-600 flex justify-between items-center bg-gray-700/50">
+            <h3 className="font-semibold text-lg flex items-center gap-2">
+              <Users className="w-5 h-5 text-green-400" />
+              Participants ({participants.length})
+            </h3>
             <Button
               variant="ghost"
               size="icon"
               onClick={() => setIsParticipantsOpen(false)}
-              className="h-8 w-8"
+              className="h-8 w-8 hover:bg-gray-600 rounded-full"
             >
               <X />
             </Button>
-                </div>
-          
-          <div className="flex-1 overflow-y-auto p-4 space-y-2">
-                  {participants.map((participant) => (
-                    <div
-                      key={participant.id}
-                className="flex items-center gap-3 p-2 rounded-lg bg-gray-700"
-                    >
-                <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-sm font-semibold">
-                        {participant.username.charAt(0).toUpperCase()}
+          </div>
+
+          <div className="flex-1 overflow-y-auto p-4 space-y-3">
+            {participants.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-full text-gray-400 space-y-2">
+                <Users className="w-12 h-12 opacity-20" />
+                <p className="text-sm">Wait... where is everyone?</p>
               </div>
-                <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium">{participant.username}</span>
-                    {participant.isHost && <Crown className="w-4 h-4 text-yellow-500" />}
-                    {participant.id === meetingSocket?.id && (
-                      <Badge variant="secondary" className="text-xs">You</Badge>
-                        )}
+            ) : (
+              participants.map((participant) => (
+                <div
+                  key={participant.id}
+                  className="flex items-center gap-3 p-3 rounded-xl bg-gray-700/50 hover:bg-gray-700 transition-colors border border-transparent hover:border-gray-600"
+                >
+                  <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center text-sm font-bold shadow-md">
+                    {participant.username.charAt(0).toUpperCase()}
                   </div>
-                  <div className="flex items-center gap-2 text-xs text-gray-400">
-                    {participant.isMuted && <MicOff className="w-3 h-3" />}
-                    {participant.isVideoOff && <VideoOff className="w-3 h-3" />}
-                    {participant.isHandRaised && <Hand className="w-3 h-3 text-blue-400" />}
-                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 truncate">
+                      <span className="text-sm font-medium truncate">{participant.username}</span>
+                      {participant.isHost && <Crown className="w-3.5 h-3.5 text-yellow-500" />}
+                      {participant.id === meetingSocket?.id && (
+                        <Badge variant="secondary" className="text-[9px] h-4 px-1 leading-none bg-blue-500/20 text-blue-400 border-none">You</Badge>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 mt-1">
+                      {participant.isMuted ? <MicOff className="w-3 h-3 text-red-400" /> : <Mic className="w-3 h-3 text-green-400" />}
+                      {participant.isVideoOff ? <VideoOff className="w-3 h-3 text-red-400" /> : <Video className="w-3 h-3 text-green-400" />}
+                      {participant.isHandRaised && <Hand className="w-3 h-3 text-blue-400 animate-bounce" />}
                     </div>
                   </div>
-                ))}
-              </div>
+                  {isHost && participant.id !== meetingSocket?.id && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-gray-400 hover:text-white"
+                      onClick={() => {/* Mock mute logic */ }}
+                    >
+                      <MicOff className="w-4 h-4" />
+                    </Button>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+
+          {isHost && (
+            <div className="p-4 border-t border-gray-600 bg-gray-700/30">
+              <Button onClick={hostMuteAll} variant="destructive" className="w-full gap-2 rounded-xl">
+                <MicOff className="w-4 h-4" /> Mute All
+              </Button>
             </div>
           )}
+        </div>
+      )}
 
-      {/* Reactions Menu */}
-      <div className="fixed bottom-24 left-1/2 transform -translate-x-1/2 flex gap-2 bg-gray-800 p-2 rounded-full border border-gray-600">
+      {/* Reactions Menu - Made responsive */}
+      <div className={cn(
+        "fixed left-1/2 transform -translate-x-1/2 flex items-center transition-all z-40 bg-gray-800/90 backdrop-blur-sm border border-gray-600 shadow-xl overflow-x-auto scrollbar-none",
+        isMobile
+          ? "bottom-24 px-1 py-1 gap-1 rounded-2xl max-w-[90vw]"
+          : "bottom-24 px-2 py-2 gap-2 rounded-full"
+      )}>
         {['👍', '👏', '🎉', '❤️', '😂', '😮', '😢', '😡', '👀', '🤔', '🤷', '✨'].map((emoji) => (
           <Button
             key={emoji}
             onClick={() => sendReaction(emoji)}
             variant="ghost"
             size="sm"
-            className="w-8 h-8 p-0 text-lg hover:scale-110 transition-transform"
+            className={cn(
+              "p-0 hover:scale-125 transition-transform shrink-0",
+              isMobile ? "w-8 h-8 text-base" : "w-10 h-10 text-xl"
+            )}
           >
             {emoji}
           </Button>
         ))}
-        </div>
       </div>
-    );
-  }
+    </div>
+  );
+}

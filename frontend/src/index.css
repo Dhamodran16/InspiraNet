@@ -358,12 +358,19 @@ input[type="datetime-local"]::-webkit-datetime-edit-minute-field {
 
 .dashboard-section {
   height: 100%;
-  padding: 1.5rem;
+  padding: 0.5rem;
   scrollbar-width: thin;
   scrollbar-color: hsl(var(--muted)) hsl(var(--background));
   position: relative;
   /* Force scrollbar to always show */
   scrollbar-gutter: stable;
+  transition: padding 0.3s ease;
+}
+
+@media (min-width: 768px) {
+  .dashboard-section {
+    padding: 1.5rem;
+  }
 }
 
 .dashboard-section::-webkit-scrollbar {
@@ -1604,18 +1611,21 @@ body {
   border-color: hsl(var(--border));
   word-break: break-word;
   overflow-wrap: break-word;
+  user-select: text !important;
+  -webkit-user-select: text !important;
+  -webkit-touch-callout: default !important;
 }
 
 .messages-theme .message-bubble-own {
-  background-color: #e7f3ff;
-  color: #1e3a8a;
-  border-color: #d1e9ff;
+  background-color: hsl(var(--primary) / 0.15);
+  color: hsl(var(--primary));
+  border-color: hsl(var(--primary) / 0.2);
 }
 
 .dark .messages-theme .message-bubble-own {
-  background-color: #1e3a8a;
-  color: #e7f3ff;
-  border-color: #2563eb;
+  background-color: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  border-color: hsl(var(--primary) / 0.8);
 }
 
 .messages-theme .message-bubble-other {
@@ -2003,4 +2013,29 @@ body {
   .control-button {
     border: 2px solid #ffffff;
   }
+}
+
+/* ===== Shared Post Highlight Glow ===== */
+@keyframes glow-pulse {
+  0% {
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.4),
+      0 0 10px rgba(59, 130, 246, 0.15);
+  }
+
+  50% {
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.9),
+      0 0 28px rgba(59, 130, 246, 0.45);
+  }
+
+  100% {
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.4),
+      0 0 10px rgba(59, 130, 246, 0.15);
+  }
+}
+
+.highlight-glow-active {
+  animation: glow-pulse 1.6s ease-in-out infinite !important;
+  border-color: rgba(59, 130, 246, 0.7) !important;
+  position: relative;
+  z-index: 5;
 }

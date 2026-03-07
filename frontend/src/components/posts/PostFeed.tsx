@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Plus, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { socketService } from '@/services/socketService';
+import ShareModal from '@/components/ui/ShareModal';
 
 const PostFeed: React.FC<{ showDeleteButton?: boolean }> = ({ showDeleteButton = false }) => {
   const navigate = useNavigate();
@@ -22,6 +23,9 @@ const PostFeed: React.FC<{ showDeleteButton?: boolean }> = ({ showDeleteButton =
   const [refreshing, setRefreshing] = useState(false);
   const [showComments, setShowComments] = useState<Record<string, boolean>>({});
   const [searchQuery, setSearchQuery] = useState("");
+  const [shareData, setShareData] = useState<{ url: string; title: string; text: string; imageUrl?: string } | null>(null);
+  const [highlightedPost, setHighlightedPost] = useState<string | null>(null);
+  const [sharingPostId, setSharingPostId] = useState<string | null>(null);
   const observer = useRef<IntersectionObserver>();
   const lastPostRef = useRef<HTMLDivElement>(null);
 
@@ -31,28 +35,28 @@ const PostFeed: React.FC<{ showDeleteButton?: boolean }> = ({ showDeleteButton =
       console.log('PostFeed: No authenticated user, skipping post loading');
       return;
     }
-      
+
     try {
       setIsLoading(true);
       setError(null);
-      
+
       console.log('PostFeed: Loading posts for page:', page);
       const response = await postsApi.getPosts(page);
-      
+
       if (response && response.posts) {
         // Temporarily use the posts directly to fix the type issue
         if (append) {
           // Deduplicate posts by _id to prevent duplicate key warnings
           const existingIds = new Set(posts.map(p => p._id));
           const newPosts = response.posts.filter(post => !existingIds.has(post._id));
-          
+
           setPosts(prev => [...prev, ...newPosts]);
           setOriginalPosts(prev => [...prev, ...newPosts]);
         } else {
           setPosts(response.posts);
           setOriginalPosts(response.posts);
         }
-        
+
         setCurrentPage(page);
         setHasMore(page < response.totalPages);
         console.log('PostFeed: Successfully loaded posts:', response.posts.length);
@@ -63,7 +67,7 @@ const PostFeed: React.FC<{ showDeleteButton?: boolean }> = ({ showDeleteButton =
       }
     } catch (error) {
       console.error('PostFeed: Error loading posts:', error);
-      
+
       if (error instanceof Error) {
         if (error.message.includes('No authentication token found')) {
           setError('Authentication required. Please log in again.');
@@ -78,7 +82,7 @@ const PostFeed: React.FC<{ showDeleteButton?: boolean }> = ({ showDeleteButton =
       } else {
         setError('An unexpected error occurred');
       }
-      
+
       setPosts([]);
       setHasMore(false);
     } finally {
@@ -95,6 +99,30 @@ const PostFeed: React.FC<{ showDeleteButton?: boolean }> = ({ showDeleteButton =
       console.log('PostFeed useEffect - User not authenticated yet:', user);
     }
   }, [user, loadPosts]);
+
+  // Deep link handling - scroll to post if ID is in URL
+  useEffect(() => {
+    if (posts.length > 0) {
+      const params = new URLSearchParams(window.location.search);
+      const postId = params.get('id');
+      if (postId) {
+        setHighlightedPost(postId);
+        setTimeout(() => {
+          const element = document.getElementById(`post-${postId}`);
+          if (element) {
+            element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            const glowLayer = element.querySelector('.highlight-glow');
+            if (glowLayer) {
+              glowLayer.classList.add('highlight-glow-active');
+              setTimeout(() => {
+                glowLayer.classList.remove('highlight-glow-active');
+              }, 5000);
+            }
+          }
+        }, 500);
+      }
+    }
+  }, [posts.length]);
 
   // Listen for search events from DashboardPage
   useEffect(() => {
@@ -159,26 +187,26 @@ const PostFeed: React.FC<{ showDeleteButton?: boolean }> = ({ showDeleteButton =
       }
 
       // Search in company name (job posts)
-      if (post.postType === 'job' && post.jobDetails?.company && 
-          post.jobDetails.company.toLowerCase().includes(query)) {
+      if (post.postType === 'job' && post.jobDetails?.company &&
+        post.jobDetails.company.toLowerCase().includes(query)) {
         return true;
       }
 
       // Search in poll question (poll posts)
-      if (post.postType === 'poll' && post.pollDetails?.question && 
-          post.pollDetails.question.toLowerCase().includes(query)) {
+      if (post.postType === 'poll' && post.pollDetails?.question &&
+        post.pollDetails.question.toLowerCase().includes(query)) {
         return true;
       }
 
       // Search in event title
-      if (post.postType === 'event' && post.eventDetails?.title && 
-          post.eventDetails.title.toLowerCase().includes(query)) {
+      if (post.postType === 'event' && post.eventDetails?.title &&
+        post.eventDetails.title.toLowerCase().includes(query)) {
         return true;
       }
 
       // Search in job title
-      if (post.postType === 'job' && post.jobDetails?.title && 
-          post.jobDetails.title.toLowerCase().includes(query)) {
+      if (post.postType === 'job' && post.jobDetails?.title &&
+        post.jobDetails.title.toLowerCase().includes(query)) {
         return true;
       }
 
@@ -287,7 +315,7 @@ const PostFeed: React.FC<{ showDeleteButton?: boolean }> = ({ showDeleteButton =
   // Refresh posts
   const handleRefresh = useCallback(async () => {
     if (!user || !user._id) return;
-    
+
     setRefreshing(true);
     try {
       await loadPosts(1, false);
@@ -320,30 +348,30 @@ const PostFeed: React.FC<{ showDeleteButton?: boolean }> = ({ showDeleteButton =
       }
 
       await postsApi.deleteComment(postId, commentId);
-      
+
       // Update the posts state to remove the deleted comment
-      setPosts(prevPosts => 
-        prevPosts.map(post => 
-          post._id === postId 
+      setPosts(prevPosts =>
+        prevPosts.map(post =>
+          post._id === postId
             ? {
-                ...post,
-                comments: post.comments?.filter(comment => comment._id !== commentId) || []
-              }
+              ...post,
+              comments: post.comments?.filter(comment => comment._id !== commentId) || []
+            }
             : post
         )
       );
-      
-      setOriginalPosts(prevPosts => 
-        prevPosts.map(post => 
-          post._id === postId 
+
+      setOriginalPosts(prevPosts =>
+        prevPosts.map(post =>
+          post._id === postId
             ? {
-                ...post,
-                comments: post.comments?.filter(comment => comment._id !== commentId) || []
-              }
+              ...post,
+              comments: post.comments?.filter(comment => comment._id !== commentId) || []
+            }
             : post
         )
       );
-      
+
       toast({
         title: "Comment deleted",
         description: "Your comment has been deleted successfully.",
@@ -363,10 +391,10 @@ const PostFeed: React.FC<{ showDeleteButton?: boolean }> = ({ showDeleteButton =
     try {
       // Call the API to delete from MongoDB
       await postsApi.deletePost(postId);
-      
+
       // Update frontend state
       setPosts(prev => prev.filter(post => post._id !== postId));
-      
+
       toast({
         title: "Post Deleted",
         description: "Post has been removed successfully from the database.",
@@ -383,10 +411,10 @@ const PostFeed: React.FC<{ showDeleteButton?: boolean }> = ({ showDeleteButton =
 
   // Handle post updates
   const handlePostUpdated = useCallback((updatedPost: Post) => {
-    setPosts(prev => prev.map(post => 
+    setPosts(prev => prev.map(post =>
       post._id === updatedPost._id ? updatedPost : post
     ));
-      toast({
+    toast({
       title: "Post Updated",
       description: "Post has been updated successfully.",
     });
@@ -405,34 +433,34 @@ const PostFeed: React.FC<{ showDeleteButton?: boolean }> = ({ showDeleteButton =
 
     try {
       console.log('🔄 Starting like process for post:', postId);
-      
+
       // Store current state for comparison
       const currentPost = posts.find(p => p._id === postId);
       const currentLikeCount = currentPost?.likes?.length || 0;
       const currentIsLiked = currentPost?.likeIds?.includes(user._id) || false;
-      
+
       console.log('📊 Current state:', {
         postId,
         currentLikeCount,
         currentIsLiked,
         userId: user._id
       });
-      
+
       // Make API call to MongoDB first
       const response = await postsApi.likePost(postId);
       console.log('✅ Like response from MongoDB:', response);
-      
+
       // Validate response
       if (!response || typeof response.liked !== 'boolean') {
         throw new Error('Invalid response from server');
       }
-      
+
       // Update posts with server response to ensure consistency
       setPosts(prev => prev.map(post => {
         if (post._id === postId) {
           const newLikes = response.likeIds || response.likes || [];
           const newIsLiked = response.liked;
-          
+
           console.log('🔄 Updating post likes:', {
             postId,
             oldCount: post.likes?.length || 0,
@@ -441,7 +469,7 @@ const PostFeed: React.FC<{ showDeleteButton?: boolean }> = ({ showDeleteButton =
             newIsLiked: newIsLiked,
             liked: response.liked
           });
-          
+
           return {
             ...post,
             likes: newLikes,
@@ -450,7 +478,7 @@ const PostFeed: React.FC<{ showDeleteButton?: boolean }> = ({ showDeleteButton =
         }
         return post;
       }));
-      
+
       // Show success message
       toast({
         title: response.liked ? "Post Liked" : "Post Unliked",
@@ -458,7 +486,7 @@ const PostFeed: React.FC<{ showDeleteButton?: boolean }> = ({ showDeleteButton =
       });
     } catch (error) {
       console.error('❌ Error liking post:', error);
-      
+
       toast({
         title: "Error",
         description: "Failed to like/unlike post. Please try again.",
@@ -482,13 +510,13 @@ const PostFeed: React.FC<{ showDeleteButton?: boolean }> = ({ showDeleteButton =
       console.log('Adding comment to post:', postId, 'Content:', commentContent);
       const response = await postsApi.commentOnPost(postId, { content: commentContent });
       console.log('Comment response:', response);
-      
+
       // Handle both success and direct response formats
       if (response) {
         const comment = response.success ? response.comment : response;
         if (comment) {
-          setPosts(prev => prev.map(post => 
-            post._id === postId 
+          setPosts(prev => prev.map(post =>
+            post._id === postId
               ? { ...post, comments: [...post.comments, comment] }
               : post
           ));
@@ -533,10 +561,10 @@ const PostFeed: React.FC<{ showDeleteButton?: boolean }> = ({ showDeleteButton =
       // Fetch the updated post to sync our state
       try {
         const updatedPost = await postsApi.getPost(postId);
-        setPosts(prev => prev.map(post => 
+        setPosts(prev => prev.map(post =>
           post._id === postId ? updatedPost : post
         ));
-        setOriginalPosts(prev => prev.map(post => 
+        setOriginalPosts(prev => prev.map(post =>
           post._id === postId ? updatedPost : post
         ));
       } catch (error) {
@@ -560,11 +588,11 @@ const PostFeed: React.FC<{ showDeleteButton?: boolean }> = ({ showDeleteButton =
       console.log('Voting on poll (fallback):', postId, 'Option:', optionId);
       const response = await postsApi.voteOnPollOption(postId, optionId);
       console.log('Poll vote response:', response);
-      
+
       // Backend now returns the full updated post object (Post type)
       if (response && '_id' in response && 'pollDetails' in response) {
-        setPosts(prev => prev.map(post => 
-          post._id === postId 
+        setPosts(prev => prev.map(post =>
+          post._id === postId
             ? { ...post, pollDetails: (response as any).pollDetails }
             : post
         ));
@@ -597,23 +625,39 @@ const PostFeed: React.FC<{ showDeleteButton?: boolean }> = ({ showDeleteButton =
   // Handle post share
   const handlePostShare = useCallback((postId: string) => {
     const post = posts.find(p => p._id === postId);
-    if (post) {
-      const shareUrl = `${window.location.origin}/post/${postId}`;
-      if (navigator.share) {
-        navigator.share({
-          title: `${post.author?.name} - ${post.postType} Post`,
-          text: post.content || 'Check out this post!',
-          url: shareUrl
-        });
-      } else {
-        navigator.clipboard.writeText(shareUrl);
-        toast({
-          title: "Link copied!",
-          description: "Post link has been copied to clipboard.",
-        });
-      }
+    if (!post) return;
+
+    const baseUrl = window.location.origin;
+    const shareUrl = `${baseUrl}/post/${postId}`;
+    const shareTitle = `${post.author?.name}'s Post on InspiraNet`;
+    const shareText = post.content || '';
+
+    // Extract first image from media array for the thumbnail
+    let imageUrl: string | undefined;
+    if (post.media && post.media.length > 0) {
+      const first = post.media[0];
+      const url = typeof first === 'string' ? first : (first as any)?.url;
+      if (url && /\.(jpg|jpeg|png|gif|webp)$/i.test(url)) imageUrl = url;
     }
-  }, [posts, toast]);
+
+    // Glow the post being shared
+    setSharingPostId(postId);
+    setShareData({ url: shareUrl, title: shareTitle, text: shareText, imageUrl });
+  }, [posts]);
+
+  // Close share modal and remove glow
+  const handleShareClose = () => {
+    setSharingPostId(null);
+    setShareData(null);
+  };
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    toast({
+      title: "Link Copied!",
+      description: "The shareable link has been copied to your clipboard.",
+    });
+  };
 
   // Handle comments toggle
   const handleToggleComments = useCallback((postId: string) => {
@@ -630,23 +674,23 @@ const PostFeed: React.FC<{ showDeleteButton?: boolean }> = ({ showDeleteButton =
         <div className="text-center">
           <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-blue-500" />
           <p className="text-gray-600 dark:text-gray-400">Loading posts...</p>
-                </div>
+        </div>
       </div>
     );
   }
 
   // Render error state
   if (error && posts.length === 0) {
-  return (
+    return (
       <div className="space-y-4">
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>{error}</AlertDescription>
         </Alert>
-        
+
         <div className="text-center">
-            <Button 
-            onClick={handleRefresh} 
+          <Button
+            onClick={handleRefresh}
             disabled={refreshing}
             variant="outline"
           >
@@ -654,16 +698,16 @@ const PostFeed: React.FC<{ showDeleteButton?: boolean }> = ({ showDeleteButton =
               <>
                 <Loader2 className="h-4 w-4 animate-spin mr-2" />
                 Retrying...
-                  </>
-                ) : (
-                  <>
+              </>
+            ) : (
+              <>
                 <RefreshCw className="h-4 w-4 mr-2" />
                 Try Again
-                  </>
-                )}
-              </Button>
-                </div>
-                    </div>
+              </>
+            )}
+          </Button>
+        </div>
+      </div>
     );
   }
 
@@ -696,11 +740,11 @@ const PostFeed: React.FC<{ showDeleteButton?: boolean }> = ({ showDeleteButton =
               Refresh Posts
             </Button>
           </div>
-                      </div>
-                    </div>
+        </div>
+      </div>
     );
   }
-                    
+
   return (
     <div className="space-y-4 min-h-full">
       {/* Posts List */}
@@ -731,13 +775,13 @@ const PostFeed: React.FC<{ showDeleteButton?: boolean }> = ({ showDeleteButton =
             // Fallback: if likes is not an array, treat as empty
             likesArray = [];
           }
-          
+
           const commentsArray = Array.isArray(post.comments) ? post.comments : [];
-          
+
           // Additional safety check for user ID - ensure exact match
           const userId = user?._id?.toString() || '';
           const isLiked = likesArray.some(likeId => likeId === userId);
-          
+
           console.log('🔍 Like check for post:', post._id, {
             userId,
             likesArray,
@@ -746,12 +790,16 @@ const PostFeed: React.FC<{ showDeleteButton?: boolean }> = ({ showDeleteButton =
             hasLikeIds: !!post.likeIds,
             exactMatch: likesArray.includes(userId)
           });
-          
+
           const commentsCount = commentsArray.length;
           const showCommentsForPost = showComments[post._id] || false;
-                
           return (
-            <div key={post._id} ref={index === posts.length - 1 ? lastPostRef : null}>
+            <div
+              key={post._id}
+              id={`post-${post._id}`}
+              ref={index === posts.length - 1 ? lastPostRef : null}
+              className={`transition-all duration-500 rounded-xl ${sharingPostId === post._id ? 'highlight-glow-active' : ''}`}
+            >
               <PostRenderer
                 post={post}
                 user={user}
@@ -772,14 +820,14 @@ const PostFeed: React.FC<{ showDeleteButton?: boolean }> = ({ showDeleteButton =
             </div>
           );
         }).filter(Boolean)} {/* Filter out null posts */}
-        </div>
+      </div>
 
       {/* Loading more indicator */}
       {isLoading && posts.length > 0 && (
         <div className="text-center py-4">
           <Loader2 className="h-6 w-6 animate-spin mx-auto text-blue-500" />
           <p className="text-gray-600 dark:text-gray-400 mt-2">Loading more posts...</p>
-      </div>
+        </div>
       )}
 
       {/* No more posts indicator */}
@@ -793,6 +841,12 @@ const PostFeed: React.FC<{ showDeleteButton?: boolean }> = ({ showDeleteButton =
           </p>
         </div>
       )}
+      {/* Share Modal */}
+      <ShareModal
+        open={!!shareData}
+        onClose={handleShareClose}
+        shareData={shareData}
+      />
     </div>
   );
 };

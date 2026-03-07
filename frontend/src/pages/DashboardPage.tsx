@@ -6,19 +6,30 @@ import PostFeed from '@/components/posts/PostFeed';
 import AlumniDirectory from '@/components/AlumniDirectory';
 import EnhancedMessagesPage from '@/pages/EnhancedMessagesPage';
 import NotificationsPage from '@/pages/NotificationsPage';
-import PlacementPortal from '@/components/placements/PlacementPortal';
-import ProfileView from '@/components/profile/ProfileView';
+const PlacementPortal = React.lazy(() => import('@/components/placements/PlacementPortal'));
+const Groups = React.lazy(() => import('@/components/groups/Groups'));
+const ProfileView = React.lazy(() => import('@/components/profile/ProfileView'));
 import Settings from '@/components/Settings';
 import GoogleCalendarHostDashboard from '@/components/meetings/GoogleCalendarHostDashboard';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import { Button } from '@/components/ui/button';
-import { ArrowUp, Search, Plus, RefreshCw, Loader2 } from 'lucide-react';
+import {
+  ArrowUp,
+  Search,
+  Plus,
+  RefreshCw,
+  Loader2,
+  Menu
+} from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { cn } from '@/lib/utils';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 const DashboardPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const isMobile = useIsMobile();
   const [currentSection, setCurrentSection] = useState("home");
   const [showScrollTop, setShowScrollTop] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
@@ -26,16 +37,21 @@ const DashboardPage = () => {
   const [refreshing, setRefreshing] = useState(false);
   const { isAuthenticated, isLoading, user } = useAuth();
 
+  // New state for mobile sidebar toggle
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+
   // Handle URL parameters for section navigation
   useEffect(() => {
     const searchParams = new URLSearchParams(location.search);
     const section = searchParams.get('section');
-    if (section && ['home', 'network', 'messages', 'notifications', 'meetings', 'placements', 'profile', 'settings'].includes(section)) {
+    if (section && ['home', 'network', 'messages', 'notifications', 'meetings', 'placements', 'profile', 'settings', 'groups'].includes(section)) {
       setCurrentSection(section);
     } else if (!section && location.pathname === '/dashboard') {
       // Default to home if no section specified
       setCurrentSection('home');
     }
+    // Close mobile sidebar when section changes
+    setIsMobileSidebarOpen(false);
   }, [location.search, location.pathname]);
 
   // Scroll to top functionality
@@ -94,6 +110,8 @@ const DashboardPage = () => {
     setCurrentSection(section);
     // Update URL without page reload
     navigate(`/dashboard?section=${section}`, { replace: true });
+    // Close sidebar on mobile after selection
+    setIsMobileSidebarOpen(false);
   };
 
   const renderSection = () => {
@@ -110,6 +128,8 @@ const DashboardPage = () => {
         return <GoogleCalendarHostDashboard />;
       case "placements":
         return <PlacementPortal />;
+      case "groups":
+        return <Groups />;
       case "profile":
         return <ProfileView />;
       case "settings":
@@ -129,16 +149,38 @@ const DashboardPage = () => {
   }
 
   return (
-    <div className="h-screen bg-background flex overflow-hidden">
-      {/* Sidebar - Fixed to left side */}
+    <div className="h-screen bg-background flex overflow-hidden relative">
+      {/* Sidebar - Desktop variant is handled within Sidebar component */}
       <Sidebar
         currentSection={currentSection}
         onSectionChange={handleSectionChange}
         onLogout={onLogout}
+        isMobileOpen={isMobileSidebarOpen}
+        onMobileOpenChange={setIsMobileSidebarOpen}
       />
 
       {/* Main Content - Adjusted for fixed sidebar */}
-      <div className="flex-1 ml-16 flex flex-col">
+      <div className={cn(
+        "flex-1 flex flex-col transition-all duration-300 ease-in-out",
+        !isMobile ? "ml-16" : "ml-0"
+      )}>
+        {/* Mobile Header - Always visible on mobile */}
+        {isMobile && (
+          <div className="sticky top-0 z-50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b px-4 py-3 flex items-center gap-3">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setIsMobileSidebarOpen(true)}
+              className="h-9 w-9"
+            >
+              <Menu className="h-5 w-5" />
+            </Button>
+            <h1 className="font-bold text-lg capitalize">
+              {currentSection === 'home' ? 'KEC Alumni Network' : currentSection}
+            </h1>
+          </div>
+        )}
+
         {/* Header with Create Post, Search, and Refresh */}
         {currentSection === "home" && (
           <div className="sticky top-0 z-40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b">

@@ -741,6 +741,18 @@ class SocketService {
     }
   }
 
+  onMessageReaction(callback: (data: { messageId: string; reactions: any[]; userId: string; emoji: string }) => void) {
+    if (this.socket) {
+      this.socket.on('message_reaction', callback);
+    }
+  }
+
+  offMessageReaction() {
+    if (this.socket) {
+      this.socket.off('message_reaction');
+    }
+  }
+
   onNotificationUpdated(callback: (data: any) => void) {
     if (this.socket) {
       this.socket.on('notification_updated', callback);

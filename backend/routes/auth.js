@@ -100,8 +100,20 @@ router.post('/register', async (req, res) => {
 
       // If department is provided, validate it matches email
       if (department) {
-        // Department short forms per latest requirement (Civil removed)
-        const deptMapping = { MCH: 'mch', AID: 'aid', AIM: 'aim', MTR: 'mtr', AUT: 'aut', EEE: 'eee', ECE: 'ece', CSE: 'cse', IT: 'it', EIE: 'eie' };
+        // Department short forms and full names mapping
+        const deptMapping = {
+          'MCH': 'mch', 'Mechanical Engineering': 'mch',
+          'AID': 'aid', 'Artificial Intelligence and Data Science': 'aid',
+          'AIM': 'aim', 'Artificial Intelligence and Machine Learning': 'aim',
+          'MTR': 'mtr', 'Mechatronics Engineering': 'mtr',
+          'AUT': 'aut', 'Automobile Engineering': 'aut',
+          'EEE': 'eee', 'Electrical and Electronics Engineering': 'eee',
+          'ECE': 'ece', 'Electronics and Communication Engineering': 'ece',
+          'CSE': 'cse', 'Computer Science and Engineering': 'cse',
+          'IT': 'it', 'Information Technology': 'it',
+          'EIE': 'eie', 'Electronics and Instrumentation Engineering': 'eie',
+          'CSD': 'csd', 'Computer Science and Design': 'csd'
+        };
         const expectedDept = deptMapping[department] || String(department).toLowerCase();
         if (emailDept !== expectedDept) {
           console.log('❌ Department mismatch - Email dept:', emailDept, 'Selected dept:', department, 'Expected:', expectedDept);
@@ -262,10 +274,39 @@ router.post('/register', async (req, res) => {
 
       // If department is provided, validate it matches email
       if (department) {
+        // Department short forms and full names mapping
+        const deptMapping = {
+          'MCH': 'mch', 'Mechanical Engineering': 'mch',
+          'AID': 'aid', 'Artificial Intelligence and Data Science': 'aid',
+          'AIM': 'aim', 'Artificial Intelligence and Machine Learning': 'aim',
+          'MTR': 'mtr', 'Mechatronics Engineering': 'mtr',
+          'AUT': 'aut', 'Automobile Engineering': 'aut',
+          'EEE': 'eee', 'Electrical and Electronics Engineering': 'eee',
+          'ECE': 'ece', 'Electronics and Communication Engineering': 'ece',
+          'CSE': 'cse', 'Computer Science and Engineering': 'cse',
+          'IT': 'it', 'Information Technology': 'it',
+          'EIE': 'eie', 'Electronics and Instrumentation Engineering': 'eie',
+          'CSD': 'csd', 'Computer Science and Design': 'csd'
+        };
+
         const match = cleanedEmail.match(/^[a-zA-Z]+\.([a-z]+)@kongu\.edu$/);
-        if (!match) return res.status(400).json({ error: `Faculty email must be name.${String(department).toLowerCase()}@kongu.edu` });
+        if (!match) {
+          const expectedShort = deptMapping[department] || String(department).toLowerCase();
+          return res.status(400).json({
+            success: false,
+            error: `Faculty email must be name.${expectedShort}@kongu.edu`,
+            message: `Faculty email must follow the format: name.${expectedShort}@kongu.edu`
+          });
+        }
         const emailDept = match[1];
-        if (emailDept !== String(department).toLowerCase()) return res.status(400).json({ error: `Email department (${emailDept}) doesn't match selected department (${department})` });
+        const expectedDept = deptMapping[department] || String(department).toLowerCase();
+        if (emailDept !== expectedDept) {
+          return res.status(400).json({
+            success: false,
+            error: `Email department (${emailDept}) doesn't match selected department (${department})`,
+            message: `The email department code "${emailDept}" doesn't match the selected department "${department}"`
+          });
+        }
       }
 
       collegeEmail = cleanedEmail;

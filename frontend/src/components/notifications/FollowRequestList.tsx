@@ -334,32 +334,46 @@ export default function FollowRequestList({ onRequestProcessed }: { onRequestPro
       {/* Header handled by parent component */}
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-3 mb-6">
-          <TabsTrigger value="received" className="flex items-center space-x-2">
-            <UserPlus className="h-4 w-4" />
-            <span className="hidden sm:inline">Received</span>
-            <span className="sm:hidden">In</span>
-            {pendingRequests.length > 0 && (
-              <Badge variant="secondary" className="ml-2">{pendingRequests.length}</Badge>
-            )}
-          </TabsTrigger>
-          <TabsTrigger value="sent" className="flex items-center space-x-2">
-            <UserCheck className="h-4 w-4" />
-            <span className="hidden sm:inline">Sent</span>
-            <span className="sm:hidden">Out</span>
-            {sentRequests.length > 0 && (
-              <Badge variant="secondary" className="ml-2">{sentRequests.length}</Badge>
-            )}
-          </TabsTrigger>
-          <TabsTrigger value="accepted" className="flex items-center space-x-2">
-            <CheckCircle className="h-4 w-4" />
-            <span className="hidden sm:inline">Accepted</span>
-            <span className="sm:hidden">Done</span>
-            {acceptedConnections.length > 0 && (
-              <Badge variant="secondary" className="ml-2">{acceptedConnections.length}</Badge>
-            )}
-          </TabsTrigger>
-        </TabsList>
+        <div className="w-full overflow-x-auto scrollbar-none mb-6">
+          <TabsList className="flex space-x-2 min-w-max pb-1 bg-transparent border-0 p-0 h-auto justify-start">
+            <TabsTrigger
+              value="received"
+              className="px-4 py-2 rounded-full text-xs sm:text-sm font-medium transition-all flex items-center gap-2 border border-slate-200 dark:border-slate-700 bg-transparent text-slate-600 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800 data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=active]:border-blue-600 data-[state=active]:shadow-sm group"
+            >
+              <UserPlus className="h-4 w-4" />
+              In
+              {pendingRequests.length > 0 && (
+                <Badge className="ml-1 px-1.5 text-[10px] h-4 min-w-[1.25rem] flex items-center justify-center transition-colors border-none group-data-[state=active]:bg-white/20 group-data-[state=active]:text-white bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300">
+                  {pendingRequests.length}
+                </Badge>
+              )}
+            </TabsTrigger>
+            <TabsTrigger
+              value="sent"
+              className="px-4 py-2 rounded-full text-xs sm:text-sm font-medium transition-all flex items-center gap-2 border border-slate-200 dark:border-slate-700 bg-transparent text-slate-600 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800 data-[state=active]:bg-slate-700 data-[state=active]:dark:bg-slate-100 data-[state=active]:text-white data-[state=active]:dark:text-slate-900 data-[state=active]:border-slate-700 data-[state=active]:dark:border-slate-100 data-[state=active]:shadow-sm group"
+            >
+              <UserCheck className="h-4 w-4" />
+              Out
+              {sentRequests.length > 0 && (
+                <Badge className="ml-1 px-1.5 text-[10px] h-4 min-w-[1.25rem] flex items-center justify-center transition-colors border-none group-data-[state=active]:bg-white/20 group-data-[state=active]:dark:bg-slate-900/20 group-data-[state=active]:text-white group-data-[state=active]:dark:text-slate-900 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300">
+                  {sentRequests.length}
+                </Badge>
+              )}
+            </TabsTrigger>
+            <TabsTrigger
+              value="accepted"
+              className="px-4 py-2 rounded-full text-xs sm:text-sm font-medium transition-all flex items-center gap-2 border border-slate-200 dark:border-slate-700 bg-transparent text-slate-600 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800 data-[state=active]:bg-emerald-600 data-[state=active]:text-white data-[state=active]:border-emerald-600 data-[state=active]:shadow-sm group"
+            >
+              <CheckCircle className="h-4 w-4" />
+              Done
+              {acceptedConnections.length > 0 && (
+                <Badge className="ml-1 px-1.5 text-[10px] h-4 min-w-[1.25rem] flex items-center justify-center transition-colors border-none group-data-[state=active]:bg-white/20 group-data-[state=active]:text-white bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300">
+                  {acceptedConnections.length}
+                </Badge>
+              )}
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
         <TabsContent value="received" className="space-y-4">
           <div className="text-center mb-4">
@@ -381,47 +395,44 @@ export default function FollowRequestList({ onRequestProcessed }: { onRequestPro
               </CardContent>
             </Card>
           ) : (
-            <div className="grid gap-4">
+            <div className="flex flex-col gap-4 sm:gap-5 mt-4">
               {pendingRequests.map((request) => (
                 <Card key={request._id} className="hover:shadow-md transition-shadow">
-                  <CardContent className="p-4 sm:p-6">
+                  <CardContent className="p-3 sm:p-6">
                     <div className="flex flex-col sm:flex-row sm:items-start justify-between space-y-4 sm:space-y-0">
                       {/* User Info */}
                       <div className="flex items-start space-x-4 flex-1 min-w-0">
-                        <Avatar className="h-14 w-14 sm:h-16 sm:w-16 flex-shrink-0 ring-2 ring-primary/20">
+                        <Avatar className="h-10 w-10 sm:h-16 sm:w-16 flex-shrink-0 ring-2 ring-primary/20">
                           <AvatarImage src={request.requester.avatar} alt={request.requester.name} />
-                          <AvatarFallback className="text-lg font-bold bg-gradient-to-br from-primary/20 to-primary/10 text-primary">
+                          <AvatarFallback className="text-sm sm:text-lg font-bold bg-gradient-to-br from-primary/20 to-primary/10 text-primary">
                             {request.requester.name.charAt(0).toUpperCase()}
                           </AvatarFallback>
                         </Avatar>
 
                         <div className="flex-1 min-w-0">
-                          <div className="flex flex-wrap items-center gap-2 mb-2">
-                            <h4 className="text-lg font-semibold text-foreground truncate max-w-[150px] sm:max-w-[250px]">
+                          <div className="flex flex-wrap items-center gap-1.5 mb-1.5 pt-0.5">
+                            <h4 className="text-sm sm:text-lg font-semibold text-foreground truncate max-w-[120px] sm:max-w-[250px]">
                               {request.requester.name}
                             </h4>
-                            <div className="flex items-center gap-2">
-                              <Badge variant="secondary" className="text-[10px] sm:text-xs uppercase px-2">
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <Badge variant="secondary" className="text-[9px] sm:text-xs uppercase px-1.5 h-4 flex items-center">
                                 {request.requester.type}
                               </Badge>
                               {getStatusBadge(request.status)}
                             </div>
                           </div>
 
-                          <div className="space-y-1 text-sm text-muted-foreground">
+                          <div className="space-y-0.5 text-[11px] sm:text-sm text-muted-foreground">
                             {request.requester.department && (
-                              <p className="flex items-center space-x-2">
+                              <p className="flex items-center gap-1">
                                 <span className="truncate">{request.requester.department}</span>
                               </p>
                             )}
-                            {request.requester.batch && (
-                              <p className="flex items-center space-x-2">
-                                <span>Batch {request.requester.batch}</span>
-                              </p>
-                            )}
-                            {request.requester.location && (
-                              <p className="flex items-center space-x-2">
-                                <span className="truncate">{request.requester.location}</span>
+                            {(request.requester.batch || request.requester.location) && (
+                              <p className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                                {request.requester.batch && <span>Batch {request.requester.batch}</span>}
+                                {request.requester.batch && request.requester.location && <span className="opacity-50">•</span>}
+                                {request.requester.location && <span className="truncate">{request.requester.location}</span>}
                               </p>
                             )}
                           </div>
@@ -429,20 +440,22 @@ export default function FollowRequestList({ onRequestProcessed }: { onRequestPro
                       </div>
 
                       {/* Action Buttons */}
-                      <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
+                      <div className="flex flex-row gap-2 mt-auto pt-2 sm:pt-0">
                         <Button
+                          size="sm"
                           onClick={() => handleAcceptRequest(request._id, request.requesterId)}
-                          className="w-full sm:w-auto bg-green-600 hover:bg-green-700"
+                          className="flex-1 sm:w-auto bg-green-600 hover:bg-green-700 text-[10px] sm:text-xs h-7 sm:h-8"
                         >
-                          <CheckCircle className="h-4 w-4 mr-2" />
+                          <CheckCircle className="h-3 w-3 sm:h-3.5 sm:w-3.5 mr-1" />
                           Accept
                         </Button>
                         <Button
+                          size="sm"
                           variant="outline"
                           onClick={() => handleRejectRequest(request._id, request.requesterId)}
-                          className="w-full sm:w-auto"
+                          className="flex-1 sm:w-auto text-[10px] sm:text-xs h-7 sm:h-8"
                         >
-                          <XCircle className="h-4 w-4 mr-2" />
+                          <XCircle className="h-3 w-3 sm:h-3.5 sm:w-3.5 mr-1" />
                           Decline
                         </Button>
                       </div>
@@ -474,47 +487,44 @@ export default function FollowRequestList({ onRequestProcessed }: { onRequestPro
               </CardContent>
             </Card>
           ) : (
-            <div className="grid gap-4">
+            <div className="flex flex-col gap-4 sm:gap-5 mt-4">
               {sentRequests.map((request) => (
                 <Card key={request._id} className="hover:shadow-md transition-shadow">
-                  <CardContent className="p-4 sm:p-6">
+                  <CardContent className="p-3 sm:p-6">
                     <div className="flex flex-col sm:flex-row sm:items-start justify-between space-y-4 sm:space-y-0">
                       {/* User Info */}
                       <div className="flex items-start space-x-4 flex-1 min-w-0">
-                        <Avatar className="h-14 w-14 sm:h-16 sm:w-16 flex-shrink-0 ring-2 ring-primary/20">
+                        <Avatar className="h-10 w-10 sm:h-16 sm:w-16 flex-shrink-0 ring-2 ring-primary/20">
                           <AvatarImage src={request.requester.avatar} alt={request.requester.name} />
-                          <AvatarFallback className="text-lg font-bold bg-gradient-to-br from-primary/20 to-primary/10 text-primary">
+                          <AvatarFallback className="text-sm sm:text-lg font-bold bg-gradient-to-br from-primary/20 to-primary/10 text-primary">
                             {request.requester.name.charAt(0).toUpperCase()}
                           </AvatarFallback>
                         </Avatar>
 
                         <div className="flex-1 min-w-0">
-                          <div className="flex flex-wrap items-center gap-2 mb-2">
-                            <h4 className="text-lg font-semibold text-foreground truncate max-w-[150px] sm:max-w-[250px]">
+                          <div className="flex flex-wrap items-center gap-1.5 mb-1.5 pt-0.5">
+                            <h4 className="text-sm sm:text-lg font-semibold text-foreground truncate max-w-[120px] sm:max-w-[250px]">
                               {request.requester.name}
                             </h4>
-                            <div className="flex items-center gap-2">
-                              <Badge variant="secondary" className="text-[10px] sm:text-xs uppercase px-2">
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <Badge variant="secondary" className="text-[9px] sm:text-xs uppercase px-1.5 h-4 flex items-center">
                                 {request.requester.type}
                               </Badge>
                               {getStatusBadge(request.status)}
                             </div>
                           </div>
 
-                          <div className="space-y-1 text-sm text-muted-foreground">
+                          <div className="space-y-0.5 text-[11px] sm:text-sm text-muted-foreground">
                             {request.requester.department && (
-                              <p className="flex items-center space-x-2">
+                              <p className="flex items-center gap-1">
                                 <span className="truncate">{request.requester.department}</span>
                               </p>
                             )}
-                            {request.requester.batch && (
-                              <p className="flex items-center space-x-2">
-                                <span>Batch {request.requester.batch}</span>
-                              </p>
-                            )}
-                            {request.requester.location && (
-                              <p className="flex items-center space-x-2">
-                                <span className="truncate">{request.requester.location}</span>
+                            {(request.requester.batch || request.requester.location) && (
+                              <p className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                                {request.requester.batch && <span>Batch {request.requester.batch}</span>}
+                                {request.requester.batch && request.requester.location && <span className="opacity-50">•</span>}
+                                {request.requester.location && <span className="truncate">{request.requester.location}</span>}
                               </p>
                             )}
                           </div>
@@ -522,13 +532,14 @@ export default function FollowRequestList({ onRequestProcessed }: { onRequestPro
                       </div>
 
                       {/* Action Buttons */}
-                      <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
+                      <div className="flex flex-row justify-start">
                         <Button
+                          size="sm"
                           variant="outline"
                           onClick={() => handleCancelRequest(request._id)}
-                          className="w-full sm:w-auto"
+                          className="flex-1 sm:w-auto text-xs h-8"
                         >
-                          <XCircle className="h-4 w-4 mr-2" />
+                          <XCircle className="h-3.5 w-3.5 mr-1" />
                           Cancel
                         </Button>
                       </div>
@@ -560,47 +571,44 @@ export default function FollowRequestList({ onRequestProcessed }: { onRequestPro
               </CardContent>
             </Card>
           ) : (
-            <div className="grid gap-4">
+            <div className="flex flex-col gap-4 sm:gap-5 mt-4">
               {acceptedConnections.map((request) => (
                 <Card key={request._id} className="hover:shadow-md transition-shadow">
-                  <CardContent className="p-4 sm:p-6">
+                  <CardContent className="p-3 sm:p-6">
                     <div className="flex flex-col sm:flex-row sm:items-start justify-between space-y-4 sm:space-y-0">
                       {/* User Info */}
                       <div className="flex items-start space-x-4 flex-1 min-w-0">
-                        <Avatar className="h-14 w-14 sm:h-16 sm:w-16 flex-shrink-0 ring-2 ring-primary/20">
+                        <Avatar className="h-10 w-10 sm:h-16 sm:w-16 flex-shrink-0 ring-2 ring-primary/20">
                           <AvatarImage src={request.requester.avatar} alt={request.requester.name} />
-                          <AvatarFallback className="text-lg font-bold bg-gradient-to-br from-primary/20 to-primary/10 text-primary">
+                          <AvatarFallback className="text-sm sm:text-lg font-bold bg-gradient-to-br from-primary/20 to-primary/10 text-primary">
                             {request.requester.name.charAt(0).toUpperCase()}
                           </AvatarFallback>
                         </Avatar>
 
                         <div className="flex-1 min-w-0">
-                          <div className="flex flex-wrap items-center gap-2 mb-2">
-                            <h4 className="text-lg font-semibold text-foreground truncate max-w-[150px] sm:max-w-[250px]">
+                          <div className="flex flex-wrap items-center gap-1.5 mb-1.5 pt-0.5">
+                            <h4 className="text-sm sm:text-lg font-semibold text-foreground truncate max-w-[120px] sm:max-w-[250px]">
                               {request.requester.name}
                             </h4>
-                            <div className="flex items-center gap-2">
-                              <Badge variant="secondary" className="text-[10px] sm:text-xs uppercase px-2">
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <Badge variant="secondary" className="text-[9px] sm:text-xs uppercase px-1.5 h-4 flex items-center">
                                 {request.requester.type}
                               </Badge>
                               {getStatusBadge(request.status)}
                             </div>
                           </div>
 
-                          <div className="space-y-1 text-sm text-muted-foreground">
+                          <div className="space-y-0.5 text-[11px] sm:text-sm text-muted-foreground">
                             {request.requester.department && (
-                              <p className="flex items-center space-x-2">
+                              <p className="flex items-center gap-1">
                                 <span className="truncate">{request.requester.department}</span>
                               </p>
                             )}
-                            {request.requester.batch && (
-                              <p className="flex items-center space-x-2">
-                                <span>Batch {request.requester.batch}</span>
-                              </p>
-                            )}
-                            {request.requester.location && (
-                              <p className="flex items-center space-x-2">
-                                <span className="truncate">{request.requester.location}</span>
+                            {(request.requester.batch || request.requester.location) && (
+                              <p className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                                {request.requester.batch && <span>Batch {request.requester.batch}</span>}
+                                {request.requester.batch && request.requester.location && <span className="opacity-50">•</span>}
+                                {request.requester.location && <span className="truncate">{request.requester.location}</span>}
                               </p>
                             )}
                           </div>
@@ -608,28 +616,31 @@ export default function FollowRequestList({ onRequestProcessed }: { onRequestPro
                       </div>
 
                       {/* Action Buttons */}
-                      <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
+                      <div className="flex flex-wrap gap-2">
                         <Button
+                          size="sm"
                           onClick={() => handleMessage(request.requester._id)}
-                          className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700"
+                          className="flex-1 sm:w-auto bg-blue-600 hover:bg-blue-700 text-xs h-8"
                         >
-                          <MessageSquare className="h-4 w-4 mr-2" />
+                          <MessageSquare className="h-3.5 w-3.5 mr-1" />
                           Message
                         </Button>
                         <Button
+                          size="sm"
                           variant="outline"
                           onClick={() => handleViewProfile(request.requester._id)}
-                          className="w-full sm:w-auto"
+                          className="flex-1 sm:w-auto text-xs h-8"
                         >
-                          <Eye className="h-4 w-4 mr-2" />
+                          <Eye className="h-3.5 w-3.5 mr-1" />
                           Profile
                         </Button>
                         <Button
-                          variant="outline"
+                          size="sm"
+                          variant="ghost"
                           onClick={() => handleUnfollow(request.requester._id)}
-                          className="w-full sm:w-auto text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
+                          className="flex-1 sm:w-auto text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 text-xs h-8"
                         >
-                          <UserMinus className="h-4 w-4 mr-2" />
+                          <UserMinus className="h-3.5 w-3.5 mr-1" />
                           Unfollow
                         </Button>
                       </div>

@@ -6,6 +6,7 @@ import { Post } from '@/services/postsApi';
 import { User } from '@/contexts/AuthContext';
 import BasePost from './BasePost';
 import MediaLightbox from './MediaLightbox';
+import Linkify from '@/components/ui/Linkify';
 
 interface EventPostProps {
   post: Post;
@@ -298,8 +299,8 @@ export default function EventPost({
         {/* Post Content Below Event Details */}
         {post.content && (
           <div className="px-4 py-2">
-            <p className="text-gray-700 dark:text-gray-300 text-[13px] leading-relaxed line-clamp-3">
-              {post.content}
+            <p className="text-gray-700 dark:text-gray-300 text-[13px] leading-relaxed line-clamp-3 whitespace-pre-wrap">
+              <Linkify text={post.content} />
             </p>
           </div>
         )}

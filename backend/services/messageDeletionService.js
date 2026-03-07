@@ -20,8 +20,8 @@ class MessageDeletionService {
   static async deleteForMe(messageIds, userId, conversationId) {
     try {
       // Ensure userId is ObjectId
-      const userIdObj = mongoose.Types.ObjectId.isValid(userId) 
-        ? new mongoose.Types.ObjectId(userId) 
+      const userIdObj = mongoose.Types.ObjectId.isValid(userId)
+        ? new mongoose.Types.ObjectId(userId)
         : userId;
 
       const messages = await Message.find({
@@ -52,17 +52,17 @@ class MessageDeletionService {
               deletedAt: new Date(),
               deleteMode: 'forMe'
             };
-            
+
             message.deletedBy.push(deletionEntry);
             await message.save();
-            
+
             // Verify the save worked correctly
             const savedMessage = await Message.findById(message._id);
             const hasThisUserDeletion = savedMessage.deletedBy.some(
               d => d.userId.toString() === userIdObj.toString() && d.deleteMode === 'forMe'
             );
-            
-            console.log('Marked message', message._id.toString(), 'as deleted for user:', userIdObj.toString(), 
+
+            console.log('Marked message', message._id.toString(), 'as deleted for user:', userIdObj.toString(),
               'deleteMode: forMe', 'Verified:', hasThisUserDeletion);
           } else {
             console.log('Message', message._id.toString(), 'already deleted for user:', userIdObj.toString());
@@ -106,9 +106,9 @@ class MessageDeletionService {
       );
 
       if (!allOwnMessages) {
-        return { 
-          success: false, 
-          error: 'You can only delete your own messages for everyone' 
+        return {
+          success: false,
+          error: 'You can only delete your own messages for everyone'
         };
       }
 
@@ -127,7 +127,7 @@ class MessageDeletionService {
         );
 
         // Continue with DeleteForEveryone for non-expired messages
-        const validMessages = messages.filter(msg => 
+        const validMessages = messages.filter(msg =>
           !expiredMessages.some(exp => exp._id.toString() === msg._id.toString())
         );
 
@@ -180,6 +180,20 @@ class MessageDeletionService {
         message.deletionMetadata.deletedForEveryone = true;
         message.deletionMetadata.deletedForEveryoneAt = new Date();
         message.deletionMetadata.deletedForEveryoneBy = userId;
+
+        // CRITICAL: Clear content and media to prevent anyone from seeing it
+        // and show a placeholder instead
+        message.content = 'This message was deleted';
+        if (message.messageType !== 'text') {
+          message.messageType = 'text'; // Change to text since media is gone
+        }
+        message.mediaUrl = null;
+        message.fileName = null;
+        message.fileSize = null;
+        message.isEncrypted = false;
+        if (message.encryptedContent) {
+          message.encryptedContent = undefined;
+        }
 
         // Add to deletedBy array for all participants
         const conversation = await Conversation.findById(conversationId);
@@ -266,7 +280,7 @@ class MessageDeletionService {
         queuedMessages.map(async (message) => {
           // Retry deletion
           message.deletionMetadata.graceDeleteRetries += 1;
-          
+
           if (message.deletionMetadata.graceDeleteRetries >= GRACE_DELETE_MAX_RETRIES) {
             message.deletionMetadata.graceDeleteQueued = false;
           }
@@ -304,7 +318,7 @@ class MessageDeletionService {
       const results = await Promise.all(
         messages.map(async (message) => {
           message.isDeleted = true;
-          
+
           const alreadyDeleted = message.deletedBy.some(
             d => d.userId.toString() === userId.toString() && d.deleteMode === 'soft'
           );
@@ -359,7 +373,7 @@ class MessageDeletionService {
               // Extract public_id from Cloudinary URL
               const urlParts = message.mediaUrl.split('/');
               const publicId = urlParts.slice(-2).join('/').split('.')[0];
-              
+
               if (publicId) {
                 await cloudinary.uploader.destroy(publicId);
                 deletedMedia.push(message.mediaUrl);
@@ -401,7 +415,7 @@ class MessageDeletionService {
   static async setAutoDelete(messageIds, userId, conversationId, duration) {
     try {
       const durationHours = AUTO_DELETE_DURATIONS[duration] || duration;
-      
+
       if (!durationHours || durationHours <= 0) {
         return { success: false, error: 'Invalid duration' };
       }
@@ -489,7 +503,7 @@ class MessageDeletionService {
       for (const conversationId of conversationIds) {
         const lastMessage = await Message.findOne({ conversationId })
           .sort({ createdAt: -1 });
-        
+
         await Conversation.findByIdAndUpdate(conversationId, {
           lastMessageContent: lastMessage ? lastMessage.content : '',
           lastMessageTime: lastMessage ? lastMessage.createdAt : new Date()
@@ -583,9 +597,9 @@ class MessageDeletionService {
    */
   static async mediaDelete(messageIds, userId, conversationId, options = {}) {
     try {
-      const { 
-        deleteMessage = false, 
-        deleteLocalOnly = false 
+      const {
+        deleteMessage = false,
+        deleteLocalOnly = false
       } = options;
 
       const messages = await Message.find({
@@ -607,7 +621,7 @@ class MessageDeletionService {
                 // Delete from Cloudinary
                 const urlParts = message.mediaUrl.split('/');
                 const publicId = urlParts.slice(-2).join('/').split('.')[0];
-                
+
                 if (publicId) {
                   await cloudinary.uploader.destroy(publicId);
                   deletedMedia.push(message.mediaUrl);
@@ -717,7 +731,7 @@ class MessageDeletionService {
       if (deleteOrphaned) {
         const conversations = await Conversation.find({}).select('_id');
         const conversationIds = conversations.map(c => c._id);
-        
+
         const orphanedResult = await Message.deleteMany({
           conversationId: { $nin: conversationIds }
         });
@@ -744,7 +758,7 @@ class MessageDeletionService {
         });
 
         const oldSoftDeletedIds = oldSoftDeleted.map(m => m._id);
-        
+
         // Delete media
         await Promise.all(
           oldSoftDeleted.map(async (message) => {

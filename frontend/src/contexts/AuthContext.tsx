@@ -368,7 +368,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const loginWithGoogle = async () => {
     try {
       // Get the auth URL from backend (which includes userId in state)
-      const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
+      const backendUrl = import.meta.env.VITE_API_URL || import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
       const response = await api.get(`${backendUrl}/api/auth/google`);
 
       if (response.data && response.data.authUrl) {
@@ -380,7 +380,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     } catch (error: any) {
       console.error('Error initiating Google OAuth:', error);
       // Fallback: try direct redirect if API call fails
-      const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
+      const backendUrl = import.meta.env.VITE_API_URL || import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
       window.location.href = `${backendUrl}/api/auth/google`;
     }
   };

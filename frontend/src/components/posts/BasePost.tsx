@@ -7,6 +7,7 @@ import { Heart, MessageCircle, Edit, Trash2, MoreVertical, X, Share2, Send } fro
 import { Post } from '@/services/postsApi';
 import { useAuth } from '@/contexts/AuthContext';
 import { Input } from '@/components/ui/input';
+import Linkify from '@/components/ui/Linkify';
 
 // Comment Menu Component
 const CommentMenu = ({ commentId, onDelete }: { commentId: string; onDelete: (commentId: string) => void }) => {
@@ -227,7 +228,12 @@ export default function BasePost({
   };
 
   return (
-    <Card className="post-card border border-gray-200 dark:border-gray-700 shadow-sm mx-auto max-w-[680px] w-full" style={{ display: 'flex', flexDirection: 'column' }}>
+    <Card
+      className="post-card relative border border-gray-200 dark:border-gray-700 shadow-sm mx-auto max-w-[680px] w-full transition-all duration-500 overflow-visible"
+      style={{ display: 'flex', flexDirection: 'column' }}
+    >
+      {/* Dynamic Highlight Overlay - Border Glow Only */}
+      <div className="absolute inset-[-2px] rounded-[inherit] pointer-events-none opacity-0 transition-opacity duration-300 highlight-glow border-2 border-transparent z-10" />
       {/* Post Header */}
       <div className="post-header px-3 py-1.5 border-b border-gray-100 dark:border-gray-800 flex-shrink-0">
         <div className="flex items-center justify-between">
@@ -423,8 +429,8 @@ export default function BasePost({
                               <span className="font-semibold text-gray-900 dark:text-gray-100">
                                 {comment.author?.name || 'Unknown User'}
                               </span>
-                              <span className="text-gray-700 dark:text-gray-300 ml-1.5">
-                                {comment.content}
+                              <span className="text-gray-700 dark:text-gray-300 ml-1.5 whitespace-pre-wrap">
+                                <Linkify text={comment.content} />
                               </span>
                             </p>
                             {comment.author?._id?.toString() === user?._id?.toString() && (
