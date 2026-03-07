@@ -562,10 +562,10 @@ const GoogleCalendarHostDashboard: React.FC = () => {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'upcoming': return 'bg-blue-100 text-blue-800';
-      case 'live': return 'bg-green-100 text-green-800';
-      case 'ended': return 'bg-gray-100 text-gray-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case 'upcoming': return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300';
+      case 'live': return 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300';
+      case 'ended': return 'bg-gray-100 text-gray-800 dark:bg-slate-800 dark:text-slate-400';
+      default: return 'bg-gray-100 text-gray-800 dark:bg-slate-800 dark:text-slate-400';
     }
   };
 
@@ -664,14 +664,14 @@ const GoogleCalendarHostDashboard: React.FC = () => {
                 </DialogHeader>
 
                 {(!canCreate || !isGoogleConnected) && (
-                  <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 mb-4">
+                  <div className="bg-orange-50 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-900/30 rounded-lg p-4 mb-4">
                     <div className="flex items-center gap-2">
-                      <AlertCircle className="h-5 w-5 text-orange-600" />
-                      <span className="text-orange-800 font-medium">
+                      <AlertCircle className="h-5 w-5 text-orange-600 dark:text-orange-400" />
+                      <span className="text-orange-800 dark:text-orange-300 font-medium">
                         {!canCreate ? 'Permission Required' : 'Connect To Your Google Account'}
                       </span>
                     </div>
-                    <p className="text-orange-700 text-sm mt-2">
+                    <p className="text-orange-700 dark:text-orange-400/80 text-sm mt-2">
                       {!canCreate
                         ? 'Only faculty and alumni can create meetings.'
                         : 'Please connect to your Google Account first to create meetings.'}
@@ -773,25 +773,25 @@ const GoogleCalendarHostDashboard: React.FC = () => {
           <div className="flex items-center gap-3">
             {checkingConnection ? (
               <>
-                <RefreshCw className="h-5 w-5 text-blue-600 animate-spin" />
-                <span className="text-blue-800 font-medium">Checking Google Calendar connection...</span>
-                <Badge variant="outline" className="text-blue-600 border-blue-600">
+                <RefreshCw className="h-5 w-5 text-blue-600 dark:text-blue-400 animate-spin" />
+                <span className="text-blue-800 dark:text-blue-300 font-medium">Checking Google Calendar connection...</span>
+                <Badge variant="outline" className="text-blue-600 border-blue-600 dark:text-blue-400 dark:border-blue-400">
                   Checking
                 </Badge>
               </>
             ) : isGoogleConnected ? (
               <>
-                <CheckCircle className="h-5 w-5 text-green-600" />
-                <span className="text-green-800 font-medium">Google Calendar Connected</span>
-                <Badge variant="outline" className="text-green-600 border-green-600">
+                <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-500" />
+                <span className="text-green-800 dark:text-green-300 font-medium">Google Calendar Connected</span>
+                <Badge variant="outline" className="text-green-600 border-green-600 dark:text-green-500 dark:border-green-500">
                   {canCreate ? 'Ready to create meetings' : 'Ready to join meetings'}
                 </Badge>
               </>
             ) : (
               <>
-                <AlertCircle className="h-5 w-5 text-orange-600" />
-                <span className="text-orange-800 font-medium">Connect To Your Google Account</span>
-                <Badge variant="outline" className="text-orange-600 border-orange-600">
+                <AlertCircle className="h-5 w-5 text-orange-600 dark:text-orange-400" />
+                <span className="text-orange-800 dark:text-orange-300 font-medium">Connect To Your Google Account</span>
+                <Badge variant="outline" className="text-orange-600 border-orange-600 dark:text-orange-400 dark:border-orange-400">
                   {canCreate ? 'Connect required' : 'Connect to join easily'}
                 </Badge>
               </>
@@ -910,26 +910,26 @@ const GoogleCalendarHostDashboard: React.FC = () => {
                   </div>
 
                   {localAttendance[meeting.id] && (
-                    <div className="mt-3 rounded-lg border border-blue-100 bg-blue-50 p-3 text-xs sm:text-sm text-blue-900">
+                    <div className="mt-3 rounded-lg border border-blue-100 dark:border-blue-900/30 bg-blue-50 dark:bg-blue-900/20 p-3 text-xs sm:text-sm text-blue-900 dark:text-blue-200">
                       <div className="flex flex-col gap-2">
                         <div className="flex items-center justify-start gap-2">
-                          <Badge variant={localAttendance[meeting.id].status === 'present' ? 'default' : 'secondary'}>
+                          <Badge variant={localAttendance[meeting.id].status === 'present' ? 'default' : 'secondary'} className={localAttendance[meeting.id].status === 'present' ? 'bg-blue-600 text-white' : ''}>
                             {localAttendance[meeting.id].status === 'present' ? 'Marked Present' : 'Marked Left'}
                           </Badge>
                         </div>
                         <div className="flex flex-col gap-1 items-start">
-                          <span className="text-left">
+                          <span className="text-left font-medium">
                             Joined: {formatLocalAttendanceTime(localAttendance[meeting.id].joinTime)}
                           </span>
                           {localAttendance[meeting.id].leaveTime && (
-                            <span className="text-left">
+                            <span className="text-left font-medium">
                               Left: {formatLocalAttendanceTime(localAttendance[meeting.id].leaveTime)}
                             </span>
                           )}
                         </div>
                       </div>
                       {!localAttendance[meeting.id].leaveTime && (
-                        <p className="mt-1 text-[0.7rem] text-blue-800">
+                        <p className="mt-2 text-[0.7rem] text-blue-800 dark:text-blue-300 italic opacity-80">
                           Don&apos;t forget to log leave when you finish the meeting.
                         </p>
                       )}
