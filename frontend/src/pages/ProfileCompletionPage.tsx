@@ -1014,92 +1014,52 @@ const ProfileCompletionPage: FC = () => {
   }
 
   return (
-    <div className="min-h-[100dvh] bg-[#0a0a0c] relative overflow-x-hidden">
-      <div className="fixed inset-0 bg-gradient-to-br from-slate-950 via-purple-950 to-slate-950 z-0"></div>
-      {/* Animated Background Elements */}
-      <div className="absolute inset-0">
-        {/* Floating Geometric Shapes */}
+      <div className="min-h-[100dvh] w-full bg-[#05050a] relative overflow-hidden">
+      {/* Fixed animated background (new style) */}
+      <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none">
+        {/* Deep base gradient */}
+        <div className="absolute inset-0 bg-gradient-to-br from-slate-950 via-indigo-950 to-slate-900" />
+
+        {/* Animated diagonal beams */}
         <motion.div
-          className="absolute top-20 left-10 w-32 h-32 bg-blue-500/10 rounded-full blur-xl"
-          animate={{
-            x: [0, 100, 0],
-            y: [0, -50, 0],
-            scale: [1, 1.2, 1],
-          }}
-          transition={{
-            duration: 8,
-            repeat: Infinity,
-            ease: "easeInOut"
-          }}
+          className="absolute -top-40 -left-1/3 h-[520px] w-[140%] rotate-6 bg-gradient-to-r from-cyan-500/25 via-transparent to-fuchsia-500/10 blur-3xl"
+          animate={{ x: ['0%', '8%', '-4%', '0%'], opacity: [0.35, 0.6, 0.4, 0.35] }}
+          transition={{ duration: 22, repeat: Infinity, ease: 'easeInOut' }}
         />
         <motion.div
-          className="absolute top-40 right-20 w-24 h-24 bg-purple-500/10 rounded-full blur-xl"
-          animate={{
-            x: [0, -80, 0],
-            y: [0, 60, 0],
-            scale: [1, 0.8, 1],
-          }}
-          transition={{
-            duration: 10,
-            repeat: Infinity,
-            ease: "easeInOut",
-            delay: 2
-          }}
+          className="absolute bottom-[-45%] right-[-10%] h-[520px] w-[120%] -rotate-6 bg-gradient-to-l from-emerald-400/18 via-transparent to-blue-500/12 blur-3xl"
+          animate={{ x: ['0%', '-6%', '4%', '0%'], opacity: [0.25, 0.55, 0.3, 0.25] }}
+          transition={{ duration: 26, repeat: Infinity, ease: 'easeInOut', delay: 4 }}
+        />
+
+        {/* Floating glow orbs */}
+        <motion.div
+          className="absolute top-1/4 left-10 h-40 w-40 rounded-full bg-cyan-400/20 blur-3xl"
+          animate={{ y: [0, -30, 10, 0], x: [0, 20, -10, 0], scale: [1, 1.15, 1.05, 1] }}
+          transition={{ duration: 18, repeat: Infinity, ease: 'easeInOut' }}
         />
         <motion.div
-          className="absolute bottom-20 left-1/4 w-40 h-40 bg-green-500/10 rounded-full blur-xl"
-          animate={{
-            x: [0, 120, 0],
-            y: [0, -80, 0],
-            scale: [1, 1.3, 1],
-          }}
-          transition={{
-            duration: 12,
-            repeat: Infinity,
-            ease: "easeInOut",
-            delay: 4
+          className="absolute bottom-16 right-16 h-32 w-32 rounded-full bg-fuchsia-500/22 blur-3xl"
+          animate={{ y: [0, 24, -12, 0], x: [0, -18, 8, 0], scale: [1.05, 1.2, 1.1, 1.05] }}
+          transition={{ duration: 20, repeat: Infinity, ease: 'easeInOut', delay: 2 }}
+        />
+
+        {/* Fine grid texture */}
+        <div
+          className="absolute inset-0 opacity-[0.035]"
+          style={{
+            backgroundImage: `radial-gradient(circle at 1px 1px, rgba(255,255,255,0.9) 1px, transparent 0)`,
+            backgroundSize: '60px 60px'
           }}
         />
 
-        {/* Animated Grid Pattern */}
-        <div className="absolute inset-0 opacity-5">
-          <div className="absolute inset-0" style={{
-            backgroundImage: `radial-gradient(circle at 1px 1px, white 1px, transparent 0)`,
-            backgroundSize: '50px 50px'
-          }} />
-        </div>
-
-        {/* Gradient Orbs */}
-        <motion.div
-          className="absolute top-1/4 right-1/4 w-96 h-96 bg-gradient-to-r from-blue-600/20 to-purple-600/20 rounded-full blur-3xl"
-          animate={{
-            scale: [1, 1.5, 1],
-            opacity: [0.3, 0.6, 0.3],
-          }}
-          transition={{
-            duration: 15,
-            repeat: Infinity,
-            ease: "easeInOut"
-          }}
-        />
-        <motion.div
-          className="absolute bottom-1/4 left-1/4 w-80 h-80 bg-gradient-to-r from-green-600/20 to-blue-600/20 rounded-full blur-3xl"
-          animate={{
-            scale: [1.5, 1, 1.5],
-            opacity: [0.4, 0.7, 0.4],
-          }}
-          transition={{
-            duration: 18,
-            repeat: Infinity,
-            ease: "easeInOut",
-            delay: 5
-          }}
-        />
+        {/* Readability overlay */}
+        <div className="absolute inset-0 bg-black/35" />
       </div>
 
       {/* Main Content */}
-      <div className="relative z-10 min-h-[100dvh] p-3 sm:p-6">
-        <div className="max-w-4xl mx-auto">
+      <div className="relative z-10 min-h-[100dvh] w-full p-3 sm:p-6">
+        <div className="max-w-4xl mx-auto w-full">
           <motion.div
             className="mb-4 sm:mb-6 text-center"
             initial={{ opacity: 0, y: -50 }}
@@ -1140,9 +1100,10 @@ const ProfileCompletionPage: FC = () => {
                 {submitError}
               </div>
             )}
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-              {/* Tabs - 2 cols on mobile, 5 on sm+ */}
-              <TabsList className="grid w-full grid-cols-2 sm:grid-cols-5 bg-gray-800/50 backdrop-blur-sm border border-gray-700/50 h-auto gap-1 p-1">
+              <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 w-full">
+              {/* Tabs - 3 cols on mobile (to align Social with Academic), 5 on sm+ */}
+              <TabsList className="grid w-full grid-cols-3 sm:grid-cols-5 bg-gray-800/50 backdrop-blur-sm border border-gray-700/50 h-auto gap-1 p-1">
+                {/* 1. Basic */}
                 <TabsTrigger
                   value="basic"
                   className="data-[state=active]:bg-blue-600/30 data-[state=active]:text-blue-300 flex items-center gap-1.5 py-2 text-xs sm:text-sm"
@@ -1151,6 +1112,7 @@ const ProfileCompletionPage: FC = () => {
                   <span>Basic</span>
                   <span className="hidden sm:inline"> Info</span>
                 </TabsTrigger>
+                {/* 2. Academic */}
                 <TabsTrigger
                   value="academic"
                   className="data-[state=active]:bg-purple-600/30 data-[state=active]:text-purple-300 flex items-center gap-1.5 py-2 text-xs sm:text-sm"
@@ -1158,14 +1120,7 @@ const ProfileCompletionPage: FC = () => {
                   <GraduationCap className="h-3.5 w-3.5 shrink-0" />
                   <span>Academic</span>
                 </TabsTrigger>
-                <TabsTrigger
-                  value="professional"
-                  className="data-[state=active]:bg-green-600/30 data-[state=active]:text-green-300 flex items-center gap-1.5 py-2 text-xs sm:text-sm"
-                >
-                  <Briefcase className="h-3.5 w-3.5 shrink-0" />
-                  <span className="hidden sm:inline">Professional</span>
-                  <span className="sm:hidden">Work</span>
-                </TabsTrigger>
+                {/* 3. Social (kept on the same row as Academic on small screens) */}
                 <TabsTrigger
                   value="social"
                   className="data-[state=active]:bg-orange-600/30 data-[state=active]:text-orange-300 flex items-center gap-1.5 py-2 text-xs sm:text-sm"
@@ -1174,9 +1129,19 @@ const ProfileCompletionPage: FC = () => {
                   <span className="hidden sm:inline">Social Links</span>
                   <span className="sm:hidden">Social</span>
                 </TabsTrigger>
+                {/* 4. Work / Professional */}
+                <TabsTrigger
+                  value="professional"
+                  className="data-[state=active]:bg-green-600/30 data-[state=active]:text-green-300 flex items-center gap-1.5 py-2 text-xs sm:text-sm"
+                >
+                  <Briefcase className="h-3.5 w-3.5 shrink-0" />
+                  <span className="hidden sm:inline">Professional</span>
+                  <span className="sm:hidden">Work</span>
+                </TabsTrigger>
+                {/* 5. Resume */}
                 <TabsTrigger
                   value="resume"
-                  className="col-span-2 sm:col-span-1 data-[state=active]:bg-red-600/30 data-[state=active]:text-red-300 flex items-center gap-1.5 py-2 text-xs sm:text-sm"
+                  className="data-[state=active]:bg-red-600/30 data-[state=active]:text-red-300 flex items-center gap-1.5 py-2 text-xs sm:text-sm"
                 >
                   <FileText className="h-3.5 w-3.5 shrink-0" />
                   <span>Resume</span>
@@ -1189,7 +1154,7 @@ const ProfileCompletionPage: FC = () => {
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ duration: 0.5 }}
                 >
-                  <Card className="bg-gray-800/50 backdrop-blur-sm border border-gray-700/50">
+                  <Card className="w-full bg-gray-800/50 backdrop-blur-sm border border-gray-700/50">
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2 text-blue-300">
                         <User className="h-5 w-5" />
@@ -1201,8 +1166,8 @@ const ProfileCompletionPage: FC = () => {
                     </CardHeader>
                     <CardContent className="space-y-4">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <Label htmlFor="personalEmail" className="text-gray-300">Personal Email</Label>
+                      <div>
+                          <Label htmlFor="personalEmail" className="text-gray-300 mb-1.5">Personal Email</Label>
                           <Input
                             id="personalEmail"
                             type="email"
@@ -1213,10 +1178,7 @@ const ProfileCompletionPage: FC = () => {
                           />
                         </div>
                         <div>
-                          <Label htmlFor="dateOfBirth" className="text-gray-300 flex items-center gap-2">
-                            <Calendar className="h-4 w-4 text-blue-400" />
-                            Date of Birth
-                          </Label>
+                          <Label htmlFor="dateOfBirth" className="text-gray-300 mb-1.5">Date of Birth</Label>
                           <Input
                             id="dateOfBirth"
                             type="date"
@@ -1250,7 +1212,7 @@ const ProfileCompletionPage: FC = () => {
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ duration: 0.5, delay: 0.1 }}
                 >
-                  <Card className="bg-gray-800/50 backdrop-blur-sm border border-gray-700/50">
+                  <Card className="w-full bg-gray-800/50 backdrop-blur-sm border border-gray-700/50">
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2 text-purple-300">
                         <GraduationCap className="h-5 w-5" />
@@ -1452,7 +1414,7 @@ const ProfileCompletionPage: FC = () => {
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ duration: 0.5, delay: 0.2 }}
                 >
-                  <Card className="bg-gray-800/50 backdrop-blur-sm border border-gray-700/50">
+                  <Card className="w-full bg-gray-800/50 backdrop-blur-sm border border-gray-700/50">
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2 text-green-300">
                         <Briefcase className="h-5 w-5" />
@@ -1507,7 +1469,7 @@ const ProfileCompletionPage: FC = () => {
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ duration: 0.5, delay: 0.3 }}
                 >
-                  <Card className="bg-gray-800/50 backdrop-blur-sm border border-gray-700/50">
+                  <Card className="w-full bg-gray-800/50 backdrop-blur-sm border border-gray-700/50">
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2 text-orange-300">
                         <User className="h-5 w-5" />
@@ -1541,7 +1503,8 @@ const ProfileCompletionPage: FC = () => {
                             className="bg-gray-700/50 border-gray-600 text-white placeholder-gray-400 focus:border-orange-500"
                           />
                         </div>
-                        <div>
+                        {/* Make LeetCode field span full width on desktop for proper alignment */}
+                        <div className="md:col-span-2">
                           <Label htmlFor="leetcode" className="text-gray-300">LeetCode Profile</Label>
                           <Input
                             id="leetcode"
@@ -1615,7 +1578,7 @@ const ProfileCompletionPage: FC = () => {
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ duration: 0.5, delay: 0.4 }}
                 >
-                  <Card className="bg-gray-800/50 backdrop-blur-sm border border-gray-700/50">
+                  <Card className="w-full bg-gray-800/50 backdrop-blur-sm border border-gray-700/50">
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2 text-red-300">
                         <FileText className="h-5 w-5" />
@@ -1671,7 +1634,7 @@ const ProfileCompletionPage: FC = () => {
                       </div>
 
                       <div>
-                        <Label htmlFor="portfolio-url" className="text-gray-300 flex items-center gap-2">
+                        <Label htmlFor="portfolio-url" className="text-gray-300 flex items-center gap-2 mb-1.5">
                           Portfolio URL
                           <span className="text-xs text-gray-400">(optional)</span>
                         </Label>
@@ -1693,7 +1656,7 @@ const ProfileCompletionPage: FC = () => {
         </div>
 
         <motion.div
-          className="flex flex-col sm:flex-row justify-between items-center gap-3 mt-8 pt-6 border-t border-gray-700/50"
+          className="flex flex-col sm:flex-row justify-between items-center gap-3 mt-8 pt-6 border-t border-gray-700/50 w-full max-w-4xl mx-auto"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.8 }}
@@ -1708,11 +1671,12 @@ const ProfileCompletionPage: FC = () => {
               }
             }}
             disabled={activeTab === 'basic'}
+            className="w-full sm:w-auto"
           >
             Previous
           </Button>
 
-          <div className="flex gap-2">
+          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
             {userType === 'student' && (user?.studentInfo?.currentYear === '1' || user?.studentInfo?.currentYear === '2') && (
               <Button
                 variant="ghost"
@@ -1723,7 +1687,7 @@ const ProfileCompletionPage: FC = () => {
                   });
                   navigate('/dashboard', { replace: true });
                 }}
-                className="text-gray-400 hover:text-white"
+                className="w-full sm:w-auto text-gray-400 hover:text-white"
               >
                 Skip for Now
               </Button>
@@ -1738,6 +1702,7 @@ const ProfileCompletionPage: FC = () => {
                     setActiveTab(tabs[currentIndex + 1]);
                   }
                 }}
+                className="w-full sm:w-auto"
               >
                 Next
               </Button>
@@ -1747,7 +1712,7 @@ const ProfileCompletionPage: FC = () => {
               <Button
                 onClick={handleSubmit}
                 disabled={isLoading}
-                className="min-w-[120px]"
+                className="w-full sm:w-auto min-w-[120px]"
               >
                 {isLoading ? (
                   <>

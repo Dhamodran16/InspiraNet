@@ -60,7 +60,8 @@ const ImageCarousel = () => {
             className="absolute inset-0 w-full h-full bg-cover bg-center"
             style={{
               backgroundImage: `url(${currentImages[currentIndex]})`,
-              filter: 'brightness(1.18) contrast(1.06) saturate(1.08)'
+              // Slightly dimmer and softer for better text readability
+              filter: 'brightness(0.9) contrast(1.04) saturate(1.02)'
             }}
           />
         </motion.div>

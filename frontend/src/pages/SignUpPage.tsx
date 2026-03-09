@@ -280,7 +280,8 @@ const SignUpPage = () => {
           height: '100dvh'
         }}
       >
-        <div className="absolute inset-0 bg-black/40"></div>
+        {/* Darker overlay for reduced background brightness */}
+        <div className="absolute inset-0 bg-black/60"></div>
       </div>
 
       {/* Content Container */}
