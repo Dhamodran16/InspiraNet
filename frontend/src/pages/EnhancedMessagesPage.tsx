@@ -156,6 +156,7 @@ const EnhancedMessagesPage: React.FC = () => {
   const [showDeleteGroupDialog, setShowDeleteGroupDialog] = useState(false);
   const [isDeletingGroup, setIsDeletingGroup] = useState(false);
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
+  const [isAddingMembersMode, setIsAddingMembersMode] = useState(false); // true = add members to existing group, false = create new group
 
   const handleReaction = async (messageId: string, emoji: string) => {
     // 1. Optimistic UI update
@@ -1272,6 +1273,7 @@ const EnhancedMessagesPage: React.FC = () => {
 
   // Handler functions for dropdown menus
   const handleCreateGroup = () => {
+    setIsAddingMembersMode(false); // explicitly creating a new group
     setShowGroupModal(true);
     setGroupName('');
     setGroupDescription('');
@@ -1381,8 +1383,9 @@ const EnhancedMessagesPage: React.FC = () => {
   };
 
   const handleGroupCreation = async () => {
-    // Check if we're adding members to existing group or creating new
-    if (selectedConversation?.isGroupChat && selectedConversation?._id) {
+    // Use explicit mode flag instead of checking selectedConversation to avoid
+    // creating new group accidentally routing to add-members flow when a group chat is selected
+    if (isAddingMembersMode && selectedConversation?._id) {
       // Adding members to existing group
       if (selectedMembers.length === 0) {
         toast({
@@ -1401,6 +1404,7 @@ const EnhancedMessagesPage: React.FC = () => {
         if (response.status === 200) {
           setShowGroupModal(false);
           setSelectedMembers([]);
+          setIsAddingMembersMode(false);
           // Reload conversation
           const convResponse = await api.get(`/api/conversations/${selectedConversation._id}`);
           setSelectedConversation(convResponse.data.conversation);
@@ -1430,10 +1434,10 @@ const EnhancedMessagesPage: React.FC = () => {
         return;
       }
 
-      if (selectedMembers.length < 2) {
+      if (selectedMembers.length < 1) {
         toast({
           title: "Error",
-          description: "At least 2 members are required to create a group.",
+          description: "At least 1 member is required to create a group.",
           variant: "destructive",
         });
         return;
@@ -1441,13 +1445,16 @@ const EnhancedMessagesPage: React.FC = () => {
 
       try {
         const response = await api.post('/api/conversations/group', {
-          members: selectedMembers.map(m => m._id),
-          groupName: (groupName || '').trim(),
-          groupDescription: (groupDescription || '').trim()
+          participantIds: selectedMembers.map(m => m._id),
+          name: (groupName || '').trim(),
+          description: (groupDescription || '').trim()
         });
 
         if (response.status === 201) {
           setShowGroupModal(false);
+          setGroupName('');
+          setGroupDescription('');
+          setSelectedMembers([]);
           loadConversations(); // Refresh conversation list
           toast({
             title: "Group Created",
@@ -3067,7 +3074,7 @@ const EnhancedMessagesPage: React.FC = () => {
           <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden">
             <DialogHeader>
               <DialogTitle className="text-xl font-semibold">
-                {selectedConversation?.isGroupChat ? 'Add Members to Group' : 'Create New Group'}
+                {isAddingMembersMode ? 'Add Members to Group' : 'Create New Group'}
               </DialogTitle>
             </DialogHeader>
 
@@ -3084,7 +3091,7 @@ const EnhancedMessagesPage: React.FC = () => {
                     onChange={(e) => setGroupName(e.target.value)}
                     placeholder="Enter group name"
                     className="mt-1"
-                    disabled={selectedConversation?.isGroupChat}
+                    disabled={isAddingMembersMode}
                   />
                 </div>
 
@@ -3099,7 +3106,7 @@ const EnhancedMessagesPage: React.FC = () => {
                     placeholder="Enter group description"
                     className="mt-1"
                     rows={3}
-                    disabled={selectedConversation?.isGroupChat}
+                    disabled={isAddingMembersMode}
                   />
                 </div>
               </div>
@@ -3276,10 +3283,10 @@ const EnhancedMessagesPage: React.FC = () => {
               </Button>
               <Button
                 onClick={handleGroupCreation}
-                disabled={!(groupName || '').trim() || selectedMembers.length < 2}
+                disabled={isAddingMembersMode ? selectedMembers.length < 1 : (!(groupName || '').trim() || selectedMembers.length < 1)}
                 className="bg-blue-600 hover:bg-blue-700"
               >
-                Create Group ({selectedMembers.length} members)
+                {isAddingMembersMode ? `Add Members (${selectedMembers.length})` : `Create Group (${selectedMembers.length} members)`}
               </Button>
             </div>
           </DialogContent>

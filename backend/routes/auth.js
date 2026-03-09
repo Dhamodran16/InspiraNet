@@ -28,6 +28,54 @@ router.get('/test-callback', (req, res) => {
   res.json({ message: 'Callback route test - router is working!' });
 });
 
+// Check if email or name is already registered (used for real-time signup validation)
+// GET /api/auth/check-availability?email=...&name=...
+router.get('/check-availability', async (req, res) => {
+  try {
+    const { email, name } = req.query;
+
+    if (email) {
+      const normalized = normalizeEmail(email);
+      const existingUser = await User.findOne(buildEmailLookupQuery(normalized)).select('type');
+      if (existingUser) {
+        return res.json({
+          exists: true,
+          field: 'email',
+          message: `This email is already registered as a ${existingUser.type}. Please use a different email or sign in.`
+        });
+      }
+    }
+
+    if (name) {
+      const trimmedName = name.trim();
+      const existingUserByName = await User.findOne({ name: { $regex: new RegExp(`^${trimmedName}$`, 'i') } }).select('type');
+      if (existingUserByName) {
+        return res.json({
+          exists: true,
+          field: 'name',
+          message: `The name "${trimmedName}" is already taken by a ${existingUserByName.type}. Please use a unique display name.`
+        });
+      }
+    }
+
+    return res.json({ exists: false });
+  } catch (err) {
+    console.error('check-availability error:', err);
+    res.status(500).json({ error: 'Could not check availability' });
+  }
+});
+
+// For backward compatibility (if any frontend still uses /check-email)
+router.get('/check-email', async (req, res) => {
+  const { email } = req.query;
+  const normalized = normalizeEmail(email);
+  const existingUser = await User.findOne(buildEmailLookupQuery(normalized)).select('type');
+  if (existingUser) {
+    return res.json({ exists: true, userType: existingUser.type });
+  }
+  return res.json({ exists: false });
+});
+
 // Log when routes are loaded
 console.log('✅ Auth routes loaded - /callback route registered');
 
@@ -200,8 +248,19 @@ router.post('/register', async (req, res) => {
         console.log('❌ Email already exists:', collegeEmail, 'as type:', existingUser.type);
         return res.status(400).json({
           success: false,
-          error: `Email ${collegeEmail} is already registered as ${existingUser.type}. One email can only be used for one account type.`,
-          message: `This email is already registered as ${existingUser.type}. Please use a different email or login.`
+          error: `Email ${collegeEmail} is already registered.`,
+          message: `This email is already registered as a ${existingUser.type}. Please use a different email or login.`
+        });
+      }
+
+      // Check if name is already taken
+      const existingUserByName = await User.findOne({ name: { $regex: new RegExp(`^${name.trim()}$`, 'i') } });
+      if (existingUserByName) {
+        console.log('❌ Name already exists:', name);
+        return res.status(400).json({
+          success: false,
+          error: `The name "${name}" is already taken.`,
+          message: `The name "${name}" is already registered. Please use a unique display name.`
         });
       }
       console.log('✅ Email is available:', collegeEmail);
@@ -311,11 +370,23 @@ router.post('/register', async (req, res) => {
 
       collegeEmail = cleanedEmail;
 
-      // Check if email exists in ANY user type (college/personal/professional/migrated)
+      // Check if email exists in ANY user type
       const existingUser = await User.findOne(buildEmailLookupQuery(collegeEmail));
       if (existingUser) {
         return res.status(400).json({
-          error: `Email ${collegeEmail} is already registered as ${existingUser.type}. One email can only be used for one account type.`
+          success: false,
+          error: `Email ${collegeEmail} is already registered.`,
+          message: `This email is already registered as a ${existingUser.type}. Please use a different email or login.`
+        });
+      }
+
+      // Check if name is already taken
+      const existingUserByName = await User.findOne({ name: { $regex: new RegExp(`^${name.trim()}$`, 'i') } });
+      if (existingUserByName) {
+        return res.status(400).json({
+          success: false,
+          error: `The name "${name}" is already taken.`,
+          message: `The name "${name}" is already registered. Please use a unique display name.`
         });
       }
 
@@ -370,7 +441,19 @@ router.post('/register', async (req, res) => {
       const existingUser = await User.findOne(buildEmailLookupQuery(personalEmail));
       if (existingUser) {
         return res.status(400).json({
-          error: `Email ${personalEmail} is already registered as ${existingUser.type}. One email can only be used for one account type.`
+          success: false,
+          error: `Email ${personalEmail} is already registered.`,
+          message: `This email is already registered as ${existingUser.type}. Please use a different email or login.`
+        });
+      }
+
+      // Check if name is already taken
+      const existingUserByName = await User.findOne({ name: { $regex: new RegExp(`^${name.trim()}$`, 'i') } });
+      if (existingUserByName) {
+        return res.status(400).json({
+          success: false,
+          error: `The name "${name}" is already taken.`,
+          message: `The name "${name}" is already registered. Please use a unique display name.`
         });
       }
 

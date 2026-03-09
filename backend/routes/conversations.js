@@ -206,30 +206,34 @@ router.get('/messageable-users', authenticateToken, async (req, res) => {
 // Create a group conversation
 router.post('/group', authenticateToken, async (req, res) => {
   try {
-    const { name, participantIds } = req.body;
+    const { name, groupName, participantIds, members, description, groupDescription } = req.body;
+    const finalName = name || groupName;
+    const finalParticipants = participantIds || members;
+    const finalDescription = description || groupDescription;
     const userId = req.user._id;
 
-    if (!name || !participantIds || participantIds.length < 2) {
-      return res.status(400).json({ error: 'Group name and at least 2 participants are required' });
+    if (!finalName || !finalParticipants || finalParticipants.length < 1) {
+      return res.status(400).json({ error: 'Group name and at least 1 other member are required' });
     }
 
     // Add creator to participants if not included
-    if (!participantIds.includes(userId)) {
-      participantIds.push(userId);
+    if (!finalParticipants.includes(userId.toString())) {
+      finalParticipants.push(userId.toString());
     }
 
     // Verify all participants exist
-    const participants = await User.find({ _id: { $in: participantIds } }).select('name email avatar type department');
-    if (participants.length !== participantIds.length) {
+    const participants = await User.find({ _id: { $in: finalParticipants } }).select('name email avatar type department');
+    if (participants.length !== finalParticipants.length) {
       return res.status(400).json({ error: 'One or more participants not found' });
     }
 
     // Create group conversation
     const conversation = new Conversation({
-      participants: participantIds,
+      participants: finalParticipants,
       isGroupChat: true,
-      groupName: name,
+      groupName: finalName,
       groupAdmin: userId,
+      groupDescription: finalDescription, // Added for future support
       isActive: true,
       unreadCount: new Map()
     });

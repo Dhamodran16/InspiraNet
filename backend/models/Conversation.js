@@ -31,6 +31,10 @@ const conversationSchema = new mongoose.Schema({
     type: String,
     default: null
   },
+  groupDescription: {
+    type: String,
+    default: null
+  },
   groupAdmin: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
@@ -49,7 +53,7 @@ const conversationSchema = new mongoose.Schema({
 });
 
 // Virtual for conversation name (for 1-on-1 chats)
-conversationSchema.virtual('conversationName').get(function() {
+conversationSchema.virtual('conversationName').get(function () {
   if (this.isGroupChat) {
     return this.groupName;
   }
@@ -58,24 +62,24 @@ conversationSchema.virtual('conversationName').get(function() {
 });
 
 // Method to get conversation name for a specific user
-conversationSchema.methods.getConversationNameForUser = function(userId) {
+conversationSchema.methods.getConversationNameForUser = function (userId) {
   if (this.isGroupChat) {
     return this.groupName;
   }
-  
+
   // For 1-on-1 chats, return the other participant's name
   const otherParticipant = this.participants.find(p => p.toString() !== userId.toString());
   return otherParticipant ? otherParticipant.name : 'Unknown User';
 };
 
 // Method to mark messages as read for a user
-conversationSchema.methods.markAsReadForUser = function(userId) {
+conversationSchema.methods.markAsReadForUser = function (userId) {
   this.unreadCount.set(userId.toString(), 0);
   return this.save();
 };
 
 // Method to increment unread count for a user
-conversationSchema.methods.incrementUnreadForUser = function(userId) {
+conversationSchema.methods.incrementUnreadForUser = function (userId) {
   const currentCount = this.unreadCount.get(userId.toString()) || 0;
   this.unreadCount.set(userId.toString(), currentCount + 1);
   return this.save();

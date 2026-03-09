@@ -1014,7 +1014,8 @@ const ProfileCompletionPage: FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 relative">
+    <div className="min-h-[100dvh] bg-[#0a0a0c] relative overflow-x-hidden">
+      <div className="fixed inset-0 bg-gradient-to-br from-slate-950 via-purple-950 to-slate-950 z-0"></div>
       {/* Animated Background Elements */}
       <div className="absolute inset-0">
         {/* Floating Geometric Shapes */}
@@ -1097,16 +1098,16 @@ const ProfileCompletionPage: FC = () => {
       </div>
 
       {/* Main Content */}
-      <div className="relative z-10 min-h-screen p-6">
+      <div className="relative z-10 min-h-[100dvh] p-3 sm:p-6">
         <div className="max-w-4xl mx-auto">
           <motion.div
-            className="mb-8 text-center"
+            className="mb-4 sm:mb-6 text-center"
             initial={{ opacity: 0, y: -50 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8 }}
           >
             <motion.h1
-              className="text-4xl font-bold mb-4 bg-gradient-to-r from-blue-400 via-purple-400 to-green-400 bg-clip-text text-transparent"
+              className="text-2xl sm:text-4xl font-bold mb-2 sm:mb-3 bg-gradient-to-r from-blue-400 via-purple-400 to-green-400 bg-clip-text text-transparent"
               initial={{ opacity: 0, scale: 0.8 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 1, delay: 0.2 }}
@@ -1114,15 +1115,15 @@ const ProfileCompletionPage: FC = () => {
               Complete Your Profile
             </motion.h1>
             <motion.p
-              className="text-gray-300 text-lg"
+              className="text-gray-300 text-sm sm:text-base"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ duration: 0.8, delay: 0.4 }}
             >
               {user ? (
-                <>Welcome, <span className="text-blue-400 font-semibold">{user.name}</span>! Let's set up your profile to connect with the alumni network.</>
+                <>Welcome, <span className="text-blue-400 font-semibold">{user.name}</span>! Let's set up your profile.</>
               ) : pendingSignupData ? (
-                <>Welcome, <span className="text-blue-400 font-semibold">{pendingSignupData.firstName} {pendingSignupData.lastName}</span>! Let's complete your profile to create your account.</>
+                <>Welcome, <span className="text-blue-400 font-semibold">{pendingSignupData.firstName} {pendingSignupData.lastName}</span>! Complete your profile to create your account.</>
               ) : (
                 <>Let's set up your profile to connect with the alumni network.</>
               )}
@@ -1139,13 +1140,47 @@ const ProfileCompletionPage: FC = () => {
                 {submitError}
               </div>
             )}
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-              <TabsList className="grid w-full grid-cols-5 bg-gray-800/50 backdrop-blur-sm border border-gray-700/50">
-                <TabsTrigger value="basic" className="data-[state=active]:bg-blue-600/20 data-[state=active]:text-blue-300">Basic Info</TabsTrigger>
-                <TabsTrigger value="academic" className="data-[state=active]:bg-purple-600/20 data-[state=active]:text-purple-300">Academic</TabsTrigger>
-                <TabsTrigger value="professional" className="data-[state=active]:bg-green-600/20 data-[state=active]:text-green-300">Professional</TabsTrigger>
-                <TabsTrigger value="social" className="data-[state=active]:bg-orange-600/20 data-[state=active]:text-orange-300">Social Links</TabsTrigger>
-                <TabsTrigger value="resume" className="data-[state=active]:bg-red-600/20 data-[state=active]:text-red-300">Resume</TabsTrigger>
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+              {/* Tabs - 2 cols on mobile, 5 on sm+ */}
+              <TabsList className="grid w-full grid-cols-2 sm:grid-cols-5 bg-gray-800/50 backdrop-blur-sm border border-gray-700/50 h-auto gap-1 p-1">
+                <TabsTrigger
+                  value="basic"
+                  className="data-[state=active]:bg-blue-600/30 data-[state=active]:text-blue-300 flex items-center gap-1.5 py-2 text-xs sm:text-sm"
+                >
+                  <User className="h-3.5 w-3.5 shrink-0" />
+                  <span>Basic</span>
+                  <span className="hidden sm:inline"> Info</span>
+                </TabsTrigger>
+                <TabsTrigger
+                  value="academic"
+                  className="data-[state=active]:bg-purple-600/30 data-[state=active]:text-purple-300 flex items-center gap-1.5 py-2 text-xs sm:text-sm"
+                >
+                  <GraduationCap className="h-3.5 w-3.5 shrink-0" />
+                  <span>Academic</span>
+                </TabsTrigger>
+                <TabsTrigger
+                  value="professional"
+                  className="data-[state=active]:bg-green-600/30 data-[state=active]:text-green-300 flex items-center gap-1.5 py-2 text-xs sm:text-sm"
+                >
+                  <Briefcase className="h-3.5 w-3.5 shrink-0" />
+                  <span className="hidden sm:inline">Professional</span>
+                  <span className="sm:hidden">Work</span>
+                </TabsTrigger>
+                <TabsTrigger
+                  value="social"
+                  className="data-[state=active]:bg-orange-600/30 data-[state=active]:text-orange-300 flex items-center gap-1.5 py-2 text-xs sm:text-sm"
+                >
+                  <Link2 className="h-3.5 w-3.5 shrink-0" />
+                  <span className="hidden sm:inline">Social Links</span>
+                  <span className="sm:hidden">Social</span>
+                </TabsTrigger>
+                <TabsTrigger
+                  value="resume"
+                  className="col-span-2 sm:col-span-1 data-[state=active]:bg-red-600/30 data-[state=active]:text-red-300 flex items-center gap-1.5 py-2 text-xs sm:text-sm"
+                >
+                  <FileText className="h-3.5 w-3.5 shrink-0" />
+                  <span>Resume</span>
+                </TabsTrigger>
               </TabsList>
 
               <TabsContent value="basic" className="space-y-6">
@@ -1658,7 +1693,7 @@ const ProfileCompletionPage: FC = () => {
         </div>
 
         <motion.div
-          className="flex justify-between items-center mt-8 pt-6 border-t border-gray-700/50"
+          className="flex flex-col sm:flex-row justify-between items-center gap-3 mt-8 pt-6 border-t border-gray-700/50"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.8 }}
